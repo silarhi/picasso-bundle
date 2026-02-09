@@ -1,0 +1,31 @@
+{
+    "name": "silarhi/picasso-bundle",
+    "description": "Responsive image component for Symfony, inspired by next/image",
+    "type": "symfony-bundle",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.2",
+        "symfony/framework-bundle": "^6.4 || ^7.0",
+        "symfony/ux-twig-component": "^2.13",
+        "league/glide": "^2.0",
+        "league/glide-symfony": "^2.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.0 || ^11.0",
+        "symfony/twig-bundle": "^6.4 || ^7.0",
+        "vich/uploader-bundle": "^2.0"
+    },
+    "suggest": {
+        "vich/uploader-bundle": "Required for the vich_uploader loader"
+    },
+    "autoload": {
+        "psr-4": {
+            "Silarhi\\PicassoBundle\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Silarhi\\PicassoBundle\\Tests\\": "tests/"
+        }
+    }
+}

@@ -1,0 +1,21 @@
+<picture>
+    {% for source in sources %}
+        <source
+            type="{{ source.type }}"
+            srcset="{{ source.srcset }}"
+            {% if sizes %}sizes="{{ sizes }}"{% endif %}
+        />
+    {% endfor %}
+
+    <img
+        src="{{ fallbackSrc }}"
+        srcset="{{ fallbackSrcset }}"
+        {% if sizes %}sizes="{{ sizes }}"{% endif %}
+        {% if width %}width="{{ width }}"{% endif %}
+        {% if height %}height="{{ height }}"{% endif %}
+        alt="{{ alt }}"
+        loading="{{ loading }}"
+        {% if blurDataUri %}style="background-size:cover;background-position:center;background-repeat:no-repeat;background-image:url({{ blurDataUri }})"{% endif %}
+        {{ attributes }}
+    />
+</picture>
