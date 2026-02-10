@@ -3,6 +3,7 @@
 namespace Silarhi\PicassoBundle\Twig\Component;
 
 use Psr\Container\ContainerInterface;
+use Silarhi\PicassoBundle\Dto\ImageSource;
 use Silarhi\PicassoBundle\Dto\LoaderContext;
 use Silarhi\PicassoBundle\Loader\LoaderInterface;
 use Silarhi\PicassoBundle\Service\BlurHashGenerator;
@@ -46,7 +47,7 @@ class ImageComponent
     /** Which loader to use ('file', 'vich_uploader'). */
     public ?string $loader = null;
 
-    /** Override image quality (1–100). */
+    /** Override image quality (1-100). */
     public ?int $quality = null;
 
     /** Fit mode (agnostic: 'contain', 'cover', 'fill', 'crop'). */
@@ -66,7 +67,7 @@ class ImageComponent
     /**
      * @internal
      *
-     * @var array<array{type: string, srcset: string}>
+     * @var ImageSource[]
      */
     public array $sources = [];
 
@@ -108,8 +109,8 @@ class ImageComponent
         if ($w === null || $h === null) {
             $dims = $loader->getDimensions($context);
             if ($dims !== null) {
-                $w ??= $dims[0];
-                $h ??= $dims[1];
+                $w ??= $dims->width;
+                $h ??= $dims->height;
             }
         }
 
@@ -159,10 +160,10 @@ class ImageComponent
                     fit: $this->fit,
                 );
             } else {
-                $this->sources[] = [
-                    'type' => self::getMimeType($format),
-                    'srcset' => $srcsetString,
-                ];
+                $this->sources[] = new ImageSource(
+                    type: self::getMimeType($format),
+                    srcset: $srcsetString,
+                );
             }
         }
     }

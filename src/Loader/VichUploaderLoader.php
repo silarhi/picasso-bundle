@@ -2,6 +2,7 @@
 
 namespace Silarhi\PicassoBundle\Loader;
 
+use Silarhi\PicassoBundle\Dto\ImageDimensions;
 use Silarhi\PicassoBundle\Dto\LoaderContext;
 use Vich\UploaderBundle\Templating\Helper\UploaderHelperInterface;
 
@@ -23,7 +24,7 @@ class VichUploaderLoader implements LoaderInterface
         return ltrim($path ?? '', '/');
     }
 
-    public function getDimensions(LoaderContext $context): ?array
+    public function getDimensions(LoaderContext $context): ?ImageDimensions
     {
         if (!$context->isEntity()) {
             return null;
@@ -37,7 +38,7 @@ class VichUploaderLoader implements LoaderInterface
         if (method_exists($source, $dimensionsGetter)) {
             $dims = $source->$dimensionsGetter();
             if (\is_array($dims) && \count($dims) === 2) {
-                return [(int) $dims[0], (int) $dims[1]];
+                return new ImageDimensions((int) $dims[0], (int) $dims[1]);
             }
         }
 
@@ -48,7 +49,7 @@ class VichUploaderLoader implements LoaderInterface
             if ($file !== null && method_exists($file, 'getDimensions')) {
                 $dims = $file->getDimensions();
                 if (\is_array($dims) && \count($dims) === 2) {
-                    return [(int) $dims[0], (int) $dims[1]];
+                    return new ImageDimensions((int) $dims[0], (int) $dims[1]);
                 }
             }
         }

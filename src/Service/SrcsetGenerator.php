@@ -3,6 +3,7 @@
 namespace Silarhi\PicassoBundle\Service;
 
 use Silarhi\PicassoBundle\Dto\ImageParams;
+use Silarhi\PicassoBundle\Dto\SrcsetEntry;
 use Silarhi\PicassoBundle\Url\ImageUrlGeneratorInterface;
 
 class SrcsetGenerator
@@ -51,7 +52,7 @@ class SrcsetGenerator
     /**
      * Generate srcset entries for a given source path and format.
      *
-     * @return array<array{url: string, descriptor: string}>
+     * @return SrcsetEntry[]
      */
     public function generateSrcset(
         string $path,
@@ -82,10 +83,7 @@ class SrcsetGenerator
             $url = $this->urlGenerator->generate($path, $params);
             $descriptor = $isFixed ? ($index + 1).'x' : $w.'w';
 
-            $entries[] = [
-                'url' => $url,
-                'descriptor' => $descriptor,
-            ];
+            $entries[] = new SrcsetEntry($url, $descriptor);
         }
 
         return $entries;
@@ -94,12 +92,12 @@ class SrcsetGenerator
     /**
      * Build the srcset attribute string from entries.
      *
-     * @param array<array{url: string, descriptor: string}> $entries
+     * @param SrcsetEntry[] $entries
      */
     public function buildSrcsetString(array $entries): string
     {
         return implode(', ', array_map(
-            static fn (array $e) => $e['url'].' '.$e['descriptor'],
+            static fn (SrcsetEntry $entry) => $entry->toString(),
             $entries,
         ));
     }

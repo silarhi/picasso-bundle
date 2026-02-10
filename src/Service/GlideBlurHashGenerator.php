@@ -3,6 +3,7 @@
 namespace Silarhi\PicassoBundle\Service;
 
 use League\Glide\Server;
+use Silarhi\PicassoBundle\Dto\BlurPlaceholderConfig;
 
 /**
  * Glide-backed blur placeholder generator.
@@ -12,28 +13,25 @@ use League\Glide\Server;
  */
 class GlideBlurHashGenerator implements BlurHashGenerator
 {
-    /**
-     * @param array{enabled: bool, size: int, blur: int, quality: int} $config
-     */
     public function __construct(
         private readonly Server $glideServer,
-        private readonly array $config,
+        private readonly BlurPlaceholderConfig $config,
     ) {
     }
 
     public function isEnabled(): bool
     {
-        return $this->config['enabled'];
+        return $this->config->enabled;
     }
 
     public function generate(string $path, ?int $width = null, ?int $height = null): ?string
     {
-        if (!$this->config['enabled']) {
+        if (!$this->config->enabled) {
             return null;
         }
 
-        $tinyWidth = $this->config['size'];
-        $tinyHeight = $this->config['size'];
+        $tinyWidth = $this->config->size;
+        $tinyHeight = $this->config->size;
 
         if ($width !== null && $height !== null && $width > 0) {
             $tinyHeight = max(1, (int) round($tinyWidth * $height / $width));
@@ -43,8 +41,8 @@ class GlideBlurHashGenerator implements BlurHashGenerator
             'w' => $tinyWidth,
             'h' => $tinyHeight,
             'fit' => 'crop',
-            'blur' => $this->config['blur'],
-            'q' => $this->config['quality'],
+            'blur' => $this->config->blur,
+            'q' => $this->config->quality,
             'fm' => 'jpg',
         ];
 

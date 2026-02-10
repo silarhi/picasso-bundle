@@ -3,6 +3,7 @@
 namespace Silarhi\PicassoBundle\Tests\Loader;
 
 use PHPUnit\Framework\TestCase;
+use Silarhi\PicassoBundle\Dto\ImageDimensions;
 use Silarhi\PicassoBundle\Dto\LoaderContext;
 use Silarhi\PicassoBundle\Loader\FileLoader;
 
@@ -53,7 +54,7 @@ class FileLoaderTest extends TestCase
         self::assertNull($this->loader->getDimensions($context));
     }
 
-    public function testGetDimensionsReturnsWidthAndHeight(): void
+    public function testGetDimensionsReturnsImageDimensions(): void
     {
         $img = imagecreatetruecolor(50, 30);
         imagepng($img, $this->tempDir.'/test.png');
@@ -62,9 +63,9 @@ class FileLoaderTest extends TestCase
         $context = new LoaderContext(source: 'test.png');
         $dims = $this->loader->getDimensions($context);
 
-        self::assertNotNull($dims);
-        self::assertSame(50, $dims[0]);
-        self::assertSame(30, $dims[1]);
+        self::assertInstanceOf(ImageDimensions::class, $dims);
+        self::assertSame(50, $dims->width);
+        self::assertSame(30, $dims->height);
     }
 
     public function testGetDimensionsWorksWithLeadingSlash(): void
@@ -76,9 +77,9 @@ class FileLoaderTest extends TestCase
         $context = new LoaderContext(source: '/test2.png');
         $dims = $this->loader->getDimensions($context);
 
-        self::assertNotNull($dims);
-        self::assertSame(100, $dims[0]);
-        self::assertSame(80, $dims[1]);
+        self::assertInstanceOf(ImageDimensions::class, $dims);
+        self::assertSame(100, $dims->width);
+        self::assertSame(80, $dims->height);
     }
 
     public function testCustomBaseDirectory(): void
@@ -94,9 +95,9 @@ class FileLoaderTest extends TestCase
         $context = new LoaderContext(source: 'photo.png');
         $dims = $loader->getDimensions($context);
 
-        self::assertNotNull($dims);
-        self::assertSame(200, $dims[0]);
-        self::assertSame(150, $dims[1]);
+        self::assertInstanceOf(ImageDimensions::class, $dims);
+        self::assertSame(200, $dims->width);
+        self::assertSame(150, $dims->height);
     }
 
     public function testContextExtraIsIgnored(): void
@@ -108,8 +109,8 @@ class FileLoaderTest extends TestCase
         $context = new LoaderContext(source: 'extra.png', extra: ['foo' => 'bar']);
         $dims = $this->loader->getDimensions($context);
 
-        self::assertNotNull($dims);
-        self::assertSame(50, $dims[0]);
+        self::assertInstanceOf(ImageDimensions::class, $dims);
+        self::assertSame(50, $dims->width);
     }
 
     private function removeDirectory(string $dir): void

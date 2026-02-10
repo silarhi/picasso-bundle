@@ -2,6 +2,7 @@
 
 namespace Silarhi\PicassoBundle\Loader;
 
+use Silarhi\PicassoBundle\Dto\ImageDimensions;
 use Silarhi\PicassoBundle\Dto\LoaderContext;
 
 class FileLoader implements LoaderInterface
@@ -16,7 +17,7 @@ class FileLoader implements LoaderInterface
         return ltrim($context->getSourceAsString(), '/');
     }
 
-    public function getDimensions(LoaderContext $context): ?array
+    public function getDimensions(LoaderContext $context): ?ImageDimensions
     {
         $absolutePath = rtrim($this->baseDirectory, '/').'/'.ltrim($context->getSourceAsString(), '/');
 
@@ -29,6 +30,6 @@ class FileLoader implements LoaderInterface
             return null;
         }
 
-        return [$info[0], $info[1]];
+        return new ImageDimensions($info[0], $info[1]);
     }
 }

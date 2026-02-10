@@ -4,6 +4,7 @@ namespace Silarhi\PicassoBundle\Tests\Service;
 
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\ImageParams;
+use Silarhi\PicassoBundle\Dto\SrcsetEntry;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
 use Silarhi\PicassoBundle\Url\ImageUrlGeneratorInterface;
 
@@ -92,8 +93,9 @@ class SrcsetGeneratorTest extends TestCase
 
         self::assertCount(8, $entries);
         foreach ($entries as $entry) {
-            self::assertMatchesRegularExpression('/^\d+w$/', $entry['descriptor']);
-            self::assertStringContainsString('fm=webp', $entry['url']);
+            self::assertInstanceOf(SrcsetEntry::class, $entry);
+            self::assertMatchesRegularExpression('/^\d+w$/', $entry->descriptor);
+            self::assertStringContainsString('fm=webp', $entry->url);
         }
     }
 
@@ -107,8 +109,8 @@ class SrcsetGeneratorTest extends TestCase
         );
 
         self::assertCount(2, $entries);
-        self::assertSame('1x', $entries[0]['descriptor']);
-        self::assertSame('2x', $entries[1]['descriptor']);
+        self::assertSame('1x', $entries[0]->descriptor);
+        self::assertSame('2x', $entries[1]->descriptor);
     }
 
     public function testGenerateSrcsetFixedPreservesAspectRatio(): void
@@ -121,12 +123,12 @@ class SrcsetGeneratorTest extends TestCase
         );
 
         // 1x: w=300, h=200
-        self::assertStringContainsString('w=300', $entries[0]['url']);
-        self::assertStringContainsString('h=200', $entries[0]['url']);
+        self::assertStringContainsString('w=300', $entries[0]->url);
+        self::assertStringContainsString('h=200', $entries[0]->url);
 
         // 2x: w=600, h=400
-        self::assertStringContainsString('w=600', $entries[1]['url']);
-        self::assertStringContainsString('h=400', $entries[1]['url']);
+        self::assertStringContainsString('w=600', $entries[1]->url);
+        self::assertStringContainsString('h=400', $entries[1]->url);
     }
 
     public function testGenerateSrcsetUsesCustomQuality(): void
@@ -139,7 +141,7 @@ class SrcsetGeneratorTest extends TestCase
         );
 
         foreach ($entries as $entry) {
-            self::assertStringContainsString('q=90', $entry['url']);
+            self::assertStringContainsString('q=90', $entry->url);
         }
     }
 
@@ -152,15 +154,15 @@ class SrcsetGeneratorTest extends TestCase
         );
 
         foreach ($entries as $entry) {
-            self::assertStringContainsString('q=75', $entry['url']);
+            self::assertStringContainsString('q=75', $entry->url);
         }
     }
 
     public function testBuildSrcsetString(): void
     {
         $entries = [
-            ['url' => '/img/photo.jpg?w=300', 'descriptor' => '1x'],
-            ['url' => '/img/photo.jpg?w=600', 'descriptor' => '2x'],
+            new SrcsetEntry('/img/photo.jpg?w=300', '1x'),
+            new SrcsetEntry('/img/photo.jpg?w=600', '2x'),
         ];
 
         $result = $this->generator->buildSrcsetString($entries);
@@ -171,8 +173,8 @@ class SrcsetGeneratorTest extends TestCase
     public function testBuildSrcsetStringWithWidthDescriptors(): void
     {
         $entries = [
-            ['url' => '/img/photo.jpg?w=640', 'descriptor' => '640w'],
-            ['url' => '/img/photo.jpg?w=1080', 'descriptor' => '1080w'],
+            new SrcsetEntry('/img/photo.jpg?w=640', '640w'),
+            new SrcsetEntry('/img/photo.jpg?w=1080', '1080w'),
         ];
 
         $result = $this->generator->buildSrcsetString($entries);
@@ -223,7 +225,7 @@ class SrcsetGeneratorTest extends TestCase
         );
 
         foreach ($entries as $entry) {
-            self::assertStringContainsString('fit=crop', $entry['url']);
+            self::assertStringContainsString('fit=crop', $entry->url);
         }
     }
 }

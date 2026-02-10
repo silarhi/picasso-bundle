@@ -4,7 +4,10 @@ namespace Silarhi\PicassoBundle\Tests\Twig\Component;
 
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
+use Silarhi\PicassoBundle\Dto\ImageDimensions;
+use Silarhi\PicassoBundle\Dto\ImageSource;
 use Silarhi\PicassoBundle\Dto\LoaderContext;
+use Silarhi\PicassoBundle\Dto\SrcsetEntry;
 use Silarhi\PicassoBundle\Loader\LoaderInterface;
 use Silarhi\PicassoBundle\Service\BlurHashGenerator;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
@@ -47,7 +50,7 @@ class ImageComponentTest extends TestCase
         $this->fileLoader->method('resolvePath')
             ->with(self::callback(fn (LoaderContext $ctx) => $ctx->getSourceAsString() === 'uploads/photo.jpg'))
             ->willReturn('uploads/photo.jpg');
-        $this->fileLoader->method('getDimensions')->willReturn([1920, 1080]);
+        $this->fileLoader->method('getDimensions')->willReturn(new ImageDimensions(1920, 1080));
         $this->blurHashGenerator->method('isEnabled')->willReturn(false);
         $this->configureSrcsetGenerator();
 
@@ -80,7 +83,7 @@ class ImageComponentTest extends TestCase
     public function testComputeImageDataFallsBackToLoaderDimensions(): void
     {
         $this->fileLoader->method('resolvePath')->willReturn('photo.jpg');
-        $this->fileLoader->method('getDimensions')->willReturn([1024, 768]);
+        $this->fileLoader->method('getDimensions')->willReturn(new ImageDimensions(1024, 768));
         $this->blurHashGenerator->method('isEnabled')->willReturn(false);
         $this->configureSrcsetGenerator();
 
@@ -96,7 +99,7 @@ class ImageComponentTest extends TestCase
     public function testComputeImageDataGeneratesBlurPlaceholder(): void
     {
         $this->fileLoader->method('resolvePath')->willReturn('photo.jpg');
-        $this->fileLoader->method('getDimensions')->willReturn([1920, 1080]);
+        $this->fileLoader->method('getDimensions')->willReturn(new ImageDimensions(1920, 1080));
         $this->blurHashGenerator->method('isEnabled')->willReturn(true);
         $this->blurHashGenerator->method('generate')
             ->with('photo.jpg', 1920, 1080)
@@ -114,7 +117,7 @@ class ImageComponentTest extends TestCase
     public function testComputeImageDataSkipsBlurWhenPlaceholderFalse(): void
     {
         $this->fileLoader->method('resolvePath')->willReturn('photo.jpg');
-        $this->fileLoader->method('getDimensions')->willReturn([1920, 1080]);
+        $this->fileLoader->method('getDimensions')->willReturn(new ImageDimensions(1920, 1080));
         $this->blurHashGenerator->expects(self::never())->method('generate');
         $this->configureSrcsetGenerator();
 
@@ -136,15 +139,15 @@ class ImageComponentTest extends TestCase
         $this->srcsetGenerator->method('generateSrcset')
             ->willReturnCallback(function (string $path, string $format): array {
                 return [
-                    ['url' => "/img/{$path}?fm={$format}&w=640", 'descriptor' => '640w'],
-                    ['url' => "/img/{$path}?fm={$format}&w=1080", 'descriptor' => '1080w'],
+                    new SrcsetEntry("/img/{$path}?fm={$format}&w=640", '640w'),
+                    new SrcsetEntry("/img/{$path}?fm={$format}&w=1080", '1080w'),
                 ];
             });
 
         $this->srcsetGenerator->method('buildSrcsetString')
             ->willReturnCallback(function (array $entries): string {
                 return implode(', ', array_map(
-                    static fn (array $e) => $e['url'].' '.$e['descriptor'],
+                    static fn (SrcsetEntry $e) => $e->toString(),
                     $entries,
                 ));
             });
@@ -160,10 +163,12 @@ class ImageComponentTest extends TestCase
 
         // avif and webp should be in sources, jpg should be fallback
         self::assertCount(2, $component->sources);
-        self::assertSame('image/avif', $component->sources[0]['type']);
-        self::assertSame('image/webp', $component->sources[1]['type']);
-        self::assertStringContainsString('fm=avif', $component->sources[0]['srcset']);
-        self::assertStringContainsString('fm=webp', $component->sources[1]['srcset']);
+        self::assertInstanceOf(ImageSource::class, $component->sources[0]);
+        self::assertInstanceOf(ImageSource::class, $component->sources[1]);
+        self::assertSame('image/avif', $component->sources[0]->type);
+        self::assertSame('image/webp', $component->sources[1]->type);
+        self::assertStringContainsString('fm=avif', $component->sources[0]->srcset);
+        self::assertStringContainsString('fm=webp', $component->sources[1]->srcset);
 
         // Fallback
         self::assertSame('/img/photo.jpg?fm=jpg&w=800', $component->fallbackSrc);
@@ -174,7 +179,7 @@ class ImageComponentTest extends TestCase
     {
         $customLoader = $this->createMock(LoaderInterface::class);
         $customLoader->method('resolvePath')->willReturn('custom/photo.jpg');
-        $customLoader->method('getDimensions')->willReturn([500, 500]);
+        $customLoader->method('getDimensions')->willReturn(new ImageDimensions(500, 500));
 
         $loaders = $this->createMock(ContainerInterface::class);
         $loaders->method('get')->with('custom')->willReturn($customLoader);
@@ -209,7 +214,7 @@ class ImageComponentTest extends TestCase
                     && $ctx->field === 'imageFile';
             }))
             ->willReturn('photo.jpg');
-        $this->fileLoader->method('getDimensions')->willReturn([100, 100]);
+        $this->fileLoader->method('getDimensions')->willReturn(new ImageDimensions(100, 100));
         $this->blurHashGenerator->method('isEnabled')->willReturn(false);
         $this->configureSrcsetGenerator();
 
@@ -239,7 +244,7 @@ class ImageComponentTest extends TestCase
     private function configureSrcsetGenerator(): void
     {
         $this->srcsetGenerator->method('generateSrcset')->willReturn([
-            ['url' => '/img/photo.jpg?w=640', 'descriptor' => '640w'],
+            new SrcsetEntry('/img/photo.jpg?w=640', '640w'),
         ]);
         $this->srcsetGenerator->method('buildSrcsetString')->willReturn('/img/photo.jpg?w=640 640w');
         $this->srcsetGenerator->method('getFallbackUrl')->willReturn('/img/photo.jpg');

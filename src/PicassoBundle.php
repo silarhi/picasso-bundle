@@ -7,6 +7,7 @@ use League\Glide\ServerFactory;
 use Silarhi\PicassoBundle\Controller\ImageController;
 use Silarhi\PicassoBundle\Loader\FileLoader;
 use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
+use Silarhi\PicassoBundle\Dto\BlurPlaceholderConfig;
 use Silarhi\PicassoBundle\Service\BlurHashGenerator;
 use Silarhi\PicassoBundle\Service\GlideBlurHashGenerator;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
@@ -131,11 +132,21 @@ class PicassoBundle extends AbstractBundle
             ]);
         $services->alias(SrcsetGenerator::class, 'picasso.srcset_generator');
 
+        // Blur Placeholder Config
+        $blurConfig = $config['blur_placeholder'];
+        $services->set('picasso.blur_placeholder_config', BlurPlaceholderConfig::class)
+            ->args([
+                $blurConfig['enabled'],
+                $blurConfig['size'],
+                $blurConfig['blur'],
+                $blurConfig['quality'],
+            ]);
+
         // BlurHash Generator (Glide implementation)
         $services->set('picasso.blur_hash_generator', GlideBlurHashGenerator::class)
             ->args([
                 service('picasso.glide_server'),
-                $config['blur_placeholder'],
+                service('picasso.blur_placeholder_config'),
             ]);
         $services->alias(BlurHashGenerator::class, 'picasso.blur_hash_generator');
         $services->alias(GlideBlurHashGenerator::class, 'picasso.blur_hash_generator');
