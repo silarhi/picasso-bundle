@@ -51,6 +51,9 @@ class ImageComponent
     /** Enable/disable blur placeholder for this image. */
     public ?bool $placeholder = null;
 
+    /** Serve the image as-is, without optimization (no srcset, no formats, no blur). */
+    public bool $unoptimized = false;
+
     // --- Computed state (set in PostMount, used by template) ---
 
     /** @internal */
@@ -88,6 +91,12 @@ class ImageComponent
     public function computeImageData(): void
     {
         if ($this->src === null) {
+            return;
+        }
+
+        // Unoptimized: serve image as-is (SVGs, GIFs, pre-optimized assets)
+        if ($this->unoptimized) {
+            $this->fallbackSrc = $this->src;
             return;
         }
 

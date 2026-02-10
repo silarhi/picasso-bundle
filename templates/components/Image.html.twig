@@ -1,4 +1,12 @@
 {% if fallbackSrc %}
+{% if unoptimized %}
+    <img
+        src="{{ fallbackSrc }}"
+        {% if width %}width="{{ width }}"{% endif %}
+        {% if height %}height="{{ height }}"{% endif %}
+        {{ attributes }}
+    />
+{% else %}
 <picture>
     {% for source in sources %}
         <source
@@ -22,4 +30,5 @@
         {{ attributes.without('style') }}
     />
 </picture>
+{% endif %}
 {% endif %}

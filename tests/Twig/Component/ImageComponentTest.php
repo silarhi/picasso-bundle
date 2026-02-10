@@ -283,6 +283,32 @@ class ImageComponentTest extends TestCase
         self::assertSame('photo.jpg', $component->resolvedPath);
     }
 
+    public function testUnoptimizedServesRawSrc(): void
+    {
+        $this->srcsetGenerator->expects(self::never())->method('generateSrcset');
+        $this->srcsetGenerator->expects(self::never())->method('getFallbackUrl');
+        $this->blurHashGenerator->expects(self::never())->method('generate');
+
+        $component = $this->createComponent();
+        $component->src = '/images/logo.svg';
+        $component->unoptimized = true;
+        $component->width = 200;
+        $component->height = 50;
+        $component->computeImageData();
+
+        self::assertSame('/images/logo.svg', $component->fallbackSrc);
+        self::assertSame('', $component->fallbackSrcset);
+        self::assertSame([], $component->sources);
+        self::assertNull($component->blurDataUri);
+    }
+
+    public function testUnoptimizedDefaultsToFalse(): void
+    {
+        $component = $this->createComponent();
+
+        self::assertFalse($component->unoptimized);
+    }
+
     public function testDefaultValues(): void
     {
         $component = $this->createComponent();
@@ -293,6 +319,7 @@ class ImageComponentTest extends TestCase
         self::assertNull($component->quality);
         self::assertSame('contain', $component->fit);
         self::assertNull($component->placeholder);
+        self::assertFalse($component->unoptimized);
         self::assertSame([], $component->context);
     }
 
