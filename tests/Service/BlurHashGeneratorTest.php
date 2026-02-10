@@ -2,19 +2,18 @@
 
 namespace Silarhi\PicassoBundle\Tests\Service;
 
-use League\Glide\Filesystem\FilesystemException;
 use League\Glide\Server;
 use PHPUnit\Framework\TestCase;
-use Silarhi\PicassoBundle\Service\BlurHashGenerator;
+use Silarhi\PicassoBundle\Service\GlideBlurHashGenerator;
 
-class BlurHashGeneratorTest extends TestCase
+class GlideBlurHashGeneratorTest extends TestCase
 {
     public function testGenerateReturnsNullWhenDisabled(): void
     {
         $server = $this->createMock(Server::class);
         $server->expects(self::never())->method('makeImage');
 
-        $generator = new BlurHashGenerator($server, [
+        $generator = new GlideBlurHashGenerator($server, [
             'enabled' => false,
             'size' => 10,
             'blur' => 50,
@@ -28,14 +27,14 @@ class BlurHashGeneratorTest extends TestCase
     {
         $server = $this->createMock(Server::class);
 
-        $enabled = new BlurHashGenerator($server, [
+        $enabled = new GlideBlurHashGenerator($server, [
             'enabled' => true,
             'size' => 10,
             'blur' => 50,
             'quality' => 30,
         ]);
 
-        $disabled = new BlurHashGenerator($server, [
+        $disabled = new GlideBlurHashGenerator($server, [
             'enabled' => false,
             'size' => 10,
             'blur' => 50,
@@ -57,7 +56,7 @@ class BlurHashGeneratorTest extends TestCase
         $server->method('makeImage')->willReturn('cached/photo.jpg');
         $server->method('getCache')->willReturn($cache);
 
-        $generator = new BlurHashGenerator($server, [
+        $generator = new GlideBlurHashGenerator($server, [
             'enabled' => true,
             'size' => 10,
             'blur' => 50,
@@ -92,7 +91,7 @@ class BlurHashGeneratorTest extends TestCase
             ->willReturn('cached/photo.jpg');
         $server->method('getCache')->willReturn($cache);
 
-        $generator = new BlurHashGenerator($server, [
+        $generator = new GlideBlurHashGenerator($server, [
             'enabled' => true,
             'size' => 10,
             'blur' => 50,
@@ -116,7 +115,7 @@ class BlurHashGeneratorTest extends TestCase
             ->willReturn('cached/photo.jpg');
         $server->method('getCache')->willReturn($cache);
 
-        $generator = new BlurHashGenerator($server, [
+        $generator = new GlideBlurHashGenerator($server, [
             'enabled' => true,
             'size' => 10,
             'blur' => 50,
@@ -132,7 +131,7 @@ class BlurHashGeneratorTest extends TestCase
         $server->method('makeImage')
             ->willThrowException(new \RuntimeException('File not found'));
 
-        $generator = new BlurHashGenerator($server, [
+        $generator = new GlideBlurHashGenerator($server, [
             'enabled' => true,
             'size' => 10,
             'blur' => 50,

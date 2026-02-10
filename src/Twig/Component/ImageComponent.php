@@ -3,6 +3,7 @@
 namespace Silarhi\PicassoBundle\Twig\Component;
 
 use Psr\Container\ContainerInterface;
+use Silarhi\PicassoBundle\Dto\LoaderContext;
 use Silarhi\PicassoBundle\Loader\LoaderInterface;
 use Silarhi\PicassoBundle\Service\BlurHashGenerator;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
@@ -17,6 +18,9 @@ class ImageComponent
 
     /** VichUploader field name (required when src is an entity). */
     public ?string $field = null;
+
+    /** Extra parameters passed to the loader context. */
+    public array $loaderExtra = [];
 
     /** Explicit source width in pixels (skips dimension detection). */
     public ?int $sourceWidth = null;
@@ -45,7 +49,7 @@ class ImageComponent
     /** Override image quality (1–100). */
     public ?int $quality = null;
 
-    /** Glide fit mode. */
+    /** Fit mode (agnostic: 'contain', 'cover', 'fill', 'crop'). */
     public string $fit = 'contain';
 
     /** Enable/disable blur placeholder for this image. */
@@ -89,14 +93,20 @@ class ImageComponent
         /** @var LoaderInterface $loader */
         $loader = $this->loaders->get($loaderName);
 
-        $this->resolvedPath = $loader->resolvePath($this->src, $this->field);
+        $context = new LoaderContext(
+            source: $this->src,
+            field: $this->field,
+            extra: $this->loaderExtra,
+        );
+
+        $this->resolvedPath = $loader->resolvePath($context);
 
         // Resolve dimensions: explicit props > loader detection
         $w = $this->sourceWidth;
         $h = $this->sourceHeight;
 
         if ($w === null || $h === null) {
-            $dims = $loader->getDimensions($this->src, $this->field);
+            $dims = $loader->getDimensions($context);
             if ($dims !== null) {
                 $w ??= $dims[0];
                 $h ??= $dims[1];

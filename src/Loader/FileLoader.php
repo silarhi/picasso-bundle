@@ -2,6 +2,8 @@
 
 namespace Silarhi\PicassoBundle\Loader;
 
+use Silarhi\PicassoBundle\Dto\LoaderContext;
+
 class FileLoader implements LoaderInterface
 {
     public function __construct(
@@ -9,14 +11,14 @@ class FileLoader implements LoaderInterface
     ) {
     }
 
-    public function resolvePath(string|object $source, ?string $field = null): string
+    public function resolvePath(LoaderContext $context): string
     {
-        return ltrim((string) $source, '/');
+        return ltrim($context->getSourceAsString(), '/');
     }
 
-    public function getDimensions(string|object $source, ?string $field = null): ?array
+    public function getDimensions(LoaderContext $context): ?array
     {
-        $absolutePath = rtrim($this->baseDirectory, '/').'/'.ltrim((string) $source, '/');
+        $absolutePath = rtrim($this->baseDirectory, '/').'/'.ltrim($context->getSourceAsString(), '/');
 
         if (!is_file($absolutePath)) {
             return null;

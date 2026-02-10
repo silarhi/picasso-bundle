@@ -3,6 +3,7 @@
 namespace Silarhi\PicassoBundle\Tests\Loader;
 
 use PHPUnit\Framework\TestCase;
+use Silarhi\PicassoBundle\Dto\LoaderContext;
 use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
 use Vich\UploaderBundle\Templating\Helper\UploaderHelperInterface;
 
@@ -23,7 +24,9 @@ class VichUploaderLoaderTest extends TestCase
 
     public function testResolvePathWithString(): void
     {
-        self::assertSame('uploads/photo.jpg', $this->loader->resolvePath('/uploads/photo.jpg'));
+        $context = new LoaderContext(source: '/uploads/photo.jpg');
+
+        self::assertSame('uploads/photo.jpg', $this->loader->resolvePath($context));
     }
 
     public function testResolvePathWithEntity(): void
@@ -34,7 +37,9 @@ class VichUploaderLoaderTest extends TestCase
             ->with($entity, 'imageFile')
             ->willReturn('/uploads/images/photo.jpg');
 
-        self::assertSame('uploads/images/photo.jpg', $this->loader->resolvePath($entity, 'imageFile'));
+        $context = new LoaderContext(source: $entity, field: 'imageFile');
+
+        self::assertSame('uploads/images/photo.jpg', $this->loader->resolvePath($context));
     }
 
     public function testResolvePathWithEntityReturnsEmptyOnNull(): void
@@ -44,12 +49,16 @@ class VichUploaderLoaderTest extends TestCase
         $this->uploaderHelper->method('asset')
             ->willReturn(null);
 
-        self::assertSame('', $this->loader->resolvePath($entity, 'imageFile'));
+        $context = new LoaderContext(source: $entity, field: 'imageFile');
+
+        self::assertSame('', $this->loader->resolvePath($context));
     }
 
     public function testGetDimensionsReturnsNullForString(): void
     {
-        self::assertNull($this->loader->getDimensions('some/path.jpg'));
+        $context = new LoaderContext(source: 'some/path.jpg');
+
+        self::assertNull($this->loader->getDimensions($context));
     }
 
     public function testGetDimensionsFromGetterMethod(): void
@@ -61,7 +70,8 @@ class VichUploaderLoaderTest extends TestCase
             }
         };
 
-        $dims = $this->loader->getDimensions($entity, 'image');
+        $context = new LoaderContext(source: $entity, field: 'image');
+        $dims = $this->loader->getDimensions($context);
 
         self::assertNotNull($dims);
         self::assertSame(1920, $dims[0]);
@@ -88,7 +98,8 @@ class VichUploaderLoaderTest extends TestCase
             }
         };
 
-        $dims = $this->loader->getDimensions($entity, 'image');
+        $context = new LoaderContext(source: $entity, field: 'image');
+        $dims = $this->loader->getDimensions($context);
 
         self::assertNotNull($dims);
         self::assertSame(800, $dims[0]);
@@ -98,7 +109,30 @@ class VichUploaderLoaderTest extends TestCase
     public function testGetDimensionsReturnsNullWhenNoMethodAvailable(): void
     {
         $entity = new \stdClass();
+        $context = new LoaderContext(source: $entity, field: 'image');
 
-        self::assertNull($this->loader->getDimensions($entity, 'image'));
+        self::assertNull($this->loader->getDimensions($context));
+    }
+
+    public function testContextExtraCanBeUsed(): void
+    {
+        $entity = new class {
+            public function getImageDimensions(): array
+            {
+                return [640, 480];
+            }
+        };
+
+        $context = new LoaderContext(
+            source: $entity,
+            field: 'image',
+            extra: ['mapping' => 'products'],
+        );
+
+        self::assertSame('products', $context->getExtra('mapping'));
+
+        $dims = $this->loader->getDimensions($context);
+        self::assertNotNull($dims);
+        self::assertSame(640, $dims[0]);
     }
 }

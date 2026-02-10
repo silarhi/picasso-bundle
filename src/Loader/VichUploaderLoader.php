@@ -2,6 +2,7 @@
 
 namespace Silarhi\PicassoBundle\Loader;
 
+use Silarhi\PicassoBundle\Dto\LoaderContext;
 use Vich\UploaderBundle\Templating\Helper\UploaderHelperInterface;
 
 class VichUploaderLoader implements LoaderInterface
@@ -11,24 +12,25 @@ class VichUploaderLoader implements LoaderInterface
     ) {
     }
 
-    public function resolvePath(string|object $source, ?string $field = null): string
+    public function resolvePath(LoaderContext $context): string
     {
-        if (\is_string($source)) {
-            return ltrim($source, '/');
+        if (!$context->isEntity()) {
+            return ltrim($context->getSourceAsString(), '/');
         }
 
-        $path = $this->uploaderHelper->asset($source, $field);
+        $path = $this->uploaderHelper->asset($context->source, $context->field);
 
         return ltrim($path ?? '', '/');
     }
 
-    public function getDimensions(string|object $source, ?string $field = null): ?array
+    public function getDimensions(LoaderContext $context): ?array
     {
-        if (!\is_object($source)) {
+        if (!$context->isEntity()) {
             return null;
         }
 
-        $fieldName = $field ?? 'image';
+        $fieldName = $context->field ?? 'image';
+        $source = $context->source;
 
         // Try get<Field>Dimensions() method (individual properties approach)
         $dimensionsGetter = 'get'.ucfirst($fieldName).'Dimensions';

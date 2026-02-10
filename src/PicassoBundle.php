@@ -8,10 +8,12 @@ use Silarhi\PicassoBundle\Controller\ImageController;
 use Silarhi\PicassoBundle\Loader\FileLoader;
 use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
 use Silarhi\PicassoBundle\Service\BlurHashGenerator;
+use Silarhi\PicassoBundle\Service\GlideBlurHashGenerator;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
-use Silarhi\PicassoBundle\Service\UrlGenerator;
 use Silarhi\PicassoBundle\Twig\Component\ImageComponent;
 use Silarhi\PicassoBundle\Twig\Extension\PicassoExtension;
+use Silarhi\PicassoBundle\Url\GlideImageUrlGenerator;
+use Silarhi\PicassoBundle\Url\ImageUrlGeneratorInterface;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
@@ -23,8 +25,12 @@ use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_lo
 
 class PicassoBundle extends AbstractBundle
 {
+    private const ALLOWED_FORMATS = ['avif', 'webp', 'jpg', 'jpeg', 'pjpg', 'png', 'gif'];
+
     public function configure(DefinitionConfigurator $definition): void
     {
+        $allowedFormats = self::ALLOWED_FORMATS;
+
         $definition->rootNode()
             ->children()
                 ->arrayNode('device_sizes')
@@ -37,7 +43,12 @@ class PicassoBundle extends AbstractBundle
                 ->end()
                 ->arrayNode('formats')
                     ->defaultValue(['avif', 'webp', 'jpg'])
-                    ->scalarPrototype()->end()
+                    ->scalarPrototype()
+                        ->validate()
+                            ->ifNotInArray($allowedFormats)
+                            ->thenInvalid('Invalid format "%s". Allowed: '.implode(', ', $allowedFormats))
+                        ->end()
+                    ->end()
                 ->end()
                 ->integerNode('default_quality')
                     ->defaultValue(75)
@@ -100,13 +111,14 @@ class PicassoBundle extends AbstractBundle
             ->factory([ServerFactory::class, 'create'])
             ->args([$glideConfig]);
 
-        // URL Generator
-        $services->set('picasso.url_generator', UrlGenerator::class)
+        // Image URL Generator (Glide implementation)
+        $services->set('picasso.url_generator', GlideImageUrlGenerator::class)
             ->args([
                 service('router'),
                 $config['glide']['sign_key'],
             ]);
-        $services->alias(UrlGenerator::class, 'picasso.url_generator');
+        $services->alias(ImageUrlGeneratorInterface::class, 'picasso.url_generator');
+        $services->alias(GlideImageUrlGenerator::class, 'picasso.url_generator');
 
         // Srcset Generator
         $services->set('picasso.srcset_generator', SrcsetGenerator::class)
@@ -119,13 +131,14 @@ class PicassoBundle extends AbstractBundle
             ]);
         $services->alias(SrcsetGenerator::class, 'picasso.srcset_generator');
 
-        // BlurHash Generator
-        $services->set('picasso.blur_hash_generator', BlurHashGenerator::class)
+        // BlurHash Generator (Glide implementation)
+        $services->set('picasso.blur_hash_generator', GlideBlurHashGenerator::class)
             ->args([
                 service('picasso.glide_server'),
                 $config['blur_placeholder'],
             ]);
         $services->alias(BlurHashGenerator::class, 'picasso.blur_hash_generator');
+        $services->alias(GlideBlurHashGenerator::class, 'picasso.blur_hash_generator');
 
         // File Loader — base_directory falls back to Glide source
         $fileLoaderBaseDir = $config['file_loader']['base_directory'] ?? $config['glide']['source'];

@@ -3,6 +3,7 @@
 namespace Silarhi\PicassoBundle\Tests\Loader;
 
 use PHPUnit\Framework\TestCase;
+use Silarhi\PicassoBundle\Dto\LoaderContext;
 use Silarhi\PicassoBundle\Loader\FileLoader;
 
 class FileLoaderTest extends TestCase
@@ -25,34 +26,41 @@ class FileLoaderTest extends TestCase
 
     public function testResolvePathStripsLeadingSlash(): void
     {
-        self::assertSame('uploads/photo.jpg', $this->loader->resolvePath('/uploads/photo.jpg'));
+        $context = new LoaderContext(source: '/uploads/photo.jpg');
+
+        self::assertSame('uploads/photo.jpg', $this->loader->resolvePath($context));
     }
 
     public function testResolvePathReturnsAsIs(): void
     {
-        self::assertSame('photo.jpg', $this->loader->resolvePath('photo.jpg'));
+        $context = new LoaderContext(source: 'photo.jpg');
+
+        self::assertSame('photo.jpg', $this->loader->resolvePath($context));
     }
 
     public function testGetDimensionsReturnsNullForNonExistentFile(): void
     {
-        self::assertNull($this->loader->getDimensions('nonexistent.jpg'));
+        $context = new LoaderContext(source: 'nonexistent.jpg');
+
+        self::assertNull($this->loader->getDimensions($context));
     }
 
     public function testGetDimensionsReturnsNullForNonImageFile(): void
     {
         file_put_contents($this->tempDir.'/file.txt', 'not an image');
+        $context = new LoaderContext(source: 'file.txt');
 
-        self::assertNull($this->loader->getDimensions('file.txt'));
+        self::assertNull($this->loader->getDimensions($context));
     }
 
     public function testGetDimensionsReturnsWidthAndHeight(): void
     {
-        // Create a 50x30 PNG image
         $img = imagecreatetruecolor(50, 30);
         imagepng($img, $this->tempDir.'/test.png');
         imagedestroy($img);
 
-        $dims = $this->loader->getDimensions('test.png');
+        $context = new LoaderContext(source: 'test.png');
+        $dims = $this->loader->getDimensions($context);
 
         self::assertNotNull($dims);
         self::assertSame(50, $dims[0]);
@@ -65,7 +73,8 @@ class FileLoaderTest extends TestCase
         imagepng($img, $this->tempDir.'/test2.png');
         imagedestroy($img);
 
-        $dims = $this->loader->getDimensions('/test2.png');
+        $context = new LoaderContext(source: '/test2.png');
+        $dims = $this->loader->getDimensions($context);
 
         self::assertNotNull($dims);
         self::assertSame(100, $dims[0]);
@@ -82,11 +91,25 @@ class FileLoaderTest extends TestCase
         imagedestroy($img);
 
         $loader = new FileLoader($subDir);
-        $dims = $loader->getDimensions('photo.png');
+        $context = new LoaderContext(source: 'photo.png');
+        $dims = $loader->getDimensions($context);
 
         self::assertNotNull($dims);
         self::assertSame(200, $dims[0]);
         self::assertSame(150, $dims[1]);
+    }
+
+    public function testContextExtraIsIgnored(): void
+    {
+        $img = imagecreatetruecolor(50, 30);
+        imagepng($img, $this->tempDir.'/extra.png');
+        imagedestroy($img);
+
+        $context = new LoaderContext(source: 'extra.png', extra: ['foo' => 'bar']);
+        $dims = $this->loader->getDimensions($context);
+
+        self::assertNotNull($dims);
+        self::assertSame(50, $dims[0]);
     }
 
     private function removeDirectory(string $dir): void

@@ -3,8 +3,9 @@
 namespace Silarhi\PicassoBundle\Tests\Service;
 
 use PHPUnit\Framework\TestCase;
+use Silarhi\PicassoBundle\Dto\ImageParams;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
-use Silarhi\PicassoBundle\Service\UrlGenerator;
+use Silarhi\PicassoBundle\Url\ImageUrlGeneratorInterface;
 
 class SrcsetGeneratorTest extends TestCase
 {
@@ -12,9 +13,26 @@ class SrcsetGeneratorTest extends TestCase
 
     protected function setUp(): void
     {
-        $urlGenerator = $this->createMock(UrlGenerator::class);
+        $urlGenerator = $this->createMock(ImageUrlGeneratorInterface::class);
         $urlGenerator->method('generate')
-            ->willReturnCallback(fn (string $path, array $params) => '/picasso/image/'.$path.'?'.http_build_query($params));
+            ->willReturnCallback(function (string $path, ImageParams $params): string {
+                $query = [];
+                if ($params->width !== null) {
+                    $query['w'] = $params->width;
+                }
+                if ($params->height !== null) {
+                    $query['h'] = $params->height;
+                }
+                if ($params->format !== null) {
+                    $query['fm'] = $params->format;
+                }
+                if ($params->quality !== null) {
+                    $query['q'] = $params->quality;
+                }
+                $query['fit'] = $params->fit;
+
+                return '/picasso/image/'.$path.'?'.http_build_query($query);
+            });
 
         $this->generator = new SrcsetGenerator(
             urlGenerator: $urlGenerator,
@@ -48,7 +66,7 @@ class SrcsetGeneratorTest extends TestCase
 
     public function testGetWidthsDeduplicates(): void
     {
-        $urlGenerator = $this->createMock(UrlGenerator::class);
+        $urlGenerator = $this->createMock(ImageUrlGeneratorInterface::class);
         $urlGenerator->method('generate')->willReturn('/img');
 
         $generator = new SrcsetGenerator(

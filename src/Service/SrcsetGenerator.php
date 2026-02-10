@@ -2,6 +2,9 @@
 
 namespace Silarhi\PicassoBundle\Service;
 
+use Silarhi\PicassoBundle\Dto\ImageParams;
+use Silarhi\PicassoBundle\Url\ImageUrlGeneratorInterface;
+
 class SrcsetGenerator
 {
     /**
@@ -10,7 +13,7 @@ class SrcsetGenerator
      * @param string[] $formats     Ordered list of output formats (last = fallback)
      */
     public function __construct(
-        private readonly UrlGenerator $urlGenerator,
+        private readonly ImageUrlGeneratorInterface $urlGenerator,
         private readonly array $deviceSizes,
         private readonly array $imageSizes,
         private readonly array $formats,
@@ -65,15 +68,15 @@ class SrcsetGenerator
         $entries = [];
 
         foreach ($widths as $index => $w) {
-            $params = [
-                'w' => $w,
-                'fm' => $format,
-                'q' => $quality,
-                'fit' => $fit,
-            ];
+            $params = new ImageParams(
+                width: $w,
+                format: $format,
+                quality: $quality,
+                fit: $fit,
+            );
 
             if ($isFixed && $width > 0 && $height !== null && $height > 0) {
-                $params['h'] = (int) round($w * $height / $width);
+                $params = $params->withHeight((int) round($w * $height / $width));
             }
 
             $url = $this->urlGenerator->generate($path, $params);
@@ -113,16 +116,14 @@ class SrcsetGenerator
         string $fit = 'contain',
     ): string {
         $quality ??= $this->defaultQuality;
-        $params = ['fm' => $format, 'q' => $quality, 'fit' => $fit];
 
-        if ($width !== null) {
-            $params['w'] = $width;
-        }
-        if ($height !== null) {
-            $params['h'] = $height;
-        }
-
-        return $this->urlGenerator->generate($path, $params);
+        return $this->urlGenerator->generate($path, new ImageParams(
+            width: $width,
+            height: $height,
+            format: $format,
+            quality: $quality,
+            fit: $fit,
+        ));
     }
 
     /**

@@ -4,6 +4,7 @@ namespace Silarhi\PicassoBundle\Tests\Twig\Component;
 
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
+use Silarhi\PicassoBundle\Dto\LoaderContext;
 use Silarhi\PicassoBundle\Loader\LoaderInterface;
 use Silarhi\PicassoBundle\Service\BlurHashGenerator;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
@@ -43,7 +44,9 @@ class ImageComponentTest extends TestCase
 
     public function testComputeImageDataResolvesPathFromLoader(): void
     {
-        $this->fileLoader->method('resolvePath')->with('uploads/photo.jpg', null)->willReturn('uploads/photo.jpg');
+        $this->fileLoader->method('resolvePath')
+            ->with(self::callback(fn (LoaderContext $ctx) => $ctx->getSourceAsString() === 'uploads/photo.jpg'))
+            ->willReturn('uploads/photo.jpg');
         $this->fileLoader->method('getDimensions')->willReturn([1920, 1080]);
         $this->blurHashGenerator->method('isEnabled')->willReturn(false);
         $this->configureSrcsetGenerator();
@@ -59,7 +62,6 @@ class ImageComponentTest extends TestCase
     public function testComputeImageDataUsesSourceWidthHeight(): void
     {
         $this->fileLoader->method('resolvePath')->willReturn('photo.jpg');
-        // getDimensions should NOT be called when sourceWidth/sourceHeight are set
         $this->fileLoader->expects(self::never())->method('getDimensions');
         $this->blurHashGenerator->method('isEnabled')->willReturn(false);
         $this->configureSrcsetGenerator();
@@ -199,6 +201,28 @@ class ImageComponentTest extends TestCase
         self::assertSame(500, $component->height);
     }
 
+    public function testComputeImageDataPassesLoaderExtra(): void
+    {
+        $this->fileLoader->method('resolvePath')
+            ->with(self::callback(function (LoaderContext $ctx): bool {
+                return $ctx->getExtra('mapping') === 'products'
+                    && $ctx->field === 'imageFile';
+            }))
+            ->willReturn('photo.jpg');
+        $this->fileLoader->method('getDimensions')->willReturn([100, 100]);
+        $this->blurHashGenerator->method('isEnabled')->willReturn(false);
+        $this->configureSrcsetGenerator();
+
+        $component = $this->createComponent();
+        $component->src = 'photo.jpg';
+        $component->field = 'imageFile';
+        $component->loaderExtra = ['mapping' => 'products'];
+        $component->sizes = '100vw';
+        $component->computeImageData();
+
+        self::assertSame('photo.jpg', $component->resolvedPath);
+    }
+
     public function testDefaultValues(): void
     {
         $component = $this->createComponent();
@@ -209,6 +233,7 @@ class ImageComponentTest extends TestCase
         self::assertNull($component->quality);
         self::assertSame('contain', $component->fit);
         self::assertNull($component->placeholder);
+        self::assertSame([], $component->loaderExtra);
     }
 
     private function configureSrcsetGenerator(): void
