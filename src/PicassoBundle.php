@@ -4,6 +4,8 @@ namespace Silarhi\PicassoBundle;
 
 use League\Glide\Responses\SymfonyResponseFactory;
 use League\Glide\ServerFactory;
+use Silarhi\PicassoBundle\Attribute\AsImageLoader;
+use Silarhi\PicassoBundle\Attribute\AsImageResolver;
 use Silarhi\PicassoBundle\Controller\ImageController;
 use Silarhi\PicassoBundle\Dto\BlurPlaceholderConfig;
 use Silarhi\PicassoBundle\Loader\GlideLoader;
@@ -19,6 +21,7 @@ use Silarhi\PicassoBundle\Twig\Component\ImageComponent;
 use Silarhi\PicassoBundle\Twig\Extension\PicassoExtension;
 use Symfony\Component\AssetMapper\AssetMapperInterface;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
+use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
@@ -30,6 +33,25 @@ use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_lo
 class PicassoBundle extends AbstractBundle
 {
     private const ALLOWED_FORMATS = ['avif', 'webp', 'jpg', 'jpeg', 'pjpg', 'png', 'gif'];
+
+    public function build(ContainerBuilder $container): void
+    {
+        parent::build($container);
+
+        $container->registerAttributeForAutoconfiguration(
+            AsImageResolver::class,
+            static function (ChildDefinition $definition, AsImageResolver $attribute): void {
+                $definition->addTag('picasso.resolver', ['key' => $attribute->name]);
+            },
+        );
+
+        $container->registerAttributeForAutoconfiguration(
+            AsImageLoader::class,
+            static function (ChildDefinition $definition, AsImageLoader $attribute): void {
+                $definition->addTag('picasso.loader', ['key' => $attribute->name]);
+            },
+        );
+    }
 
     public function configure(DefinitionConfigurator $definition): void
     {
