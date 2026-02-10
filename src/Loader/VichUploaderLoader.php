@@ -4,12 +4,12 @@ namespace Silarhi\PicassoBundle\Loader;
 
 use Silarhi\PicassoBundle\Dto\ImageDimensions;
 use Silarhi\PicassoBundle\Dto\LoaderContext;
-use Vich\UploaderBundle\Templating\Helper\UploaderHelperInterface;
+use Vich\UploaderBundle\Storage\StorageInterface;
 
 class VichUploaderLoader implements LoaderInterface
 {
     public function __construct(
-        private readonly UploaderHelperInterface $uploaderHelper,
+        private readonly StorageInterface $storage,
     ) {
     }
 
@@ -19,7 +19,9 @@ class VichUploaderLoader implements LoaderInterface
             return ltrim($context->getSourceAsString(), '/');
         }
 
-        $path = $this->uploaderHelper->asset($context->source, $context->field);
+        // Get the relative filesystem path within the storage directory.
+        // This is what Glide (or any local processor) needs to locate the source file.
+        $path = $this->storage->resolvePath($context->source, $context->field, null, true);
 
         return ltrim($path ?? '', '/');
     }

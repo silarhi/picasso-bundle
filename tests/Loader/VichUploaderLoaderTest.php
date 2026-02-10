@@ -6,21 +6,21 @@ use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\ImageDimensions;
 use Silarhi\PicassoBundle\Dto\LoaderContext;
 use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
-use Vich\UploaderBundle\Templating\Helper\UploaderHelperInterface;
+use Vich\UploaderBundle\Storage\StorageInterface;
 
 class VichUploaderLoaderTest extends TestCase
 {
     private VichUploaderLoader $loader;
-    private UploaderHelperInterface $uploaderHelper;
+    private StorageInterface $storage;
 
     protected function setUp(): void
     {
-        if (!interface_exists(UploaderHelperInterface::class)) {
+        if (!interface_exists(StorageInterface::class)) {
             self::markTestSkipped('VichUploaderBundle is not installed.');
         }
 
-        $this->uploaderHelper = $this->createMock(UploaderHelperInterface::class);
-        $this->loader = new VichUploaderLoader($this->uploaderHelper);
+        $this->storage = $this->createMock(StorageInterface::class);
+        $this->loader = new VichUploaderLoader($this->storage);
     }
 
     public function testResolvePathWithString(): void
@@ -30,24 +30,37 @@ class VichUploaderLoaderTest extends TestCase
         self::assertSame('uploads/photo.jpg', $this->loader->resolvePath($context));
     }
 
-    public function testResolvePathWithEntity(): void
+    public function testResolvePathWithEntityUsesStorageRelativePath(): void
     {
         $entity = new \stdClass();
 
-        $this->uploaderHelper->method('asset')
-            ->with($entity, 'imageFile')
-            ->willReturn('/uploads/images/photo.jpg');
+        $this->storage->method('resolvePath')
+            ->with($entity, 'imageFile', null, true)
+            ->willReturn('2024/february/photo.jpg');
 
         $context = new LoaderContext(source: $entity, field: 'imageFile');
 
-        self::assertSame('uploads/images/photo.jpg', $this->loader->resolvePath($context));
+        self::assertSame('2024/february/photo.jpg', $this->loader->resolvePath($context));
+    }
+
+    public function testResolvePathWithEntityStripsLeadingSlash(): void
+    {
+        $entity = new \stdClass();
+
+        $this->storage->method('resolvePath')
+            ->with($entity, 'imageFile', null, true)
+            ->willReturn('/photo.jpg');
+
+        $context = new LoaderContext(source: $entity, field: 'imageFile');
+
+        self::assertSame('photo.jpg', $this->loader->resolvePath($context));
     }
 
     public function testResolvePathWithEntityReturnsEmptyOnNull(): void
     {
         $entity = new \stdClass();
 
-        $this->uploaderHelper->method('asset')
+        $this->storage->method('resolvePath')
             ->willReturn(null);
 
         $context = new LoaderContext(source: $entity, field: 'imageFile');

@@ -5,21 +5,23 @@ namespace Silarhi\PicassoBundle;
 use League\Glide\Responses\SymfonyResponseFactory;
 use League\Glide\ServerFactory;
 use Silarhi\PicassoBundle\Controller\ImageController;
+use Silarhi\PicassoBundle\Dto\BlurPlaceholderConfig;
 use Silarhi\PicassoBundle\Loader\FileLoader;
 use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
-use Silarhi\PicassoBundle\Dto\BlurPlaceholderConfig;
 use Silarhi\PicassoBundle\Service\BlurHashGenerator;
 use Silarhi\PicassoBundle\Service\GlideBlurHashGenerator;
+use Silarhi\PicassoBundle\Service\NullBlurHashGenerator;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
 use Silarhi\PicassoBundle\Twig\Component\ImageComponent;
 use Silarhi\PicassoBundle\Twig\Extension\PicassoExtension;
 use Silarhi\PicassoBundle\Url\GlideImageUrlGenerator;
 use Silarhi\PicassoBundle\Url\ImageUrlGeneratorInterface;
+use Silarhi\PicassoBundle\Url\ImgixImageUrlGenerator;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
-use Vich\UploaderBundle\Templating\Helper\UploaderHelperInterface;
+use Vich\UploaderBundle\Storage\StorageInterface as VichStorageInterface;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_locator;
@@ -33,6 +35,14 @@ class PicassoBundle extends AbstractBundle
         $allowedFormats = self::ALLOWED_FORMATS;
 
         $definition->rootNode()
+            ->validate()
+                ->ifTrue(fn (array $v) => empty($v['glide']) && empty($v['imgix']))
+                ->thenInvalid('You must configure either "glide" or "imgix" as an image provider.')
+            ->end()
+            ->validate()
+                ->ifTrue(fn (array $v) => !empty($v['glide']) && !empty($v['imgix']))
+                ->thenInvalid('You cannot configure both "glide" and "imgix". Choose one provider.')
+            ->end()
             ->children()
                 ->arrayNode('device_sizes')
                     ->defaultValue([640, 750, 828, 1080, 1200, 1920, 2048, 3840])
@@ -74,7 +84,6 @@ class PicassoBundle extends AbstractBundle
                     ->end()
                 ->end()
                 ->arrayNode('glide')
-                    ->isRequired()
                     ->children()
                         ->scalarNode('source')->isRequired()->end()
                         ->scalarNode('cache')->isRequired()->end()
@@ -89,6 +98,13 @@ class PicassoBundle extends AbstractBundle
                         ->integerNode('max_image_size')->defaultNull()->end()
                     ->end()
                 ->end()
+                ->arrayNode('imgix')
+                    ->children()
+                        ->scalarNode('domain')->isRequired()->info('Your imgix source domain (e.g. "my-source.imgix.net")')->end()
+                        ->scalarNode('sign_key')->defaultNull()->info('Imgix secure URL token for signed URLs')->end()
+                        ->booleanNode('use_https')->defaultTrue()->end()
+                    ->end()
+                ->end()
             ->end()
         ;
     }
@@ -96,30 +112,13 @@ class PicassoBundle extends AbstractBundle
     public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
     {
         $services = $container->services();
+        $isGlide = !empty($config['glide']);
 
-        // Glide Server
-        $glideConfig = [
-            'source' => $config['glide']['source'],
-            'cache' => $config['glide']['cache'],
-            'driver' => $config['glide']['driver'],
-            'response' => new SymfonyResponseFactory(),
-        ];
-        if ($config['glide']['max_image_size'] !== null) {
-            $glideConfig['max_image_size'] = $config['glide']['max_image_size'];
+        if ($isGlide) {
+            $this->registerGlideServices($services, $config);
+        } else {
+            $this->registerImgixServices($services, $config);
         }
-
-        $services->set('picasso.glide_server', \League\Glide\Server::class)
-            ->factory([ServerFactory::class, 'create'])
-            ->args([$glideConfig]);
-
-        // Image URL Generator (Glide implementation)
-        $services->set('picasso.url_generator', GlideImageUrlGenerator::class)
-            ->args([
-                service('router'),
-                $config['glide']['sign_key'],
-            ]);
-        $services->alias(ImageUrlGeneratorInterface::class, 'picasso.url_generator');
-        $services->alias(GlideImageUrlGenerator::class, 'picasso.url_generator');
 
         // Srcset Generator
         $services->set('picasso.srcset_generator', SrcsetGenerator::class)
@@ -142,25 +141,19 @@ class PicassoBundle extends AbstractBundle
                 $blurConfig['quality'],
             ]);
 
-        // BlurHash Generator (Glide implementation)
-        $services->set('picasso.blur_hash_generator', GlideBlurHashGenerator::class)
-            ->args([
-                service('picasso.glide_server'),
-                service('picasso.blur_placeholder_config'),
-            ]);
-        $services->alias(BlurHashGenerator::class, 'picasso.blur_hash_generator');
-        $services->alias(GlideBlurHashGenerator::class, 'picasso.blur_hash_generator');
-
-        // File Loader — base_directory falls back to Glide source
-        $fileLoaderBaseDir = $config['file_loader']['base_directory'] ?? $config['glide']['source'];
-        $services->set('picasso.loader.file', FileLoader::class)
-            ->args([$fileLoaderBaseDir])
-            ->tag('picasso.loader', ['key' => 'file']);
+        // File Loader
+        $fileLoaderBaseDir = $config['file_loader']['base_directory']
+            ?? ($config['glide']['source'] ?? null);
+        if ($fileLoaderBaseDir !== null) {
+            $services->set('picasso.loader.file', FileLoader::class)
+                ->args([$fileLoaderBaseDir])
+                ->tag('picasso.loader', ['key' => 'file']);
+        }
 
         // VichUploader Loader (conditional)
-        if (interface_exists(UploaderHelperInterface::class)) {
+        if (interface_exists(VichStorageInterface::class)) {
             $services->set('picasso.loader.vich_uploader', VichUploaderLoader::class)
-                ->args([service('Vich\\UploaderBundle\\Templating\\Helper\\UploaderHelperInterface')])
+                ->args([service('Vich\\UploaderBundle\\Storage\\StorageInterface')])
                 ->tag('picasso.loader', ['key' => 'vich_uploader']);
         }
 
@@ -168,15 +161,6 @@ class PicassoBundle extends AbstractBundle
         $services->set('picasso.twig_extension', PicassoExtension::class)
             ->args([service('picasso.url_generator')])
             ->tag('twig.extension');
-
-        // Image Controller
-        $services->set('picasso.controller.image', ImageController::class)
-            ->args([
-                service('picasso.glide_server'),
-                $config['glide']['sign_key'],
-            ])
-            ->tag('controller.service_arguments')
-            ->public();
 
         // Image Component
         $services->set('picasso.image_component', ImageComponent::class)
@@ -201,5 +185,67 @@ class PicassoBundle extends AbstractBundle
                 \dirname(__DIR__).'/templates' => 'Picasso',
             ],
         ]);
+    }
+
+    private function registerGlideServices(object $services, array $config): void
+    {
+        // Glide Server
+        $glideConfig = [
+            'source' => $config['glide']['source'],
+            'cache' => $config['glide']['cache'],
+            'driver' => $config['glide']['driver'],
+            'response' => new SymfonyResponseFactory(),
+        ];
+        if ($config['glide']['max_image_size'] !== null) {
+            $glideConfig['max_image_size'] = $config['glide']['max_image_size'];
+        }
+
+        $services->set('picasso.glide_server', \League\Glide\Server::class)
+            ->factory([ServerFactory::class, 'create'])
+            ->args([$glideConfig]);
+
+        // Image URL Generator (Glide)
+        $services->set('picasso.url_generator', GlideImageUrlGenerator::class)
+            ->args([
+                service('router'),
+                $config['glide']['sign_key'],
+            ]);
+        $services->alias(ImageUrlGeneratorInterface::class, 'picasso.url_generator');
+        $services->alias(GlideImageUrlGenerator::class, 'picasso.url_generator');
+
+        // BlurHash Generator (Glide)
+        $services->set('picasso.blur_hash_generator', GlideBlurHashGenerator::class)
+            ->args([
+                service('picasso.glide_server'),
+                service('picasso.blur_placeholder_config'),
+            ]);
+        $services->alias(BlurHashGenerator::class, 'picasso.blur_hash_generator');
+        $services->alias(GlideBlurHashGenerator::class, 'picasso.blur_hash_generator');
+
+        // Image Controller (Glide only — serves transformed images)
+        $services->set('picasso.controller.image', ImageController::class)
+            ->args([
+                service('picasso.glide_server'),
+                $config['glide']['sign_key'],
+            ])
+            ->tag('controller.service_arguments')
+            ->public();
+    }
+
+    private function registerImgixServices(object $services, array $config): void
+    {
+        // Image URL Generator (imgix)
+        $services->set('picasso.url_generator', ImgixImageUrlGenerator::class)
+            ->args([
+                $config['imgix']['domain'],
+                $config['imgix']['sign_key'],
+                $config['imgix']['use_https'],
+            ]);
+        $services->alias(ImageUrlGeneratorInterface::class, 'picasso.url_generator');
+        $services->alias(ImgixImageUrlGenerator::class, 'picasso.url_generator');
+
+        // No server-side blur placeholder for imgix (images are on CDN)
+        $services->set('picasso.blur_hash_generator', NullBlurHashGenerator::class);
+        $services->alias(BlurHashGenerator::class, 'picasso.blur_hash_generator');
     }
 }
