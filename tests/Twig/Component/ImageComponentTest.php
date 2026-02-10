@@ -74,6 +74,18 @@ class ImageComponentTest extends TestCase
         self::assertSame('uploads/photo.jpg', $component->resolvedPath);
     }
 
+    public function testComputeImageDataSkipsWhenSrcIsNull(): void
+    {
+        $this->configureSrcsetGenerator();
+
+        $component = $this->createComponent();
+        $component->computeImageData();
+
+        self::assertSame('', $component->resolvedPath);
+        self::assertSame('', $component->fallbackSrc);
+        self::assertSame([], $component->sources);
+    }
+
     public function testComputeImageDataUsesSourceWidthHeight(): void
     {
         $this->fileLoader->method('resolvePath')->willReturn('photo.jpg');
@@ -251,12 +263,11 @@ class ImageComponentTest extends TestCase
         self::assertSame('photo.jpg', $component->resolvedPath);
     }
 
-    public function testComputeImageDataPassesLoaderExtra(): void
+    public function testComputeImageDataPassesContext(): void
     {
         $this->fileLoader->method('resolvePath')
             ->with(self::callback(function (LoaderContext $ctx): bool {
-                return $ctx->getExtra('mapping') === 'products'
-                    && $ctx->field === 'imageFile';
+                return $ctx->getExtra('mapping') === 'products';
             }))
             ->willReturn('photo.jpg');
         $this->fileLoader->method('getDimensions')->willReturn(new ImageDimensions(100, 100));
@@ -265,8 +276,7 @@ class ImageComponentTest extends TestCase
 
         $component = $this->createComponent();
         $component->src = 'photo.jpg';
-        $component->field = 'imageFile';
-        $component->loaderExtra = ['mapping' => 'products'];
+        $component->context = ['mapping' => 'products'];
         $component->sizes = '100vw';
         $component->computeImageData();
 
@@ -277,14 +287,13 @@ class ImageComponentTest extends TestCase
     {
         $component = $this->createComponent();
 
-        self::assertSame('', $component->alt);
-        self::assertSame('lazy', $component->loading);
+        self::assertNull($component->src);
         self::assertNull($component->loader);
         self::assertNull($component->provider);
         self::assertNull($component->quality);
         self::assertSame('contain', $component->fit);
         self::assertNull($component->placeholder);
-        self::assertSame([], $component->loaderExtra);
+        self::assertSame([], $component->context);
     }
 
     private function configureSrcsetGenerator(): void

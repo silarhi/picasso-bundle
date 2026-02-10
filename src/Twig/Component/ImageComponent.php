@@ -15,14 +15,11 @@ use Symfony\UX\TwigComponent\Attribute\PostMount;
 #[AsTwigComponent('Picasso:Image', template: '@Picasso/components/Image.html.twig')]
 class ImageComponent
 {
-    /** The image source: a path string or an entity object (for VichUploader). */
-    public string|object $src;
+    /** The image source path (null renders nothing). */
+    public ?string $src = null;
 
-    /** VichUploader field name (required when src is an entity). */
-    public ?string $field = null;
-
-    /** Extra parameters passed to the loader context. */
-    public array $loaderExtra = [];
+    /** Extra context passed to the loader. */
+    public array $context = [];
 
     /** Explicit source width in pixels (skips dimension detection). */
     public ?int $sourceWidth = null;
@@ -38,12 +35,6 @@ class ImageComponent
 
     /** Responsive sizes attribute (triggers responsive mode with width descriptors). */
     public ?string $sizes = null;
-
-    /** Alt text for the image. */
-    public string $alt = '';
-
-    /** Loading strategy: 'lazy' or 'eager'. */
-    public string $loading = 'lazy';
 
     /** Which loader to use ('file', 'vich_uploader', 'flysystem'). */
     public ?string $loader = null;
@@ -96,24 +87,27 @@ class ImageComponent
     #[PostMount]
     public function computeImageData(): void
     {
+        if ($this->src === null) {
+            return;
+        }
+
         $loaderName = $this->loader ?? $this->defaultLoader;
         /** @var LoaderInterface $loader */
         $loader = $this->loaders->get($loaderName);
 
-        $context = new LoaderContext(
+        $loaderContext = new LoaderContext(
             source: $this->src,
-            field: $this->field,
-            extra: $this->loaderExtra,
+            extra: $this->context,
         );
 
-        $this->resolvedPath = $loader->resolvePath($context);
+        $this->resolvedPath = $loader->resolvePath($loaderContext);
 
         // Resolve dimensions: explicit props > loader detection
         $w = $this->sourceWidth;
         $h = $this->sourceHeight;
 
         if ($w === null || $h === null) {
-            $dims = $loader->getDimensions($context);
+            $dims = $loader->getDimensions($loaderContext);
             if ($dims !== null) {
                 $w ??= $dims->width;
                 $h ??= $dims->height;
