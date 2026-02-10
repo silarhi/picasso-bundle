@@ -3,16 +3,33 @@
 namespace Silarhi\PicassoBundle\Tests\Twig\Extension;
 
 use PHPUnit\Framework\TestCase;
+use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Dto\ImageParams;
 use Silarhi\PicassoBundle\Twig\Extension\PicassoExtension;
 use Silarhi\PicassoBundle\Url\ImageUrlGeneratorInterface;
 
 class PicassoExtensionTest extends TestCase
 {
-    public function testImageUrlDelegatesToUrlGenerator(): void
+    private ImageUrlGeneratorInterface $urlGenerator;
+    private ContainerInterface $providers;
+
+    protected function setUp(): void
     {
-        $urlGenerator = $this->createMock(ImageUrlGeneratorInterface::class);
-        $urlGenerator->expects(self::once())
+        $this->urlGenerator = $this->createMock(ImageUrlGeneratorInterface::class);
+
+        $this->providers = $this->createMock(ContainerInterface::class);
+        $this->providers->method('get')
+            ->willReturnCallback(function (string $key): ImageUrlGeneratorInterface {
+                if ($key === 'glide' || $key === 'imgix') {
+                    return $this->urlGenerator;
+                }
+                throw new \InvalidArgumentException("Unknown provider: $key");
+            });
+    }
+
+    public function testImageUrlDelegatesToDefaultProvider(): void
+    {
+        $this->urlGenerator->expects(self::once())
             ->method('generate')
             ->with(
                 'photo.jpg',
@@ -20,7 +37,7 @@ class PicassoExtensionTest extends TestCase
             )
             ->willReturn('/picasso/image/photo.jpg?w=300&fm=webp&s=abc');
 
-        $extension = new PicassoExtension($urlGenerator);
+        $extension = new PicassoExtension($this->providers, 'glide');
         $result = $extension->imageUrl('photo.jpg', ['width' => 300, 'format' => 'webp']);
 
         self::assertSame('/picasso/image/photo.jpg?w=300&fm=webp&s=abc', $result);
@@ -28,8 +45,7 @@ class PicassoExtensionTest extends TestCase
 
     public function testImageUrlPassesAllAgnosticParams(): void
     {
-        $urlGenerator = $this->createMock(ImageUrlGeneratorInterface::class);
-        $urlGenerator->expects(self::once())
+        $this->urlGenerator->expects(self::once())
             ->method('generate')
             ->with(
                 'photo.jpg',
@@ -43,7 +59,7 @@ class PicassoExtensionTest extends TestCase
             )
             ->willReturn('/url');
 
-        $extension = new PicassoExtension($urlGenerator);
+        $extension = new PicassoExtension($this->providers, 'glide');
         $extension->imageUrl('photo.jpg', [
             'width' => 300,
             'height' => 200,
@@ -55,10 +71,33 @@ class PicassoExtensionTest extends TestCase
         ]);
     }
 
+    public function testImageUrlUsesExplicitProvider(): void
+    {
+        $imgixGenerator = $this->createMock(ImageUrlGeneratorInterface::class);
+        $imgixGenerator->expects(self::once())
+            ->method('generate')
+            ->with('photo.jpg', self::isInstanceOf(ImageParams::class))
+            ->willReturn('https://cdn.imgix.net/photo.jpg?w=300');
+
+        $providers = $this->createMock(ContainerInterface::class);
+        $providers->expects(self::once())
+            ->method('get')
+            ->with('imgix')
+            ->willReturn($imgixGenerator);
+
+        $extension = new PicassoExtension($providers, 'glide');
+        $result = $extension->imageUrl('photo.jpg', [
+            'width' => 300,
+            'format' => 'webp',
+            'provider' => 'imgix',
+        ]);
+
+        self::assertSame('https://cdn.imgix.net/photo.jpg?w=300', $result);
+    }
+
     public function testRegistersTwigFunction(): void
     {
-        $urlGenerator = $this->createMock(ImageUrlGeneratorInterface::class);
-        $extension = new PicassoExtension($urlGenerator);
+        $extension = new PicassoExtension($this->providers, 'glide');
 
         $functions = $extension->getFunctions();
 

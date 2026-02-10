@@ -8,6 +8,7 @@ use Silarhi\PicassoBundle\Dto\LoaderContext;
 use Silarhi\PicassoBundle\Loader\LoaderInterface;
 use Silarhi\PicassoBundle\Service\BlurHashGenerator;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
+use Silarhi\PicassoBundle\Url\ImageUrlGeneratorInterface;
 use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
 use Symfony\UX\TwigComponent\Attribute\PostMount;
 
@@ -44,8 +45,11 @@ class ImageComponent
     /** Loading strategy: 'lazy' or 'eager'. */
     public string $loading = 'lazy';
 
-    /** Which loader to use ('file', 'vich_uploader'). */
+    /** Which loader to use ('file', 'vich_uploader', 'flysystem'). */
     public ?string $loader = null;
+
+    /** Which provider to use for URL generation ('glide', 'imgix'). */
+    public ?string $provider = null;
 
     /** Override image quality (1-100). */
     public ?int $quality = null;
@@ -81,7 +85,9 @@ class ImageComponent
         private readonly SrcsetGenerator $srcsetGenerator,
         private readonly BlurHashGenerator $blurHashGenerator,
         private readonly ContainerInterface $loaders,
+        private readonly ContainerInterface $providers,
         private readonly string $defaultLoader,
+        private readonly string $defaultProvider,
         private readonly array $formats,
         private readonly int $defaultQuality,
     ) {
@@ -131,6 +137,11 @@ class ImageComponent
             );
         }
 
+        // Resolve URL generator from provider
+        $providerName = $this->provider ?? $this->defaultProvider;
+        /** @var ImageUrlGeneratorInterface $urlGenerator */
+        $urlGenerator = $this->providers->get($providerName);
+
         // Generate sources for each format
         $quality = $this->quality ?? $this->defaultQuality;
         $formats = $this->formats;
@@ -138,6 +149,7 @@ class ImageComponent
 
         foreach ($this->formats as $format) {
             $entries = $this->srcsetGenerator->generateSrcset(
+                urlGenerator: $urlGenerator,
                 path: $this->resolvedPath,
                 format: $format,
                 width: $this->width,
@@ -152,6 +164,7 @@ class ImageComponent
             if ($format === $fallbackFormat) {
                 $this->fallbackSrcset = $srcsetString;
                 $this->fallbackSrc = $this->srcsetGenerator->getFallbackUrl(
+                    urlGenerator: $urlGenerator,
                     path: $this->resolvedPath,
                     format: $format,
                     width: $this->width,

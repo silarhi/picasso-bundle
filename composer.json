@@ -6,16 +6,18 @@
     "require": {
         "php": ">=8.2",
         "symfony/framework-bundle": "^6.4 || ^7.0",
-        "symfony/ux-twig-component": "^2.13",
-        "league/glide": "^2.0",
-        "league/glide-symfony": "^2.0"
+        "symfony/ux-twig-component": "^2.13"
     },
     "require-dev": {
         "phpunit/phpunit": "^10.0 || ^11.0",
         "symfony/twig-bundle": "^6.4 || ^7.0",
+        "league/glide": "^2.0",
+        "league/glide-symfony": "^2.0",
         "vich/uploader-bundle": "^2.0"
     },
     "suggest": {
+        "league/glide": "Required for the Glide image provider (local image transformation)",
+        "league/glide-symfony": "Required for the Glide image provider",
         "vich/uploader-bundle": "Required for the vich_uploader loader"
     },
     "autoload": {

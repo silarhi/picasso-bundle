@@ -2,6 +2,7 @@
 
 namespace Silarhi\PicassoBundle\Twig\Extension;
 
+use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Dto\ImageParams;
 use Silarhi\PicassoBundle\Url\ImageUrlGeneratorInterface;
 use Twig\Extension\AbstractExtension;
@@ -10,7 +11,8 @@ use Twig\TwigFunction;
 class PicassoExtension extends AbstractExtension
 {
     public function __construct(
-        private readonly ImageUrlGeneratorInterface $urlGenerator,
+        private readonly ContainerInterface $providers,
+        private readonly string $defaultProvider,
     ) {
     }
 
@@ -25,11 +27,18 @@ class PicassoExtension extends AbstractExtension
      * Generate a single image URL from agnostic parameters.
      *
      * Usage in Twig:
-     *   {{ picasso_image_url('uploads/photo.jpg', {width: 300, height: 200, format: 'webp'}) }}
+     *   {{ picasso_image_url('uploads/photo.jpg', {width: 300, format: 'webp'}) }}
+     *   {{ picasso_image_url('uploads/photo.jpg', {width: 300, format: 'webp', provider: 'imgix'}) }}
      */
     public function imageUrl(string $path, array $params = []): string
     {
-        return $this->urlGenerator->generate($path, new ImageParams(
+        $providerName = $params['provider'] ?? $this->defaultProvider;
+        unset($params['provider']);
+
+        /** @var ImageUrlGeneratorInterface $urlGenerator */
+        $urlGenerator = $this->providers->get($providerName);
+
+        return $urlGenerator->generate($path, new ImageParams(
             width: $params['width'] ?? null,
             height: $params['height'] ?? null,
             format: $params['format'] ?? null,

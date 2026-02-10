@@ -12,13 +12,16 @@ use Silarhi\PicassoBundle\Loader\LoaderInterface;
 use Silarhi\PicassoBundle\Service\BlurHashGenerator;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
 use Silarhi\PicassoBundle\Twig\Component\ImageComponent;
+use Silarhi\PicassoBundle\Url\ImageUrlGeneratorInterface;
 
 class ImageComponentTest extends TestCase
 {
     private SrcsetGenerator $srcsetGenerator;
     private BlurHashGenerator $blurHashGenerator;
     private ContainerInterface $loaders;
+    private ContainerInterface $providers;
     private LoaderInterface $fileLoader;
+    private ImageUrlGeneratorInterface $urlGenerator;
 
     protected function setUp(): void
     {
@@ -31,6 +34,13 @@ class ImageComponentTest extends TestCase
         $this->loaders->method('get')
             ->with('file')
             ->willReturn($this->fileLoader);
+
+        $this->urlGenerator = $this->createMock(ImageUrlGeneratorInterface::class);
+
+        $this->providers = $this->createMock(ContainerInterface::class);
+        $this->providers->method('get')
+            ->with('glide')
+            ->willReturn($this->urlGenerator);
     }
 
     private function createComponent(): ImageComponent
@@ -39,7 +49,9 @@ class ImageComponentTest extends TestCase
             srcsetGenerator: $this->srcsetGenerator,
             blurHashGenerator: $this->blurHashGenerator,
             loaders: $this->loaders,
+            providers: $this->providers,
             defaultLoader: 'file',
+            defaultProvider: 'glide',
             formats: ['avif', 'webp', 'jpg'],
             defaultQuality: 75,
         );
@@ -137,7 +149,7 @@ class ImageComponentTest extends TestCase
         $this->blurHashGenerator->method('isEnabled')->willReturn(false);
 
         $this->srcsetGenerator->method('generateSrcset')
-            ->willReturnCallback(function (string $path, string $format): array {
+            ->willReturnCallback(function (ImageUrlGeneratorInterface $urlGen, string $path, string $format): array {
                 return [
                     new SrcsetEntry("/img/{$path}?fm={$format}&w=640", '640w'),
                     new SrcsetEntry("/img/{$path}?fm={$format}&w=1080", '1080w'),
@@ -191,7 +203,9 @@ class ImageComponentTest extends TestCase
             srcsetGenerator: $this->srcsetGenerator,
             blurHashGenerator: $this->blurHashGenerator,
             loaders: $loaders,
+            providers: $this->providers,
             defaultLoader: 'file',
+            defaultProvider: 'glide',
             formats: ['avif', 'webp', 'jpg'],
             defaultQuality: 75,
         );
@@ -204,6 +218,37 @@ class ImageComponentTest extends TestCase
         self::assertSame('custom/photo.jpg', $component->resolvedPath);
         self::assertSame(500, $component->width);
         self::assertSame(500, $component->height);
+    }
+
+    public function testComputeImageDataUsesCustomProvider(): void
+    {
+        $imgixUrlGenerator = $this->createMock(ImageUrlGeneratorInterface::class);
+
+        $providers = $this->createMock(ContainerInterface::class);
+        $providers->method('get')->with('imgix')->willReturn($imgixUrlGenerator);
+
+        $this->fileLoader->method('resolvePath')->willReturn('photo.jpg');
+        $this->fileLoader->method('getDimensions')->willReturn(new ImageDimensions(800, 600));
+        $this->blurHashGenerator->method('isEnabled')->willReturn(false);
+        $this->configureSrcsetGenerator();
+
+        $component = new ImageComponent(
+            srcsetGenerator: $this->srcsetGenerator,
+            blurHashGenerator: $this->blurHashGenerator,
+            loaders: $this->loaders,
+            providers: $providers,
+            defaultLoader: 'file',
+            defaultProvider: 'glide',
+            formats: ['webp', 'jpg'],
+            defaultQuality: 75,
+        );
+
+        $component->src = 'photo.jpg';
+        $component->provider = 'imgix';
+        $component->sizes = '100vw';
+        $component->computeImageData();
+
+        self::assertSame('photo.jpg', $component->resolvedPath);
     }
 
     public function testComputeImageDataPassesLoaderExtra(): void
@@ -235,6 +280,7 @@ class ImageComponentTest extends TestCase
         self::assertSame('', $component->alt);
         self::assertSame('lazy', $component->loading);
         self::assertNull($component->loader);
+        self::assertNull($component->provider);
         self::assertNull($component->quality);
         self::assertSame('contain', $component->fit);
         self::assertNull($component->placeholder);

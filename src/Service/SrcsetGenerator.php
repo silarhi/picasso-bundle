@@ -14,7 +14,6 @@ class SrcsetGenerator
      * @param string[] $formats     Ordered list of output formats (last = fallback)
      */
     public function __construct(
-        private readonly ImageUrlGeneratorInterface $urlGenerator,
         private readonly array $deviceSizes,
         private readonly array $imageSizes,
         private readonly array $formats,
@@ -55,6 +54,7 @@ class SrcsetGenerator
      * @return SrcsetEntry[]
      */
     public function generateSrcset(
+        ImageUrlGeneratorInterface $urlGenerator,
         string $path,
         string $format,
         ?int $width = null,
@@ -80,7 +80,7 @@ class SrcsetGenerator
                 $params = $params->withHeight((int) round($w * $height / $width));
             }
 
-            $url = $this->urlGenerator->generate($path, $params);
+            $url = $urlGenerator->generate($path, $params);
             $descriptor = $isFixed ? ($index + 1).'x' : $w.'w';
 
             $entries[] = new SrcsetEntry($url, $descriptor);
@@ -106,6 +106,7 @@ class SrcsetGenerator
      * Get the fallback src URL (used on the <img> tag's src attribute).
      */
     public function getFallbackUrl(
+        ImageUrlGeneratorInterface $urlGenerator,
         string $path,
         string $format,
         ?int $width = null,
@@ -115,7 +116,7 @@ class SrcsetGenerator
     ): string {
         $quality ??= $this->defaultQuality;
 
-        return $this->urlGenerator->generate($path, new ImageParams(
+        return $urlGenerator->generate($path, new ImageParams(
             width: $width,
             height: $height,
             format: $format,
