@@ -4,7 +4,7 @@ namespace Silarhi\PicassoBundle\Service;
 
 use Silarhi\PicassoBundle\Dto\ImageParams;
 use Silarhi\PicassoBundle\Dto\SrcsetEntry;
-use Silarhi\PicassoBundle\Url\ImageUrlGeneratorInterface;
+use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
 
 class SrcsetGenerator
 {
@@ -54,7 +54,7 @@ class SrcsetGenerator
      * @return SrcsetEntry[]
      */
     public function generateSrcset(
-        ImageUrlGeneratorInterface $urlGenerator,
+        ImageLoaderInterface $loader,
         string $path,
         string $format,
         ?int $width = null,
@@ -80,7 +80,7 @@ class SrcsetGenerator
                 $params = $params->withHeight((int) round($w * $height / $width));
             }
 
-            $url = $urlGenerator->generate($path, $params);
+            $url = $loader->getUrl($path, $params);
             $descriptor = $isFixed ? ($index + 1).'x' : $w.'w';
 
             $entries[] = new SrcsetEntry($url, $descriptor);
@@ -106,7 +106,7 @@ class SrcsetGenerator
      * Get the fallback src URL (used on the <img> tag's src attribute).
      */
     public function getFallbackUrl(
-        ImageUrlGeneratorInterface $urlGenerator,
+        ImageLoaderInterface $loader,
         string $path,
         string $format,
         ?int $width = null,
@@ -116,7 +116,7 @@ class SrcsetGenerator
     ): string {
         $quality ??= $this->defaultQuality;
 
-        return $urlGenerator->generate($path, new ImageParams(
+        return $loader->getUrl($path, new ImageParams(
             width: $width,
             height: $height,
             format: $format,

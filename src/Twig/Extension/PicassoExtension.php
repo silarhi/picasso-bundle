@@ -4,15 +4,15 @@ namespace Silarhi\PicassoBundle\Twig\Extension;
 
 use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Dto\ImageParams;
-use Silarhi\PicassoBundle\Url\ImageUrlGeneratorInterface;
+use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFunction;
 
 class PicassoExtension extends AbstractExtension
 {
     public function __construct(
-        private readonly ContainerInterface $providers,
-        private readonly string $defaultProvider,
+        private readonly ContainerInterface $loaders,
+        private readonly string $defaultLoader,
     ) {
     }
 
@@ -28,17 +28,17 @@ class PicassoExtension extends AbstractExtension
      *
      * Usage in Twig:
      *   {{ picasso_image_url('uploads/photo.jpg', {width: 300, format: 'webp'}) }}
-     *   {{ picasso_image_url('uploads/photo.jpg', {width: 300, format: 'webp', provider: 'imgix'}) }}
+     *   {{ picasso_image_url('uploads/photo.jpg', {width: 300, format: 'webp', loader: 'imgix'}) }}
      */
     public function imageUrl(string $path, array $params = []): string
     {
-        $providerName = $params['provider'] ?? $this->defaultProvider;
-        unset($params['provider']);
+        $loaderName = $params['loader'] ?? $this->defaultLoader;
+        unset($params['loader']);
 
-        /** @var ImageUrlGeneratorInterface $urlGenerator */
-        $urlGenerator = $this->providers->get($providerName);
+        /** @var ImageLoaderInterface $loader */
+        $loader = $this->loaders->get($loaderName);
 
-        return $urlGenerator->generate($path, new ImageParams(
+        return $loader->getUrl($path, new ImageParams(
             width: $params['width'] ?? null,
             height: $params['height'] ?? null,
             format: $params['format'] ?? null,

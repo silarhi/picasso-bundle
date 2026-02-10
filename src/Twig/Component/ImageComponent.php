@@ -6,10 +6,9 @@ use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Dto\BlurPlaceholderConfig;
 use Silarhi\PicassoBundle\Dto\ImageParams;
 use Silarhi\PicassoBundle\Dto\ImageSource;
-use Silarhi\PicassoBundle\Dto\LoaderContext;
-use Silarhi\PicassoBundle\Loader\LoaderInterface;
+use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
+use Silarhi\PicassoBundle\Resolver\ImageResolverInterface;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
-use Silarhi\PicassoBundle\Url\ImageUrlGeneratorInterface;
 use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
 use Symfony\UX\TwigComponent\Attribute\PostMount;
 
@@ -19,7 +18,7 @@ class ImageComponent
     /** The image source path (null renders nothing). */
     public ?string $src = null;
 
-    /** Extra context passed to the loader. */
+    /** Extra context passed to the resolver. */
     public array $context = [];
 
     /** Explicit source width in pixels (skips dimension detection). */
@@ -37,11 +36,11 @@ class ImageComponent
     /** Responsive sizes attribute (triggers responsive mode with width descriptors). */
     public ?string $sizes = null;
 
-    /** Which loader to use ('file', 'vich_uploader', 'flysystem'). */
-    public ?string $loader = null;
+    /** Which resolver to use ('filesystem', 'vich_uploader', 'flysystem'). */
+    public ?string $resolver = null;
 
-    /** Which provider to use for URL generation ('glide', 'imgix'). */
-    public ?string $provider = null;
+    /** Which loader to use for URL generation ('glide', 'imgix'). */
+    public ?string $loader = null;
 
     /** Override image quality (1-100). */
     public ?int $quality = null;
@@ -79,10 +78,10 @@ class ImageComponent
     public function __construct(
         private readonly SrcsetGenerator $srcsetGenerator,
         private readonly BlurPlaceholderConfig $blurConfig,
+        private readonly ContainerInterface $resolvers,
         private readonly ContainerInterface $loaders,
-        private readonly ContainerInterface $providers,
+        private readonly string $defaultResolver,
         private readonly string $defaultLoader,
-        private readonly string $defaultProvider,
         private readonly array $formats,
         private readonly int $defaultQuality,
     ) {
@@ -101,42 +100,29 @@ class ImageComponent
             return;
         }
 
-        $loaderName = $this->loader ?? $this->defaultLoader;
-        /** @var LoaderInterface $loader */
-        $loader = $this->loaders->get($loaderName);
+        $resolverName = $this->resolver ?? $this->defaultResolver;
+        /** @var ImageResolverInterface $resolver */
+        $resolver = $this->resolvers->get($resolverName);
 
-        $loaderContext = new LoaderContext(
-            source: $this->src,
-            extra: $this->context,
-        );
+        $resolved = $resolver->resolve($this->src, $this->context);
+        $this->resolvedPath = $resolved->path;
 
-        $this->resolvedPath = $loader->resolvePath($loaderContext);
+        // Resolve dimensions: explicit props > resolver detection > display dims
+        $w = $this->sourceWidth ?? $resolved->width;
+        $h = $this->sourceHeight ?? $resolved->height;
 
-        // Resolve dimensions: explicit props > loader detection
-        $w = $this->sourceWidth;
-        $h = $this->sourceHeight;
-
-        if ($w === null || $h === null) {
-            $dims = $loader->getDimensions($loaderContext);
-            if ($dims !== null) {
-                $w ??= $dims->width;
-                $h ??= $dims->height;
-            }
-        }
-
-        // Fall back to display dimensions
         $resolvedWidth = $w ?? $this->width;
         $resolvedHeight = $h ?? $this->height;
 
         $this->width ??= $resolvedWidth;
         $this->height ??= $resolvedHeight;
 
-        // Resolve URL generator from provider
-        $providerName = $this->provider ?? $this->defaultProvider;
-        /** @var ImageUrlGeneratorInterface $urlGenerator */
-        $urlGenerator = $this->providers->get($providerName);
+        // Resolve image loader
+        $loaderName = $this->loader ?? $this->defaultLoader;
+        /** @var ImageLoaderInterface $imageLoader */
+        $imageLoader = $this->loaders->get($loaderName);
 
-        // Generate blur placeholder URL via the provider
+        // Generate blur placeholder URL via the loader
         $shouldBlur = $this->placeholder ?? $this->blurConfig->enabled;
         if ($shouldBlur) {
             $tinyWidth = $this->blurConfig->size;
@@ -146,7 +132,7 @@ class ImageComponent
                 $tinyHeight = max(1, (int) round($tinyWidth * $resolvedHeight / $resolvedWidth));
             }
 
-            $this->blurDataUri = $urlGenerator->generate($this->resolvedPath, new ImageParams(
+            $this->blurDataUri = $imageLoader->getUrl($this->resolvedPath, new ImageParams(
                 width: $tinyWidth,
                 height: $tinyHeight,
                 format: 'jpg',
@@ -163,7 +149,7 @@ class ImageComponent
 
         foreach ($this->formats as $format) {
             $entries = $this->srcsetGenerator->generateSrcset(
-                urlGenerator: $urlGenerator,
+                loader: $imageLoader,
                 path: $this->resolvedPath,
                 format: $format,
                 width: $this->width,
@@ -178,7 +164,7 @@ class ImageComponent
             if ($format === $fallbackFormat) {
                 $this->fallbackSrcset = $srcsetString;
                 $this->fallbackSrc = $this->srcsetGenerator->getFallbackUrl(
-                    urlGenerator: $urlGenerator,
+                    loader: $imageLoader,
                     path: $this->resolvedPath,
                     format: $format,
                     width: $this->width,

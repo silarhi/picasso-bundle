@@ -5,18 +5,18 @@ namespace Silarhi\PicassoBundle\Tests\Service;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\ImageParams;
 use Silarhi\PicassoBundle\Dto\SrcsetEntry;
+use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
-use Silarhi\PicassoBundle\Url\ImageUrlGeneratorInterface;
 
 class SrcsetGeneratorTest extends TestCase
 {
     private SrcsetGenerator $generator;
-    private ImageUrlGeneratorInterface $urlGenerator;
+    private ImageLoaderInterface $loader;
 
     protected function setUp(): void
     {
-        $this->urlGenerator = $this->createMock(ImageUrlGeneratorInterface::class);
-        $this->urlGenerator->method('generate')
+        $this->loader = $this->createMock(ImageLoaderInterface::class);
+        $this->loader->method('getUrl')
             ->willReturnCallback(function (string $path, ImageParams $params): string {
                 $query = [];
                 if ($params->width !== null) {
@@ -69,7 +69,7 @@ class SrcsetGeneratorTest extends TestCase
     {
         $generator = new SrcsetGenerator(
             deviceSizes: [640, 1080],
-            imageSizes: [640, 128], // 640 is a duplicate
+            imageSizes: [640, 128],
             formats: ['jpg'],
             defaultQuality: 75,
         );
@@ -82,7 +82,7 @@ class SrcsetGeneratorTest extends TestCase
     public function testGenerateSrcsetResponsiveUsesWidthDescriptors(): void
     {
         $entries = $this->generator->generateSrcset(
-            urlGenerator: $this->urlGenerator,
+            loader: $this->loader,
             path: 'photo.jpg',
             format: 'webp',
             sizes: '100vw',
@@ -99,7 +99,7 @@ class SrcsetGeneratorTest extends TestCase
     public function testGenerateSrcsetFixedUsesDensityDescriptors(): void
     {
         $entries = $this->generator->generateSrcset(
-            urlGenerator: $this->urlGenerator,
+            loader: $this->loader,
             path: 'photo.jpg',
             format: 'webp',
             width: 300,
@@ -114,18 +114,15 @@ class SrcsetGeneratorTest extends TestCase
     public function testGenerateSrcsetFixedPreservesAspectRatio(): void
     {
         $entries = $this->generator->generateSrcset(
-            urlGenerator: $this->urlGenerator,
+            loader: $this->loader,
             path: 'photo.jpg',
             format: 'jpg',
             width: 300,
             height: 200,
         );
 
-        // 1x: w=300, h=200
         self::assertStringContainsString('w=300', $entries[0]->url);
         self::assertStringContainsString('h=200', $entries[0]->url);
-
-        // 2x: w=600, h=400
         self::assertStringContainsString('w=600', $entries[1]->url);
         self::assertStringContainsString('h=400', $entries[1]->url);
     }
@@ -133,7 +130,7 @@ class SrcsetGeneratorTest extends TestCase
     public function testGenerateSrcsetUsesCustomQuality(): void
     {
         $entries = $this->generator->generateSrcset(
-            urlGenerator: $this->urlGenerator,
+            loader: $this->loader,
             path: 'photo.jpg',
             format: 'webp',
             width: 300,
@@ -148,7 +145,7 @@ class SrcsetGeneratorTest extends TestCase
     public function testGenerateSrcsetUsesDefaultQuality(): void
     {
         $entries = $this->generator->generateSrcset(
-            urlGenerator: $this->urlGenerator,
+            loader: $this->loader,
             path: 'photo.jpg',
             format: 'webp',
             width: 300,
@@ -186,7 +183,7 @@ class SrcsetGeneratorTest extends TestCase
     public function testGetFallbackUrl(): void
     {
         $url = $this->generator->getFallbackUrl(
-            urlGenerator: $this->urlGenerator,
+            loader: $this->loader,
             path: 'photo.jpg',
             format: 'jpg',
             width: 800,
@@ -203,7 +200,7 @@ class SrcsetGeneratorTest extends TestCase
     public function testGetFallbackUrlWithoutDimensions(): void
     {
         $url = $this->generator->getFallbackUrl(
-            urlGenerator: $this->urlGenerator,
+            loader: $this->loader,
             path: 'photo.jpg',
             format: 'webp',
         );
@@ -221,7 +218,7 @@ class SrcsetGeneratorTest extends TestCase
     public function testGenerateSrcsetIncludesFitParam(): void
     {
         $entries = $this->generator->generateSrcset(
-            urlGenerator: $this->urlGenerator,
+            loader: $this->loader,
             path: 'photo.jpg',
             format: 'webp',
             width: 300,

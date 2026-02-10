@@ -1,15 +1,15 @@
 <?php
 
-namespace Silarhi\PicassoBundle\Tests\Url;
+namespace Silarhi\PicassoBundle\Tests\Loader;
 
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\ImageParams;
-use Silarhi\PicassoBundle\Url\GlideImageUrlGenerator;
+use Silarhi\PicassoBundle\Loader\GlideLoader;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
-class GlideImageUrlGeneratorTest extends TestCase
+class GlideLoaderTest extends TestCase
 {
-    private GlideImageUrlGenerator $generator;
+    private GlideLoader $loader;
 
     protected function setUp(): void
     {
@@ -22,12 +22,12 @@ class GlideImageUrlGeneratorTest extends TestCase
                 return '/picasso/image/'.$path.'?'.http_build_query($params);
             });
 
-        $this->generator = new GlideImageUrlGenerator($router, 'test-secret-key');
+        $this->loader = new GlideLoader($router, 'test-secret-key');
     }
 
-    public function testGenerateMapsParamsToGlideFormat(): void
+    public function testGetUrlMapsParamsToGlideFormat(): void
     {
-        $url = $this->generator->generate('photo.jpg', new ImageParams(
+        $url = $this->loader->getUrl('photo.jpg', new ImageParams(
             width: 300,
             height: 200,
             format: 'webp',
@@ -44,9 +44,9 @@ class GlideImageUrlGeneratorTest extends TestCase
         self::assertStringContainsString('s=', $url);
     }
 
-    public function testGenerateOmitsNullParams(): void
+    public function testGetUrlOmitsNullParams(): void
     {
-        $url = $this->generator->generate('photo.jpg', new ImageParams(
+        $url = $this->loader->getUrl('photo.jpg', new ImageParams(
             format: 'jpg',
         ));
 
@@ -56,9 +56,9 @@ class GlideImageUrlGeneratorTest extends TestCase
         self::assertStringContainsString('fm=jpg', $url);
     }
 
-    public function testGenerateIncludesBlurParam(): void
+    public function testGetUrlIncludesBlurParam(): void
     {
-        $url = $this->generator->generate('photo.jpg', new ImageParams(
+        $url = $this->loader->getUrl('photo.jpg', new ImageParams(
             width: 10,
             blur: 50,
         ));
@@ -66,9 +66,9 @@ class GlideImageUrlGeneratorTest extends TestCase
         self::assertStringContainsString('blur=50', $url);
     }
 
-    public function testGenerateIncludesDprParam(): void
+    public function testGetUrlIncludesDprParam(): void
     {
-        $url = $this->generator->generate('photo.jpg', new ImageParams(
+        $url = $this->loader->getUrl('photo.jpg', new ImageParams(
             width: 300,
             dpr: 2,
         ));
@@ -76,11 +76,11 @@ class GlideImageUrlGeneratorTest extends TestCase
         self::assertStringContainsString('dpr=2', $url);
     }
 
-    public function testGenerateWithDifferentPathsProducesDifferentSignatures(): void
+    public function testGetUrlWithDifferentPathsProducesDifferentSignatures(): void
     {
         $params = new ImageParams(width: 300);
-        $url1 = $this->generator->generate('photo1.jpg', $params);
-        $url2 = $this->generator->generate('photo2.jpg', $params);
+        $url1 = $this->loader->getUrl('photo1.jpg', $params);
+        $url2 = $this->loader->getUrl('photo2.jpg', $params);
 
         parse_str(parse_url($url1, \PHP_URL_QUERY) ?? '', $params1);
         parse_str(parse_url($url2, \PHP_URL_QUERY) ?? '', $params2);
@@ -88,10 +88,10 @@ class GlideImageUrlGeneratorTest extends TestCase
         self::assertNotSame($params1['s'], $params2['s']);
     }
 
-    public function testGenerateWithDifferentParamsProducesDifferentSignatures(): void
+    public function testGetUrlWithDifferentParamsProducesDifferentSignatures(): void
     {
-        $url1 = $this->generator->generate('photo.jpg', new ImageParams(width: 300));
-        $url2 = $this->generator->generate('photo.jpg', new ImageParams(width: 600));
+        $url1 = $this->loader->getUrl('photo.jpg', new ImageParams(width: 300));
+        $url2 = $this->loader->getUrl('photo.jpg', new ImageParams(width: 600));
 
         parse_str(parse_url($url1, \PHP_URL_QUERY) ?? '', $params1);
         parse_str(parse_url($url2, \PHP_URL_QUERY) ?? '', $params2);

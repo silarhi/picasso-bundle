@@ -1,18 +1,18 @@
 <?php
 
-namespace Silarhi\PicassoBundle\Url;
+namespace Silarhi\PicassoBundle\Loader;
 
 use League\Glide\Signatures\SignatureFactory;
 use Silarhi\PicassoBundle\Dto\ImageParams;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
 /**
- * Glide-backed implementation.
+ * Glide-backed loader.
  *
  * Maps agnostic ImageParams to Glide query parameters and generates
  * signed URLs via the Symfony router.
  */
-class GlideImageUrlGenerator implements ImageUrlGeneratorInterface
+class GlideLoader implements ImageLoaderInterface
 {
     public function __construct(
         private readonly UrlGeneratorInterface $router,
@@ -20,7 +20,7 @@ class GlideImageUrlGenerator implements ImageUrlGeneratorInterface
     ) {
     }
 
-    public function generate(string $path, ImageParams $params): string
+    public function getUrl(string $path, ImageParams $params): string
     {
         $glideParams = self::mapToGlideParams($params);
 
@@ -35,8 +35,6 @@ class GlideImageUrlGenerator implements ImageUrlGeneratorInterface
     }
 
     /**
-     * Map agnostic ImageParams to Glide-specific query parameters.
-     *
      * @return array<string, int|string>
      */
     private static function mapToGlideParams(ImageParams $params): array

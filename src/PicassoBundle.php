@@ -6,15 +6,18 @@ use League\Glide\Responses\SymfonyResponseFactory;
 use League\Glide\ServerFactory;
 use Silarhi\PicassoBundle\Controller\ImageController;
 use Silarhi\PicassoBundle\Dto\BlurPlaceholderConfig;
-use Silarhi\PicassoBundle\Loader\FileLoader;
-use Silarhi\PicassoBundle\Loader\FlysystemLoader;
-use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
+use Silarhi\PicassoBundle\Loader\GlideLoader;
+use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
+use Silarhi\PicassoBundle\Loader\ImgixLoader;
+use Silarhi\PicassoBundle\Resolver\AssetMapperResolver;
+use Silarhi\PicassoBundle\Resolver\FilesystemResolver;
+use Silarhi\PicassoBundle\Resolver\FlysystemResolver;
+use Silarhi\PicassoBundle\Resolver\ImageResolverInterface;
+use Silarhi\PicassoBundle\Resolver\VichUploaderResolver;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
 use Silarhi\PicassoBundle\Twig\Component\ImageComponent;
 use Silarhi\PicassoBundle\Twig\Extension\PicassoExtension;
-use Silarhi\PicassoBundle\Url\GlideImageUrlGenerator;
-use Silarhi\PicassoBundle\Url\ImageUrlGeneratorInterface;
-use Silarhi\PicassoBundle\Url\ImgixImageUrlGenerator;
+use Symfony\Component\AssetMapper\AssetMapperInterface;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
@@ -35,7 +38,7 @@ class PicassoBundle extends AbstractBundle
         $definition->rootNode()
             ->validate()
                 ->ifTrue(fn (array $v) => empty($v['glide']) && empty($v['imgix']))
-                ->thenInvalid('You must configure at least one provider ("glide" and/or "imgix").')
+                ->thenInvalid('You must configure at least one loader ("glide" and/or "imgix").')
             ->end()
             ->children()
                 ->arrayNode('device_sizes')
@@ -59,12 +62,12 @@ class PicassoBundle extends AbstractBundle
                     ->defaultValue(75)
                     ->min(1)->max(100)
                 ->end()
-                ->scalarNode('default_loader')
-                    ->defaultValue('file')
+                ->scalarNode('default_resolver')
+                    ->defaultValue('filesystem')
                 ->end()
-                ->scalarNode('default_provider')
+                ->scalarNode('default_loader')
                     ->defaultNull()
-                    ->info('Which provider to use by default ("glide" or "imgix"). Auto-detected when only one is configured.')
+                    ->info('Which loader to use by default ("glide" or "imgix"). Auto-detected when only one is configured.')
                 ->end()
                 ->arrayNode('blur_placeholder')
                     ->addDefaultsIfNotSet()
@@ -75,7 +78,7 @@ class PicassoBundle extends AbstractBundle
                         ->integerNode('quality')->defaultValue(30)->end()
                     ->end()
                 ->end()
-                ->arrayNode('file_loader')
+                ->arrayNode('filesystem')
                     ->addDefaultsIfNotSet()
                     ->children()
                         ->scalarNode('base_directory')->defaultNull()->end()
@@ -113,19 +116,19 @@ class PicassoBundle extends AbstractBundle
         $hasGlide = !empty($config['glide']);
         $hasImgix = !empty($config['imgix']);
 
-        // Determine default provider
-        $defaultProvider = $config['default_provider'];
-        if ($defaultProvider === null) {
+        // Determine default loader
+        $defaultLoader = $config['default_loader'];
+        if ($defaultLoader === null) {
             if ($hasGlide && !$hasImgix) {
-                $defaultProvider = 'glide';
+                $defaultLoader = 'glide';
             } elseif ($hasImgix && !$hasGlide) {
-                $defaultProvider = 'imgix';
+                $defaultLoader = 'imgix';
             } elseif ($hasGlide && $hasImgix) {
-                throw new \LogicException('When both "glide" and "imgix" providers are configured, you must set "default_provider" explicitly.');
+                throw new \LogicException('When both "glide" and "imgix" loaders are configured, you must set "default_loader" explicitly.');
             }
         }
 
-        // Register providers
+        // Register loaders
         if ($hasGlide) {
             $this->registerGlideServices($services, $config);
         }
@@ -133,10 +136,10 @@ class PicassoBundle extends AbstractBundle
             $this->registerImgixServices($services, $config);
         }
 
-        // Alias the default provider for backward compatibility
-        if ($defaultProvider !== null) {
-            $services->alias('picasso.url_generator', 'picasso.provider.'.$defaultProvider);
-            $services->alias(ImageUrlGeneratorInterface::class, 'picasso.provider.'.$defaultProvider);
+        // Alias the default loader
+        if ($defaultLoader !== null) {
+            $services->alias('picasso.default_loader', 'picasso.loader.'.$defaultLoader);
+            $services->alias(ImageLoaderInterface::class, 'picasso.loader.'.$defaultLoader);
         }
 
         // Srcset Generator
@@ -159,32 +162,39 @@ class PicassoBundle extends AbstractBundle
                 $blurConfig['quality'],
             ]);
 
-        // --- Loaders ---
+        // --- Resolvers ---
 
-        // File Loader
-        $fileLoaderBaseDir = $config['file_loader']['base_directory'] ?? null;
-        if ($fileLoaderBaseDir !== null) {
-            $services->set('picasso.loader.file', FileLoader::class)
-                ->args([$fileLoaderBaseDir])
-                ->tag('picasso.loader', ['key' => 'file']);
-        }
+        // Filesystem Resolver
+        $services->set('picasso.resolver.filesystem', FilesystemResolver::class)
+            ->args([$config['filesystem']['base_directory'] ?? null])
+            ->tag('picasso.resolver', ['key' => 'filesystem']);
 
-        // Flysystem Loader (always available, no dependencies)
-        $services->set('picasso.loader.flysystem', FlysystemLoader::class)
-            ->tag('picasso.loader', ['key' => 'flysystem']);
+        // Flysystem Resolver (always available, no dependencies)
+        $services->set('picasso.resolver.flysystem', FlysystemResolver::class)
+            ->tag('picasso.resolver', ['key' => 'flysystem']);
 
-        // VichUploader Loader (conditional)
+        // VichUploader Resolver (conditional)
         if (interface_exists(VichStorageInterface::class)) {
-            $services->set('picasso.loader.vich_uploader', VichUploaderLoader::class)
+            $services->set('picasso.resolver.vich_uploader', VichUploaderResolver::class)
                 ->args([service('Vich\\UploaderBundle\\Storage\\StorageInterface')])
-                ->tag('picasso.loader', ['key' => 'vich_uploader']);
+                ->tag('picasso.resolver', ['key' => 'vich_uploader']);
         }
+
+        // AssetMapper Resolver (conditional)
+        if (interface_exists(AssetMapperInterface::class)) {
+            $services->set('picasso.resolver.asset_mapper', AssetMapperResolver::class)
+                ->args([service('asset_mapper')])
+                ->tag('picasso.resolver', ['key' => 'asset_mapper']);
+        }
+
+        // Alias the default resolver
+        $services->alias(ImageResolverInterface::class, 'picasso.resolver.'.$config['default_resolver']);
 
         // Twig Extension
         $services->set('picasso.twig_extension', PicassoExtension::class)
             ->args([
-                tagged_locator('picasso.provider', 'key'),
-                $defaultProvider,
+                tagged_locator('picasso.loader', 'key'),
+                $defaultLoader,
             ])
             ->tag('twig.extension');
 
@@ -193,10 +203,10 @@ class PicassoBundle extends AbstractBundle
             ->args([
                 service('picasso.srcset_generator'),
                 service('picasso.blur_placeholder_config'),
+                tagged_locator('picasso.resolver', 'key'),
                 tagged_locator('picasso.loader', 'key'),
-                tagged_locator('picasso.provider', 'key'),
-                $config['default_loader'],
-                $defaultProvider,
+                $config['default_resolver'],
+                $defaultLoader,
                 $config['formats'],
                 $config['default_quality'],
             ])
@@ -232,14 +242,14 @@ class PicassoBundle extends AbstractBundle
             ->factory([ServerFactory::class, 'create'])
             ->args([$glideConfig]);
 
-        // Image URL Generator (Glide) — tagged as provider
-        $services->set('picasso.provider.glide', GlideImageUrlGenerator::class)
+        // Glide Loader — tagged as picasso.loader
+        $services->set('picasso.loader.glide', GlideLoader::class)
             ->args([
                 service('router'),
                 $config['glide']['sign_key'],
             ])
-            ->tag('picasso.provider', ['key' => 'glide']);
-        $services->alias(GlideImageUrlGenerator::class, 'picasso.provider.glide');
+            ->tag('picasso.loader', ['key' => 'glide']);
+        $services->alias(GlideLoader::class, 'picasso.loader.glide');
 
         // Image Controller (Glide only — serves transformed images)
         $services->set('picasso.controller.image', ImageController::class)
@@ -253,14 +263,14 @@ class PicassoBundle extends AbstractBundle
 
     private function registerImgixServices(object $services, array $config): void
     {
-        // Image URL Generator (imgix) — tagged as provider
-        $services->set('picasso.provider.imgix', ImgixImageUrlGenerator::class)
+        // Imgix Loader — tagged as picasso.loader
+        $services->set('picasso.loader.imgix', ImgixLoader::class)
             ->args([
                 $config['imgix']['domain'],
                 $config['imgix']['sign_key'],
                 $config['imgix']['use_https'],
             ])
-            ->tag('picasso.provider', ['key' => 'imgix']);
-        $services->alias(ImgixImageUrlGenerator::class, 'picasso.provider.imgix');
+            ->tag('picasso.loader', ['key' => 'imgix']);
+        $services->alias(ImgixLoader::class, 'picasso.loader.imgix');
     }
 }
