@@ -4,12 +4,13 @@ namespace Silarhi\PicassoBundle\Tests\Twig\Component;
 
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
+use Silarhi\PicassoBundle\Dto\BlurPlaceholderConfig;
 use Silarhi\PicassoBundle\Dto\ImageDimensions;
+use Silarhi\PicassoBundle\Dto\ImageParams;
 use Silarhi\PicassoBundle\Dto\ImageSource;
 use Silarhi\PicassoBundle\Dto\LoaderContext;
 use Silarhi\PicassoBundle\Dto\SrcsetEntry;
 use Silarhi\PicassoBundle\Loader\LoaderInterface;
-use Silarhi\PicassoBundle\Service\BlurHashGenerator;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
 use Silarhi\PicassoBundle\Twig\Component\ImageComponent;
 use Silarhi\PicassoBundle\Url\ImageUrlGeneratorInterface;
@@ -17,7 +18,6 @@ use Silarhi\PicassoBundle\Url\ImageUrlGeneratorInterface;
 class ImageComponentTest extends TestCase
 {
     private SrcsetGenerator $srcsetGenerator;
-    private BlurHashGenerator $blurHashGenerator;
     private ContainerInterface $loaders;
     private ContainerInterface $providers;
     private LoaderInterface $fileLoader;
@@ -26,7 +26,6 @@ class ImageComponentTest extends TestCase
     protected function setUp(): void
     {
         $this->srcsetGenerator = $this->createMock(SrcsetGenerator::class);
-        $this->blurHashGenerator = $this->createMock(BlurHashGenerator::class);
 
         $this->fileLoader = $this->createMock(LoaderInterface::class);
 
@@ -43,11 +42,11 @@ class ImageComponentTest extends TestCase
             ->willReturn($this->urlGenerator);
     }
 
-    private function createComponent(): ImageComponent
+    private function createComponent(bool $blurEnabled = false): ImageComponent
     {
         return new ImageComponent(
             srcsetGenerator: $this->srcsetGenerator,
-            blurHashGenerator: $this->blurHashGenerator,
+            blurConfig: new BlurPlaceholderConfig(enabled: $blurEnabled),
             loaders: $this->loaders,
             providers: $this->providers,
             defaultLoader: 'file',
@@ -63,7 +62,6 @@ class ImageComponentTest extends TestCase
             ->with(self::callback(fn (LoaderContext $ctx) => $ctx->getSourceAsString() === 'uploads/photo.jpg'))
             ->willReturn('uploads/photo.jpg');
         $this->fileLoader->method('getDimensions')->willReturn(new ImageDimensions(1920, 1080));
-        $this->blurHashGenerator->method('isEnabled')->willReturn(false);
         $this->configureSrcsetGenerator();
 
         $component = $this->createComponent();
@@ -90,7 +88,6 @@ class ImageComponentTest extends TestCase
     {
         $this->fileLoader->method('resolvePath')->willReturn('photo.jpg');
         $this->fileLoader->expects(self::never())->method('getDimensions');
-        $this->blurHashGenerator->method('isEnabled')->willReturn(false);
         $this->configureSrcsetGenerator();
 
         $component = $this->createComponent();
@@ -108,7 +105,6 @@ class ImageComponentTest extends TestCase
     {
         $this->fileLoader->method('resolvePath')->willReturn('photo.jpg');
         $this->fileLoader->method('getDimensions')->willReturn(new ImageDimensions(1024, 768));
-        $this->blurHashGenerator->method('isEnabled')->willReturn(false);
         $this->configureSrcsetGenerator();
 
         $component = $this->createComponent();
@@ -124,30 +120,52 @@ class ImageComponentTest extends TestCase
     {
         $this->fileLoader->method('resolvePath')->willReturn('photo.jpg');
         $this->fileLoader->method('getDimensions')->willReturn(new ImageDimensions(1920, 1080));
-        $this->blurHashGenerator->method('isEnabled')->willReturn(true);
-        $this->blurHashGenerator->method('generate')
-            ->with('photo.jpg', 1920, 1080)
-            ->willReturn('data:image/jpeg;base64,abc123');
         $this->configureSrcsetGenerator();
 
-        $component = $this->createComponent();
+        $this->urlGenerator->method('generate')
+            ->with('photo.jpg', self::callback(function (ImageParams $params): bool {
+                return $params->width === 10
+                    && $params->height === 6
+                    && $params->format === 'jpg'
+                    && $params->quality === 30
+                    && $params->fit === 'crop'
+                    && $params->blur === 50;
+            }))
+            ->willReturn('/picasso/image/photo.jpg?w=10&h=6&fm=jpg&q=30&blur=50');
+
+        $component = $this->createComponent(blurEnabled: true);
         $component->src = 'photo.jpg';
         $component->sizes = '100vw';
         $component->computeImageData();
 
-        self::assertSame('data:image/jpeg;base64,abc123', $component->blurDataUri);
+        self::assertSame('/picasso/image/photo.jpg?w=10&h=6&fm=jpg&q=30&blur=50', $component->blurDataUri);
     }
 
     public function testComputeImageDataSkipsBlurWhenPlaceholderFalse(): void
     {
         $this->fileLoader->method('resolvePath')->willReturn('photo.jpg');
         $this->fileLoader->method('getDimensions')->willReturn(new ImageDimensions(1920, 1080));
-        $this->blurHashGenerator->expects(self::never())->method('generate');
+        $this->urlGenerator->expects(self::never())->method('generate');
         $this->configureSrcsetGenerator();
 
-        $component = $this->createComponent();
+        $component = $this->createComponent(blurEnabled: true);
         $component->src = 'photo.jpg';
         $component->placeholder = false;
+        $component->sizes = '100vw';
+        $component->computeImageData();
+
+        self::assertNull($component->blurDataUri);
+    }
+
+    public function testComputeImageDataSkipsBlurWhenConfigDisabled(): void
+    {
+        $this->fileLoader->method('resolvePath')->willReturn('photo.jpg');
+        $this->fileLoader->method('getDimensions')->willReturn(new ImageDimensions(1920, 1080));
+        $this->urlGenerator->expects(self::never())->method('generate');
+        $this->configureSrcsetGenerator();
+
+        $component = $this->createComponent(blurEnabled: false);
+        $component->src = 'photo.jpg';
         $component->sizes = '100vw';
         $component->computeImageData();
 
@@ -158,7 +176,6 @@ class ImageComponentTest extends TestCase
     {
         $this->fileLoader->method('resolvePath')->willReturn('photo.jpg');
         $this->fileLoader->method('getDimensions')->willReturn(null);
-        $this->blurHashGenerator->method('isEnabled')->willReturn(false);
 
         $this->srcsetGenerator->method('generateSrcset')
             ->willReturnCallback(function (ImageUrlGeneratorInterface $urlGen, string $path, string $format): array {
@@ -208,12 +225,11 @@ class ImageComponentTest extends TestCase
         $loaders = $this->createMock(ContainerInterface::class);
         $loaders->method('get')->with('custom')->willReturn($customLoader);
 
-        $this->blurHashGenerator->method('isEnabled')->willReturn(false);
         $this->configureSrcsetGenerator();
 
         $component = new ImageComponent(
             srcsetGenerator: $this->srcsetGenerator,
-            blurHashGenerator: $this->blurHashGenerator,
+            blurConfig: new BlurPlaceholderConfig(enabled: false),
             loaders: $loaders,
             providers: $this->providers,
             defaultLoader: 'file',
@@ -241,12 +257,11 @@ class ImageComponentTest extends TestCase
 
         $this->fileLoader->method('resolvePath')->willReturn('photo.jpg');
         $this->fileLoader->method('getDimensions')->willReturn(new ImageDimensions(800, 600));
-        $this->blurHashGenerator->method('isEnabled')->willReturn(false);
         $this->configureSrcsetGenerator();
 
         $component = new ImageComponent(
             srcsetGenerator: $this->srcsetGenerator,
-            blurHashGenerator: $this->blurHashGenerator,
+            blurConfig: new BlurPlaceholderConfig(enabled: false),
             loaders: $this->loaders,
             providers: $providers,
             defaultLoader: 'file',
@@ -271,7 +286,6 @@ class ImageComponentTest extends TestCase
             }))
             ->willReturn('photo.jpg');
         $this->fileLoader->method('getDimensions')->willReturn(new ImageDimensions(100, 100));
-        $this->blurHashGenerator->method('isEnabled')->willReturn(false);
         $this->configureSrcsetGenerator();
 
         $component = $this->createComponent();
@@ -287,7 +301,6 @@ class ImageComponentTest extends TestCase
     {
         $this->srcsetGenerator->expects(self::never())->method('generateSrcset');
         $this->srcsetGenerator->expects(self::never())->method('getFallbackUrl');
-        $this->blurHashGenerator->expects(self::never())->method('generate');
 
         $component = $this->createComponent();
         $component->src = '/images/logo.svg';
@@ -321,6 +334,25 @@ class ImageComponentTest extends TestCase
         self::assertNull($component->placeholder);
         self::assertFalse($component->unoptimized);
         self::assertSame([], $component->context);
+    }
+
+    public function testPlaceholderPropOverridesConfig(): void
+    {
+        $this->fileLoader->method('resolvePath')->willReturn('photo.jpg');
+        $this->fileLoader->method('getDimensions')->willReturn(new ImageDimensions(800, 600));
+        $this->configureSrcsetGenerator();
+
+        $this->urlGenerator->method('generate')
+            ->willReturn('/picasso/image/photo.jpg?w=10&h=8&fm=jpg&q=30&blur=50');
+
+        // Config has blur disabled, but placeholder=true overrides it
+        $component = $this->createComponent(blurEnabled: false);
+        $component->src = 'photo.jpg';
+        $component->placeholder = true;
+        $component->sizes = '100vw';
+        $component->computeImageData();
+
+        self::assertNotNull($component->blurDataUri);
     }
 
     private function configureSrcsetGenerator(): void

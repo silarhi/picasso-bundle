@@ -9,9 +9,6 @@ use Silarhi\PicassoBundle\Dto\BlurPlaceholderConfig;
 use Silarhi\PicassoBundle\Loader\FileLoader;
 use Silarhi\PicassoBundle\Loader\FlysystemLoader;
 use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
-use Silarhi\PicassoBundle\Service\BlurHashGenerator;
-use Silarhi\PicassoBundle\Service\GlideBlurHashGenerator;
-use Silarhi\PicassoBundle\Service\NullBlurHashGenerator;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
 use Silarhi\PicassoBundle\Twig\Component\ImageComponent;
 use Silarhi\PicassoBundle\Twig\Extension\PicassoExtension;
@@ -136,12 +133,6 @@ class PicassoBundle extends AbstractBundle
             $this->registerImgixServices($services, $config);
         }
 
-        // BlurHash: use Glide if available, otherwise null
-        if (!$hasGlide) {
-            $services->set('picasso.blur_hash_generator', NullBlurHashGenerator::class);
-            $services->alias(BlurHashGenerator::class, 'picasso.blur_hash_generator');
-        }
-
         // Alias the default provider for backward compatibility
         if ($defaultProvider !== null) {
             $services->alias('picasso.url_generator', 'picasso.provider.'.$defaultProvider);
@@ -201,7 +192,7 @@ class PicassoBundle extends AbstractBundle
         $services->set('picasso.image_component', ImageComponent::class)
             ->args([
                 service('picasso.srcset_generator'),
-                service('picasso.blur_hash_generator'),
+                service('picasso.blur_placeholder_config'),
                 tagged_locator('picasso.loader', 'key'),
                 tagged_locator('picasso.provider', 'key'),
                 $config['default_loader'],
@@ -249,15 +240,6 @@ class PicassoBundle extends AbstractBundle
             ])
             ->tag('picasso.provider', ['key' => 'glide']);
         $services->alias(GlideImageUrlGenerator::class, 'picasso.provider.glide');
-
-        // BlurHash Generator (Glide-backed)
-        $services->set('picasso.blur_hash_generator', GlideBlurHashGenerator::class)
-            ->args([
-                service('picasso.glide_server'),
-                service('picasso.blur_placeholder_config'),
-            ]);
-        $services->alias(BlurHashGenerator::class, 'picasso.blur_hash_generator');
-        $services->alias(GlideBlurHashGenerator::class, 'picasso.blur_hash_generator');
 
         // Image Controller (Glide only — serves transformed images)
         $services->set('picasso.controller.image', ImageController::class)

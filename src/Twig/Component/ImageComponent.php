@@ -3,10 +3,11 @@
 namespace Silarhi\PicassoBundle\Twig\Component;
 
 use Psr\Container\ContainerInterface;
+use Silarhi\PicassoBundle\Dto\BlurPlaceholderConfig;
+use Silarhi\PicassoBundle\Dto\ImageParams;
 use Silarhi\PicassoBundle\Dto\ImageSource;
 use Silarhi\PicassoBundle\Dto\LoaderContext;
 use Silarhi\PicassoBundle\Loader\LoaderInterface;
-use Silarhi\PicassoBundle\Service\BlurHashGenerator;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
 use Silarhi\PicassoBundle\Url\ImageUrlGeneratorInterface;
 use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
@@ -77,7 +78,7 @@ class ImageComponent
 
     public function __construct(
         private readonly SrcsetGenerator $srcsetGenerator,
-        private readonly BlurHashGenerator $blurHashGenerator,
+        private readonly BlurPlaceholderConfig $blurConfig,
         private readonly ContainerInterface $loaders,
         private readonly ContainerInterface $providers,
         private readonly string $defaultLoader,
@@ -130,20 +131,30 @@ class ImageComponent
         $this->width ??= $resolvedWidth;
         $this->height ??= $resolvedHeight;
 
-        // Generate blur placeholder
-        $shouldBlur = $this->placeholder ?? $this->blurHashGenerator->isEnabled();
-        if ($shouldBlur) {
-            $this->blurDataUri = $this->blurHashGenerator->generate(
-                $this->resolvedPath,
-                $resolvedWidth,
-                $resolvedHeight,
-            );
-        }
-
         // Resolve URL generator from provider
         $providerName = $this->provider ?? $this->defaultProvider;
         /** @var ImageUrlGeneratorInterface $urlGenerator */
         $urlGenerator = $this->providers->get($providerName);
+
+        // Generate blur placeholder URL via the provider
+        $shouldBlur = $this->placeholder ?? $this->blurConfig->enabled;
+        if ($shouldBlur) {
+            $tinyWidth = $this->blurConfig->size;
+            $tinyHeight = $this->blurConfig->size;
+
+            if ($resolvedWidth !== null && $resolvedHeight !== null && $resolvedWidth > 0) {
+                $tinyHeight = max(1, (int) round($tinyWidth * $resolvedHeight / $resolvedWidth));
+            }
+
+            $this->blurDataUri = $urlGenerator->generate($this->resolvedPath, new ImageParams(
+                width: $tinyWidth,
+                height: $tinyHeight,
+                format: 'jpg',
+                quality: $this->blurConfig->quality,
+                fit: 'crop',
+                blur: $this->blurConfig->blur,
+            ));
+        }
 
         // Generate sources for each format
         $quality = $this->quality ?? $this->defaultQuality;
