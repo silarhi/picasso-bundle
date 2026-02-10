@@ -15,6 +15,7 @@ use Silarhi\PicassoBundle\Resolver\AssetMapperResolver;
 use Silarhi\PicassoBundle\Resolver\FilesystemResolver;
 use Silarhi\PicassoBundle\Resolver\FlysystemResolver;
 use Silarhi\PicassoBundle\Resolver\ImageResolverInterface;
+use Silarhi\PicassoBundle\Resolver\VichMappingHelper;
 use Silarhi\PicassoBundle\Resolver\VichUploaderResolver;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
 use Silarhi\PicassoBundle\Twig\Component\ImageComponent;
@@ -197,8 +198,14 @@ class PicassoBundle extends AbstractBundle
 
         // VichUploader Resolver (conditional)
         if (interface_exists(VichStorageInterface::class)) {
+            $services->set('picasso.vich_mapping_helper', VichMappingHelper::class)
+                ->args([service('Vich\\UploaderBundle\\Mapping\\PropertyMappingFactory')]);
+
             $services->set('picasso.resolver.vich_uploader', VichUploaderResolver::class)
-                ->args([service('Vich\\UploaderBundle\\Storage\\StorageInterface')])
+                ->args([
+                    service('Vich\\UploaderBundle\\Storage\\StorageInterface'),
+                    service('picasso.vich_mapping_helper'),
+                ])
                 ->tag('picasso.resolver', ['key' => 'vich_uploader']);
         }
 

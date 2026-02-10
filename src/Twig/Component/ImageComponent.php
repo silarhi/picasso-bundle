@@ -104,7 +104,13 @@ class ImageComponent
         /** @var ImageResolverInterface $resolver */
         $resolver = $this->resolvers->get($resolverName);
 
-        $resolved = $resolver->resolve($this->src, $this->context);
+        $ctx = $this->context;
+        if ($this->sourceWidth !== null && $this->sourceHeight !== null) {
+            $ctx['sourceWidth'] = $this->sourceWidth;
+            $ctx['sourceHeight'] = $this->sourceHeight;
+        }
+
+        $resolved = $resolver->resolve($this->src, $ctx);
         $this->resolvedPath = $resolved->path;
 
         // Resolve dimensions: explicit props > resolver detection > display dims

@@ -9,33 +9,49 @@ class VichUploaderResolver implements ImageResolverInterface
 {
     public function __construct(
         private readonly StorageInterface $storage,
+        private readonly VichMappingHelper $mappingHelper,
     ) {
     }
 
     public function resolve(string $source, array $context = []): ResolvedImage
     {
         $entity = $context['entity'] ?? null;
+
+        if ($entity === null) {
+            return new ResolvedImage(ltrim($source, '/'));
+        }
+
         $field = $context['field'] ?? null;
+        $fileProperty = $this->mappingHelper->getFilePropertyName($entity, $field);
 
-        if ($entity !== null && $field !== null) {
-            $path = $this->storage->resolvePath($entity, $field, null, true);
+        if ($fileProperty === null) {
+            return new ResolvedImage(ltrim($source, '/'));
+        }
 
+        $path = $this->storage->resolvePath($entity, $fileProperty, null, true);
+
+        // Skip dimension detection when source dimensions are provided
+        if (isset($context['sourceWidth'], $context['sourceHeight'])) {
             return new ResolvedImage(
                 ltrim($path ?? '', '/'),
-                ...self::detectDimensions($entity, $field),
+                $context['sourceWidth'],
+                $context['sourceHeight'],
             );
         }
 
-        return new ResolvedImage(ltrim($source, '/'));
+        return new ResolvedImage(
+            ltrim($path ?? '', '/'),
+            ...self::detectDimensions($entity, $fileProperty),
+        );
     }
 
     /**
      * @return array{width: int|null, height: int|null}
      */
-    private static function detectDimensions(object $entity, string $field): array
+    private static function detectDimensions(object $entity, string $fileProperty): array
     {
-        // Try get<Field>Dimensions() method
-        $dimensionsGetter = 'get'.ucfirst($field).'Dimensions';
+        // Try get<FileProperty>Dimensions() method
+        $dimensionsGetter = 'get'.ucfirst($fileProperty).'Dimensions';
         if (method_exists($entity, $dimensionsGetter)) {
             $dims = $entity->$dimensionsGetter();
             if (\is_array($dims) && \count($dims) === 2) {
@@ -44,7 +60,7 @@ class VichUploaderResolver implements ImageResolverInterface
         }
 
         // Try embedded File object approach
-        $fileGetter = 'get'.ucfirst($field);
+        $fileGetter = 'get'.ucfirst($fileProperty);
         if (method_exists($entity, $fileGetter)) {
             $file = $entity->$fileGetter();
             if ($file !== null && method_exists($file, 'getDimensions')) {

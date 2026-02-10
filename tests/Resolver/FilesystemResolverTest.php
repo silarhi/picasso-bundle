@@ -122,6 +122,34 @@ class FilesystemResolverTest extends TestCase
         self::assertSame(50, $result->width);
     }
 
+    public function testResolveSkipsDimensionDetectionWhenSourceDimensionsProvided(): void
+    {
+        $img = imagecreatetruecolor(50, 30);
+        imagepng($img, $this->tempDir.'/skip.png');
+        imagedestroy($img);
+
+        $resolver = new FilesystemResolver($this->tempDir);
+        $result = $resolver->resolve('skip.png', [
+            'sourceWidth' => 800,
+            'sourceHeight' => 600,
+        ]);
+
+        self::assertSame(800, $result->width);
+        self::assertSame(600, $result->height);
+    }
+
+    public function testResolveStillDetectsDimensionsWithoutBaseDirectoryWhenSourceDimensionsProvided(): void
+    {
+        $resolver = new FilesystemResolver();
+        $result = $resolver->resolve('photo.jpg', [
+            'sourceWidth' => 1024,
+            'sourceHeight' => 768,
+        ]);
+
+        self::assertSame(1024, $result->width);
+        self::assertSame(768, $result->height);
+    }
+
     private function removeDirectory(string $dir): void
     {
         if (!is_dir($dir)) {

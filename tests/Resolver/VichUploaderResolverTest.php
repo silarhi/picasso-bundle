@@ -3,6 +3,7 @@
 namespace Silarhi\PicassoBundle\Tests\Resolver;
 
 use PHPUnit\Framework\TestCase;
+use Silarhi\PicassoBundle\Resolver\VichMappingHelper;
 use Silarhi\PicassoBundle\Resolver\VichUploaderResolver;
 use Vich\UploaderBundle\Storage\StorageInterface;
 
@@ -10,6 +11,7 @@ class VichUploaderResolverTest extends TestCase
 {
     private VichUploaderResolver $resolver;
     private StorageInterface $storage;
+    private VichMappingHelper $mappingHelper;
 
     protected function setUp(): void
     {
@@ -18,7 +20,8 @@ class VichUploaderResolverTest extends TestCase
         }
 
         $this->storage = $this->createMock(StorageInterface::class);
-        $this->resolver = new VichUploaderResolver($this->storage);
+        $this->mappingHelper = $this->createMock(VichMappingHelper::class);
+        $this->resolver = new VichUploaderResolver($this->storage, $this->mappingHelper);
     }
 
     public function testResolveWithStringSource(): void
@@ -30,9 +33,13 @@ class VichUploaderResolverTest extends TestCase
         self::assertNull($result->height);
     }
 
-    public function testResolveWithEntityContext(): void
+    public function testResolveWithEntityAndFieldContext(): void
     {
         $entity = new \stdClass();
+
+        $this->mappingHelper->method('getFilePropertyName')
+            ->with($entity, 'imageFile')
+            ->willReturn('imageFile');
 
         $this->storage->method('resolvePath')
             ->with($entity, 'imageFile', null, true)
@@ -46,9 +53,47 @@ class VichUploaderResolverTest extends TestCase
         self::assertSame('2024/february/photo.jpg', $result->path);
     }
 
+    public function testResolveAutoDetectsFieldWhenNull(): void
+    {
+        $entity = new \stdClass();
+
+        $this->mappingHelper->method('getFilePropertyName')
+            ->with($entity, null)
+            ->willReturn('imageFile');
+
+        $this->storage->method('resolvePath')
+            ->with($entity, 'imageFile', null, true)
+            ->willReturn('auto/detected.jpg');
+
+        $result = $this->resolver->resolve('photo.jpg', [
+            'entity' => $entity,
+        ]);
+
+        self::assertSame('auto/detected.jpg', $result->path);
+    }
+
+    public function testResolveFallsBackWhenNoMappingFound(): void
+    {
+        $entity = new \stdClass();
+
+        $this->mappingHelper->method('getFilePropertyName')
+            ->with($entity, null)
+            ->willReturn(null);
+
+        $result = $this->resolver->resolve('photo.jpg', [
+            'entity' => $entity,
+        ]);
+
+        self::assertSame('photo.jpg', $result->path);
+        self::assertNull($result->width);
+    }
+
     public function testResolveWithEntityStripsLeadingSlash(): void
     {
         $entity = new \stdClass();
+
+        $this->mappingHelper->method('getFilePropertyName')
+            ->willReturn('imageFile');
 
         $this->storage->method('resolvePath')
             ->with($entity, 'imageFile', null, true)
@@ -66,6 +111,9 @@ class VichUploaderResolverTest extends TestCase
     {
         $entity = new \stdClass();
 
+        $this->mappingHelper->method('getFilePropertyName')
+            ->willReturn('imageFile');
+
         $this->storage->method('resolvePath')
             ->willReturn(null);
 
@@ -80,17 +128,20 @@ class VichUploaderResolverTest extends TestCase
     public function testResolveDetectsDimensionsFromGetterMethod(): void
     {
         $entity = new class {
-            public function getImageDimensions(): array
+            public function getImageFileDimensions(): array
             {
                 return [1920, 1080];
             }
         };
 
+        $this->mappingHelper->method('getFilePropertyName')
+            ->willReturn('imageFile');
+
         $this->storage->method('resolvePath')->willReturn('photo.jpg');
 
         $result = $this->resolver->resolve('photo.jpg', [
             'entity' => $entity,
-            'field' => 'image',
+            'field' => 'imageFile',
         ]);
 
         self::assertSame(1920, $result->width);
@@ -111,17 +162,20 @@ class VichUploaderResolverTest extends TestCase
             {
             }
 
-            public function getImage(): object
+            public function getImageFile(): object
             {
                 return $this->file;
             }
         };
 
+        $this->mappingHelper->method('getFilePropertyName')
+            ->willReturn('imageFile');
+
         $this->storage->method('resolvePath')->willReturn('photo.jpg');
 
         $result = $this->resolver->resolve('photo.jpg', [
             'entity' => $entity,
-            'field' => 'image',
+            'field' => 'imageFile',
         ]);
 
         self::assertSame(800, $result->width);
@@ -132,15 +186,43 @@ class VichUploaderResolverTest extends TestCase
     {
         $entity = new \stdClass();
 
+        $this->mappingHelper->method('getFilePropertyName')
+            ->willReturn('imageFile');
+
         $this->storage->method('resolvePath')->willReturn('photo.jpg');
 
         $result = $this->resolver->resolve('photo.jpg', [
             'entity' => $entity,
-            'field' => 'image',
+            'field' => 'imageFile',
         ]);
 
         self::assertNull($result->width);
         self::assertNull($result->height);
+    }
+
+    public function testResolveSkipsDimensionDetectionWhenSourceDimensionsProvided(): void
+    {
+        $entity = new class {
+            public function getImageFileDimensions(): array
+            {
+                return [1920, 1080];
+            }
+        };
+
+        $this->mappingHelper->method('getFilePropertyName')
+            ->willReturn('imageFile');
+
+        $this->storage->method('resolvePath')->willReturn('photo.jpg');
+
+        $result = $this->resolver->resolve('photo.jpg', [
+            'entity' => $entity,
+            'field' => 'imageFile',
+            'sourceWidth' => 500,
+            'sourceHeight' => 400,
+        ]);
+
+        self::assertSame(500, $result->width);
+        self::assertSame(400, $result->height);
     }
 
     public function testResolveFallsBackToStringWhenNoEntity(): void

@@ -15,6 +15,11 @@ class FilesystemResolver implements ImageResolverInterface
     {
         $path = ltrim($source, '/');
 
+        // Skip dimension detection when source dimensions are provided
+        if (isset($context['sourceWidth'], $context['sourceHeight'])) {
+            return new ResolvedImage($path, $context['sourceWidth'], $context['sourceHeight']);
+        }
+
         $width = null;
         $height = null;
 
