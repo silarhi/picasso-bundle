@@ -2,9 +2,10 @@
 
 namespace Silarhi\PicassoBundle\Service;
 
-use Silarhi\PicassoBundle\Dto\ImageParams;
+use Silarhi\PicassoBundle\Dto\Image;
+use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Dto\SrcsetEntry;
-use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
+use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 
 class SrcsetGenerator
 {
@@ -23,9 +24,6 @@ class SrcsetGenerator
 
     /**
      * Determine which widths to include in the srcset.
-     *
-     * Responsive mode (sizes given): all deviceSizes + imageSizes, merged and sorted.
-     * Fixed mode (sizes null, width given): 1x and 2x of the specified width.
      *
      * @return int[]
      */
@@ -49,19 +47,22 @@ class SrcsetGenerator
     }
 
     /**
-     * Generate srcset entries for a given source path and format.
+     * Generate srcset entries for a given image and format.
+     *
+     * @param array<string, mixed> $context
      *
      * @return SrcsetEntry[]
      */
     public function generateSrcset(
-        ImageLoaderInterface $loader,
-        string $path,
+        ImageTransformerInterface $transformer,
+        Image $image,
         string $format,
         ?int $width = null,
         ?int $height = null,
         ?string $sizes = null,
         ?int $quality = null,
         string $fit = 'contain',
+        array $context = [],
     ): array {
         $quality ??= $this->defaultQuality;
         $widths = $this->getWidths($sizes, $width);
@@ -69,18 +70,20 @@ class SrcsetGenerator
         $entries = [];
 
         foreach ($widths as $index => $w) {
-            $params = new ImageParams(
+            $h = null;
+            if ($isFixed && $width > 0 && $height !== null && $height > 0) {
+                $h = (int) round($w * $height / $width);
+            }
+
+            $transformation = new ImageTransformation(
                 width: $w,
+                height: $h,
                 format: $format,
                 quality: $quality,
                 fit: $fit,
             );
 
-            if ($isFixed && $width > 0 && $height !== null && $height > 0) {
-                $params = $params->withHeight((int) round($w * $height / $width));
-            }
-
-            $url = $loader->getUrl($path, $params);
+            $url = $transformer->url($image, $transformation, $context);
             $descriptor = $isFixed ? ($index + 1).'x' : $w.'w';
 
             $entries[] = new SrcsetEntry($url, $descriptor);
@@ -103,26 +106,29 @@ class SrcsetGenerator
     }
 
     /**
-     * Get the fallback src URL (used on the <img> tag's src attribute).
+     * Get the fallback src URL.
+     *
+     * @param array<string, mixed> $context
      */
     public function getFallbackUrl(
-        ImageLoaderInterface $loader,
-        string $path,
+        ImageTransformerInterface $transformer,
+        Image $image,
         string $format,
         ?int $width = null,
         ?int $height = null,
         ?int $quality = null,
         string $fit = 'contain',
+        array $context = [],
     ): string {
         $quality ??= $this->defaultQuality;
 
-        return $loader->getUrl($path, new ImageParams(
+        return $transformer->url($image, new ImageTransformation(
             width: $width,
             height: $height,
             format: $format,
             quality: $quality,
             fit: $fit,
-        ));
+        ), $context);
     }
 
     /**

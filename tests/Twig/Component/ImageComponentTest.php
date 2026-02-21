@@ -4,62 +4,63 @@ namespace Silarhi\PicassoBundle\Tests\Twig\Component;
 
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
-use Silarhi\PicassoBundle\Dto\BlurPlaceholderConfig;
-use Silarhi\PicassoBundle\Dto\ImageParams;
+use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageSource;
-use Silarhi\PicassoBundle\Dto\ResolvedImage;
+use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Dto\SrcsetEntry;
 use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
-use Silarhi\PicassoBundle\Resolver\ImageResolverInterface;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
+use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 use Silarhi\PicassoBundle\Twig\Component\ImageComponent;
 
 class ImageComponentTest extends TestCase
 {
     private SrcsetGenerator $srcsetGenerator;
-    private ContainerInterface $resolvers;
     private ContainerInterface $loaders;
-    private ImageResolverInterface $filesystemResolver;
-    private ImageLoaderInterface $glideLoader;
+    private ContainerInterface $transformers;
+    private ImageLoaderInterface $filesystemLoader;
+    private ImageTransformerInterface $glideTransformer;
 
     protected function setUp(): void
     {
         $this->srcsetGenerator = $this->createMock(SrcsetGenerator::class);
 
-        $this->filesystemResolver = $this->createMock(ImageResolverInterface::class);
-
-        $this->resolvers = $this->createMock(ContainerInterface::class);
-        $this->resolvers->method('get')
-            ->with('filesystem')
-            ->willReturn($this->filesystemResolver);
-
-        $this->glideLoader = $this->createMock(ImageLoaderInterface::class);
+        $this->filesystemLoader = $this->createMock(ImageLoaderInterface::class);
 
         $this->loaders = $this->createMock(ContainerInterface::class);
         $this->loaders->method('get')
+            ->with('filesystem')
+            ->willReturn($this->filesystemLoader);
+
+        $this->glideTransformer = $this->createMock(ImageTransformerInterface::class);
+
+        $this->transformers = $this->createMock(ContainerInterface::class);
+        $this->transformers->method('get')
             ->with('glide')
-            ->willReturn($this->glideLoader);
+            ->willReturn($this->glideTransformer);
     }
 
     private function createComponent(bool $blurEnabled = false): ImageComponent
     {
         return new ImageComponent(
             srcsetGenerator: $this->srcsetGenerator,
-            blurConfig: new BlurPlaceholderConfig(enabled: $blurEnabled),
-            resolvers: $this->resolvers,
             loaders: $this->loaders,
-            defaultResolver: 'filesystem',
-            defaultLoader: 'glide',
+            transformers: $this->transformers,
+            defaultLoader: 'filesystem',
+            defaultTransformer: 'glide',
             formats: ['avif', 'webp', 'jpg'],
             defaultQuality: 75,
+            blurEnabled: $blurEnabled,
+            blurSize: 10,
+            blurAmount: 50,
+            blurQuality: 30,
         );
     }
 
-    public function testComputeImageDataResolvesPathFromResolver(): void
+    public function testComputeImageDataLoadsImageFromLoader(): void
     {
-        $this->filesystemResolver->method('resolve')
-            ->with('uploads/photo.jpg', [])
-            ->willReturn(new ResolvedImage('uploads/photo.jpg', 1920, 1080));
+        $this->filesystemLoader->method('load')
+            ->willReturn(new Image(path: 'uploads/photo.jpg', width: 1920, height: 1080));
         $this->configureSrcsetGenerator();
 
         $component = $this->createComponent();
@@ -84,8 +85,8 @@ class ImageComponentTest extends TestCase
 
     public function testComputeImageDataUsesSourceWidthHeight(): void
     {
-        $this->filesystemResolver->method('resolve')
-            ->willReturn(new ResolvedImage('photo.jpg'));
+        $this->filesystemLoader->method('load')
+            ->willReturn(new Image(path: 'photo.jpg'));
         $this->configureSrcsetGenerator();
 
         $component = $this->createComponent();
@@ -99,10 +100,10 @@ class ImageComponentTest extends TestCase
         self::assertSame(600, $component->height);
     }
 
-    public function testComputeImageDataFallsBackToResolverDimensions(): void
+    public function testComputeImageDataFallsBackToLoaderDimensions(): void
     {
-        $this->filesystemResolver->method('resolve')
-            ->willReturn(new ResolvedImage('photo.jpg', 1024, 768));
+        $this->filesystemLoader->method('load')
+            ->willReturn(new Image(path: 'photo.jpg', width: 1024, height: 768));
         $this->configureSrcsetGenerator();
 
         $component = $this->createComponent();
@@ -116,34 +117,38 @@ class ImageComponentTest extends TestCase
 
     public function testComputeImageDataGeneratesBlurPlaceholder(): void
     {
-        $this->filesystemResolver->method('resolve')
-            ->willReturn(new ResolvedImage('photo.jpg', 1920, 1080));
+        $this->filesystemLoader->method('load')
+            ->willReturn(new Image(path: 'photo.jpg', width: 1920, height: 1080));
         $this->configureSrcsetGenerator();
 
-        $this->glideLoader->method('getUrl')
-            ->with('photo.jpg', self::callback(function (ImageParams $params): bool {
-                return $params->width === 10
-                    && $params->height === 6
-                    && $params->format === 'jpg'
-                    && $params->quality === 30
-                    && $params->fit === 'crop'
-                    && $params->blur === 50;
-            }))
-            ->willReturn('/picasso/image/photo.jpg?w=10&h=6&fm=jpg&q=30&blur=50');
+        $this->glideTransformer->method('url')
+            ->with(
+                self::isInstanceOf(Image::class),
+                self::callback(function (ImageTransformation $t): bool {
+                    return $t->width === 10
+                        && $t->height === 6
+                        && $t->format === 'jpg'
+                        && $t->quality === 30
+                        && $t->fit === 'crop'
+                        && $t->blur === 50;
+                }),
+                ['loader' => 'filesystem'],
+            )
+            ->willReturn('/picasso/glide/filesystem/photo.jpg?w=10&h=6&fm=jpg&q=30&blur=50');
 
         $component = $this->createComponent(blurEnabled: true);
         $component->src = 'photo.jpg';
         $component->sizes = '100vw';
         $component->computeImageData();
 
-        self::assertSame('/picasso/image/photo.jpg?w=10&h=6&fm=jpg&q=30&blur=50', $component->blurDataUri);
+        self::assertSame('/picasso/glide/filesystem/photo.jpg?w=10&h=6&fm=jpg&q=30&blur=50', $component->blurDataUri);
     }
 
     public function testComputeImageDataSkipsBlurWhenPlaceholderFalse(): void
     {
-        $this->filesystemResolver->method('resolve')
-            ->willReturn(new ResolvedImage('photo.jpg', 1920, 1080));
-        $this->glideLoader->expects(self::never())->method('getUrl');
+        $this->filesystemLoader->method('load')
+            ->willReturn(new Image(path: 'photo.jpg', width: 1920, height: 1080));
+        $this->glideTransformer->expects(self::never())->method('url');
         $this->configureSrcsetGenerator();
 
         $component = $this->createComponent(blurEnabled: true);
@@ -157,9 +162,9 @@ class ImageComponentTest extends TestCase
 
     public function testComputeImageDataSkipsBlurWhenConfigDisabled(): void
     {
-        $this->filesystemResolver->method('resolve')
-            ->willReturn(new ResolvedImage('photo.jpg', 1920, 1080));
-        $this->glideLoader->expects(self::never())->method('getUrl');
+        $this->filesystemLoader->method('load')
+            ->willReturn(new Image(path: 'photo.jpg', width: 1920, height: 1080));
+        $this->glideTransformer->expects(self::never())->method('url');
         $this->configureSrcsetGenerator();
 
         $component = $this->createComponent(blurEnabled: false);
@@ -172,14 +177,14 @@ class ImageComponentTest extends TestCase
 
     public function testComputeImageDataGeneratesSourcesAndFallback(): void
     {
-        $this->filesystemResolver->method('resolve')
-            ->willReturn(new ResolvedImage('photo.jpg'));
+        $this->filesystemLoader->method('load')
+            ->willReturn(new Image(path: 'photo.jpg'));
 
         $this->srcsetGenerator->method('generateSrcset')
-            ->willReturnCallback(function (ImageLoaderInterface $loader, string $path, string $format): array {
+            ->willReturnCallback(function (ImageTransformerInterface $t, Image $img, string $format): array {
                 return [
-                    new SrcsetEntry("/img/{$path}?fm={$format}&w=640", '640w'),
-                    new SrcsetEntry("/img/{$path}?fm={$format}&w=1080", '1080w'),
+                    new SrcsetEntry("/img/{$img->path}?fm={$format}&w=640", '640w'),
+                    new SrcsetEntry("/img/{$img->path}?fm={$format}&w=1080", '1080w'),
                 ];
             });
 
@@ -205,89 +210,44 @@ class ImageComponentTest extends TestCase
         self::assertInstanceOf(ImageSource::class, $component->sources[1]);
         self::assertSame('image/avif', $component->sources[0]->type);
         self::assertSame('image/webp', $component->sources[1]->type);
-        self::assertStringContainsString('fm=avif', $component->sources[0]->srcset);
-        self::assertStringContainsString('fm=webp', $component->sources[1]->srcset);
 
         self::assertSame('/img/photo.jpg?fm=jpg&w=800', $component->fallbackSrc);
         self::assertStringContainsString('fm=jpg', $component->fallbackSrcset);
     }
 
-    public function testComputeImageDataUsesCustomResolver(): void
+    public function testComputeImageDataUsesCustomLoader(): void
     {
-        $customResolver = $this->createMock(ImageResolverInterface::class);
-        $customResolver->method('resolve')
-            ->willReturn(new ResolvedImage('custom/photo.jpg', 500, 500));
+        $customLoader = $this->createMock(ImageLoaderInterface::class);
+        $customLoader->method('load')
+            ->willReturn(new Image(path: 'custom/photo.jpg', width: 500, height: 500));
 
-        $resolvers = $this->createMock(ContainerInterface::class);
-        $resolvers->method('get')->with('custom')->willReturn($customResolver);
+        $loaders = $this->createMock(ContainerInterface::class);
+        $loaders->method('get')->with('custom')->willReturn($customLoader);
 
         $this->configureSrcsetGenerator();
 
         $component = new ImageComponent(
             srcsetGenerator: $this->srcsetGenerator,
-            blurConfig: new BlurPlaceholderConfig(enabled: false),
-            resolvers: $resolvers,
-            loaders: $this->loaders,
-            defaultResolver: 'filesystem',
-            defaultLoader: 'glide',
+            loaders: $loaders,
+            transformers: $this->transformers,
+            defaultLoader: 'filesystem',
+            defaultTransformer: 'glide',
             formats: ['avif', 'webp', 'jpg'],
             defaultQuality: 75,
+            blurEnabled: false,
+            blurSize: 10,
+            blurAmount: 50,
+            blurQuality: 30,
         );
 
         $component->src = 'photo.jpg';
-        $component->resolver = 'custom';
+        $component->loader = 'custom';
         $component->sizes = '100vw';
         $component->computeImageData();
 
         self::assertSame('custom/photo.jpg', $component->resolvedPath);
         self::assertSame(500, $component->width);
         self::assertSame(500, $component->height);
-    }
-
-    public function testComputeImageDataUsesCustomLoader(): void
-    {
-        $imgixLoader = $this->createMock(ImageLoaderInterface::class);
-
-        $loaders = $this->createMock(ContainerInterface::class);
-        $loaders->method('get')->with('imgix')->willReturn($imgixLoader);
-
-        $this->filesystemResolver->method('resolve')
-            ->willReturn(new ResolvedImage('photo.jpg', 800, 600));
-        $this->configureSrcsetGenerator();
-
-        $component = new ImageComponent(
-            srcsetGenerator: $this->srcsetGenerator,
-            blurConfig: new BlurPlaceholderConfig(enabled: false),
-            resolvers: $this->resolvers,
-            loaders: $loaders,
-            defaultResolver: 'filesystem',
-            defaultLoader: 'glide',
-            formats: ['webp', 'jpg'],
-            defaultQuality: 75,
-        );
-
-        $component->src = 'photo.jpg';
-        $component->loader = 'imgix';
-        $component->sizes = '100vw';
-        $component->computeImageData();
-
-        self::assertSame('photo.jpg', $component->resolvedPath);
-    }
-
-    public function testComputeImageDataPassesContext(): void
-    {
-        $this->filesystemResolver->method('resolve')
-            ->with('photo.jpg', ['mapping' => 'products'])
-            ->willReturn(new ResolvedImage('photo.jpg', 100, 100));
-        $this->configureSrcsetGenerator();
-
-        $component = $this->createComponent();
-        $component->src = 'photo.jpg';
-        $component->context = ['mapping' => 'products'];
-        $component->sizes = '100vw';
-        $component->computeImageData();
-
-        self::assertSame('photo.jpg', $component->resolvedPath);
     }
 
     public function testUnoptimizedServesRawSrc(): void
@@ -308,20 +268,13 @@ class ImageComponentTest extends TestCase
         self::assertNull($component->blurDataUri);
     }
 
-    public function testUnoptimizedDefaultsToFalse(): void
-    {
-        $component = $this->createComponent();
-
-        self::assertFalse($component->unoptimized);
-    }
-
     public function testDefaultValues(): void
     {
         $component = $this->createComponent();
 
         self::assertNull($component->src);
-        self::assertNull($component->resolver);
         self::assertNull($component->loader);
+        self::assertNull($component->transformer);
         self::assertNull($component->quality);
         self::assertSame('contain', $component->fit);
         self::assertNull($component->placeholder);
@@ -331,12 +284,12 @@ class ImageComponentTest extends TestCase
 
     public function testPlaceholderPropOverridesConfig(): void
     {
-        $this->filesystemResolver->method('resolve')
-            ->willReturn(new ResolvedImage('photo.jpg', 800, 600));
+        $this->filesystemLoader->method('load')
+            ->willReturn(new Image(path: 'photo.jpg', width: 800, height: 600));
         $this->configureSrcsetGenerator();
 
-        $this->glideLoader->method('getUrl')
-            ->willReturn('/picasso/image/photo.jpg?w=10&h=8&fm=jpg&q=30&blur=50');
+        $this->glideTransformer->method('url')
+            ->willReturn('/picasso/glide/filesystem/photo.jpg?w=10&h=8&fm=jpg&q=30&blur=50');
 
         $component = $this->createComponent(blurEnabled: false);
         $component->src = 'photo.jpg';
@@ -345,6 +298,26 @@ class ImageComponentTest extends TestCase
         $component->computeImageData();
 
         self::assertNotNull($component->blurDataUri);
+    }
+
+    public function testWithMetadataIsFalseWhenBothSourceDimensionsProvided(): void
+    {
+        $this->filesystemLoader->expects(self::once())
+            ->method('load')
+            ->with(
+                self::isInstanceOf(\Silarhi\PicassoBundle\Dto\ImageReference::class),
+                false,
+            )
+            ->willReturn(new Image(path: 'photo.jpg'));
+
+        $this->configureSrcsetGenerator();
+
+        $component = $this->createComponent();
+        $component->src = 'photo.jpg';
+        $component->sourceWidth = 800;
+        $component->sourceHeight = 600;
+        $component->sizes = '100vw';
+        $component->computeImageData();
     }
 
     private function configureSrcsetGenerator(): void

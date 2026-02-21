@@ -1,18 +1,14 @@
 <?php
 
-namespace Silarhi\PicassoBundle\Loader;
+namespace Silarhi\PicassoBundle\Transformer;
 
-use Silarhi\PicassoBundle\Dto\ImageParams;
+use Silarhi\PicassoBundle\Dto\Image;
+use Silarhi\PicassoBundle\Dto\ImageTransformation;
 
 /**
- * Imgix-backed loader.
- *
- * Maps agnostic ImageParams to imgix query parameters and generates
- * URLs pointing to the imgix CDN.
- *
  * @see https://docs.imgix.com/apis/rendering
  */
-class ImgixLoader implements ImageLoaderInterface
+class ImgixTransformer implements ImageTransformerInterface
 {
     public function __construct(
         private readonly string $domain,
@@ -21,11 +17,11 @@ class ImgixLoader implements ImageLoaderInterface
     ) {
     }
 
-    public function getUrl(string $path, ImageParams $params): string
+    public function url(Image $image, ImageTransformation $transformation, array $context = []): string
     {
-        $imgixParams = self::mapToImgixParams($params);
+        $imgixParams = self::mapToImgixParams($transformation);
 
-        $path = '/'.ltrim($path, '/');
+        $path = '/'.ltrim($image->path ?? '', '/');
         $queryString = http_build_query($imgixParams);
 
         if ($this->signKey !== null) {
@@ -41,30 +37,28 @@ class ImgixLoader implements ImageLoaderInterface
     /**
      * @return array<string, int|string>
      */
-    private static function mapToImgixParams(ImageParams $params): array
+    private static function mapToImgixParams(ImageTransformation $transformation): array
     {
         $imgix = [];
 
-        if ($params->width !== null) {
-            $imgix['w'] = $params->width;
+        if ($transformation->width !== null) {
+            $imgix['w'] = $transformation->width;
         }
-        if ($params->height !== null) {
-            $imgix['h'] = $params->height;
+        if ($transformation->height !== null) {
+            $imgix['h'] = $transformation->height;
         }
-        if ($params->format !== null) {
-            $imgix['fm'] = $params->format;
-        }
-        if ($params->quality !== null) {
-            $imgix['q'] = $params->quality;
+        if ($transformation->format !== null) {
+            $imgix['fm'] = $transformation->format;
         }
 
-        $imgix['fit'] = self::mapFit($params->fit);
+        $imgix['q'] = $transformation->quality;
+        $imgix['fit'] = self::mapFit($transformation->fit);
 
-        if ($params->blur !== null) {
-            $imgix['blur'] = $params->blur;
+        if ($transformation->blur !== null) {
+            $imgix['blur'] = $transformation->blur;
         }
-        if ($params->dpr !== null) {
-            $imgix['dpr'] = $params->dpr;
+        if ($transformation->dpr !== null) {
+            $imgix['dpr'] = $transformation->dpr;
         }
 
         return $imgix;

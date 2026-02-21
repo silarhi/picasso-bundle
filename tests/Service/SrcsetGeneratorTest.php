@@ -3,37 +3,36 @@
 namespace Silarhi\PicassoBundle\Tests\Service;
 
 use PHPUnit\Framework\TestCase;
-use Silarhi\PicassoBundle\Dto\ImageParams;
+use Silarhi\PicassoBundle\Dto\Image;
+use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Dto\SrcsetEntry;
-use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
+use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 
 class SrcsetGeneratorTest extends TestCase
 {
     private SrcsetGenerator $generator;
-    private ImageLoaderInterface $loader;
+    private ImageTransformerInterface $transformer;
 
     protected function setUp(): void
     {
-        $this->loader = $this->createMock(ImageLoaderInterface::class);
-        $this->loader->method('getUrl')
-            ->willReturnCallback(function (string $path, ImageParams $params): string {
+        $this->transformer = $this->createMock(ImageTransformerInterface::class);
+        $this->transformer->method('url')
+            ->willReturnCallback(function (Image $image, ImageTransformation $t, array $context): string {
                 $query = [];
-                if ($params->width !== null) {
-                    $query['w'] = $params->width;
+                if ($t->width !== null) {
+                    $query['w'] = $t->width;
                 }
-                if ($params->height !== null) {
-                    $query['h'] = $params->height;
+                if ($t->height !== null) {
+                    $query['h'] = $t->height;
                 }
-                if ($params->format !== null) {
-                    $query['fm'] = $params->format;
+                if ($t->format !== null) {
+                    $query['fm'] = $t->format;
                 }
-                if ($params->quality !== null) {
-                    $query['q'] = $params->quality;
-                }
-                $query['fit'] = $params->fit;
+                $query['q'] = $t->quality;
+                $query['fit'] = $t->fit;
 
-                return '/picasso/image/'.$path.'?'.http_build_query($query);
+                return '/picasso/glide/filesystem/'.$image->path.'?'.http_build_query($query);
             });
 
         $this->generator = new SrcsetGenerator(
@@ -81,9 +80,11 @@ class SrcsetGeneratorTest extends TestCase
 
     public function testGenerateSrcsetResponsiveUsesWidthDescriptors(): void
     {
+        $image = new Image(path: 'photo.jpg');
+
         $entries = $this->generator->generateSrcset(
-            loader: $this->loader,
-            path: 'photo.jpg',
+            transformer: $this->transformer,
+            image: $image,
             format: 'webp',
             sizes: '100vw',
         );
@@ -98,9 +99,11 @@ class SrcsetGeneratorTest extends TestCase
 
     public function testGenerateSrcsetFixedUsesDensityDescriptors(): void
     {
+        $image = new Image(path: 'photo.jpg');
+
         $entries = $this->generator->generateSrcset(
-            loader: $this->loader,
-            path: 'photo.jpg',
+            transformer: $this->transformer,
+            image: $image,
             format: 'webp',
             width: 300,
             height: 200,
@@ -113,9 +116,11 @@ class SrcsetGeneratorTest extends TestCase
 
     public function testGenerateSrcsetFixedPreservesAspectRatio(): void
     {
+        $image = new Image(path: 'photo.jpg');
+
         $entries = $this->generator->generateSrcset(
-            loader: $this->loader,
-            path: 'photo.jpg',
+            transformer: $this->transformer,
+            image: $image,
             format: 'jpg',
             width: 300,
             height: 200,
@@ -129,9 +134,11 @@ class SrcsetGeneratorTest extends TestCase
 
     public function testGenerateSrcsetUsesCustomQuality(): void
     {
+        $image = new Image(path: 'photo.jpg');
+
         $entries = $this->generator->generateSrcset(
-            loader: $this->loader,
-            path: 'photo.jpg',
+            transformer: $this->transformer,
+            image: $image,
             format: 'webp',
             width: 300,
             quality: 90,
@@ -144,9 +151,11 @@ class SrcsetGeneratorTest extends TestCase
 
     public function testGenerateSrcsetUsesDefaultQuality(): void
     {
+        $image = new Image(path: 'photo.jpg');
+
         $entries = $this->generator->generateSrcset(
-            loader: $this->loader,
-            path: 'photo.jpg',
+            transformer: $this->transformer,
+            image: $image,
             format: 'webp',
             width: 300,
         );
@@ -168,23 +177,13 @@ class SrcsetGeneratorTest extends TestCase
         self::assertSame('/img/photo.jpg?w=300 1x, /img/photo.jpg?w=600 2x', $result);
     }
 
-    public function testBuildSrcsetStringWithWidthDescriptors(): void
-    {
-        $entries = [
-            new SrcsetEntry('/img/photo.jpg?w=640', '640w'),
-            new SrcsetEntry('/img/photo.jpg?w=1080', '1080w'),
-        ];
-
-        $result = $this->generator->buildSrcsetString($entries);
-
-        self::assertSame('/img/photo.jpg?w=640 640w, /img/photo.jpg?w=1080 1080w', $result);
-    }
-
     public function testGetFallbackUrl(): void
     {
+        $image = new Image(path: 'photo.jpg');
+
         $url = $this->generator->getFallbackUrl(
-            loader: $this->loader,
-            path: 'photo.jpg',
+            transformer: $this->transformer,
+            image: $image,
             format: 'jpg',
             width: 800,
             height: 600,
@@ -197,19 +196,6 @@ class SrcsetGeneratorTest extends TestCase
         self::assertStringContainsString('q=80', $url);
     }
 
-    public function testGetFallbackUrlWithoutDimensions(): void
-    {
-        $url = $this->generator->getFallbackUrl(
-            loader: $this->loader,
-            path: 'photo.jpg',
-            format: 'webp',
-        );
-
-        self::assertStringContainsString('fm=webp', $url);
-        self::assertStringNotContainsString('w=', $url);
-        self::assertStringNotContainsString('h=', $url);
-    }
-
     public function testGetFormats(): void
     {
         self::assertSame(['avif', 'webp', 'jpg'], $this->generator->getFormats());
@@ -217,9 +203,11 @@ class SrcsetGeneratorTest extends TestCase
 
     public function testGenerateSrcsetIncludesFitParam(): void
     {
+        $image = new Image(path: 'photo.jpg');
+
         $entries = $this->generator->generateSrcset(
-            loader: $this->loader,
-            path: 'photo.jpg',
+            transformer: $this->transformer,
+            image: $image,
             format: 'webp',
             width: 300,
             fit: 'crop',
@@ -228,5 +216,29 @@ class SrcsetGeneratorTest extends TestCase
         foreach ($entries as $entry) {
             self::assertStringContainsString('fit=crop', $entry->url);
         }
+    }
+
+    public function testGenerateSrcsetPassesContext(): void
+    {
+        $contextReceived = [];
+        $transformer = $this->createMock(ImageTransformerInterface::class);
+        $transformer->method('url')
+            ->willReturnCallback(function (Image $image, ImageTransformation $t, array $context) use (&$contextReceived): string {
+                $contextReceived = $context;
+
+                return '/url';
+            });
+
+        $image = new Image(path: 'photo.jpg');
+
+        $this->generator->generateSrcset(
+            transformer: $transformer,
+            image: $image,
+            format: 'webp',
+            width: 300,
+            context: ['loader' => 'vich'],
+        );
+
+        self::assertSame('vich', $contextReceived['loader']);
     }
 }

@@ -2,17 +2,16 @@
 
 namespace Silarhi\PicassoBundle\Twig\Extension;
 
-use Psr\Container\ContainerInterface;
-use Silarhi\PicassoBundle\Dto\ImageParams;
-use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
+use Silarhi\PicassoBundle\Dto\ImageReference;
+use Silarhi\PicassoBundle\Dto\ImageTransformation;
+use Silarhi\PicassoBundle\Service\ImagePipeline;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFunction;
 
 class PicassoExtension extends AbstractExtension
 {
     public function __construct(
-        private readonly ContainerInterface $loaders,
-        private readonly string $defaultLoader,
+        private readonly ImagePipeline $pipeline,
     ) {
     }
 
@@ -28,24 +27,28 @@ class PicassoExtension extends AbstractExtension
      *
      * Usage in Twig:
      *   {{ picasso_image_url('uploads/photo.jpg', {width: 300, format: 'webp'}) }}
-     *   {{ picasso_image_url('uploads/photo.jpg', {width: 300, format: 'webp', loader: 'imgix'}) }}
+     *   {{ picasso_image_url('uploads/photo.jpg', {width: 300, loader: 'vich', transformer: 'imgix'}) }}
+     *
+     * @param array<string, mixed> $params
      */
     public function imageUrl(string $path, array $params = []): string
     {
-        $loaderName = $params['loader'] ?? $this->defaultLoader;
-        unset($params['loader']);
+        $loader = $params['loader'] ?? null;
+        $transformer = $params['transformer'] ?? null;
+        unset($params['loader'], $params['transformer']);
 
-        /** @var ImageLoaderInterface $loader */
-        $loader = $this->loaders->get($loaderName);
+        $reference = new ImageReference($path);
 
-        return $loader->getUrl($path, new ImageParams(
+        $transformation = new ImageTransformation(
             width: $params['width'] ?? null,
             height: $params['height'] ?? null,
             format: $params['format'] ?? null,
-            quality: $params['quality'] ?? null,
+            quality: $params['quality'] ?? 75,
             fit: $params['fit'] ?? 'contain',
             blur: $params['blur'] ?? null,
             dpr: $params['dpr'] ?? null,
-        ));
+        );
+
+        return $this->pipeline->url($reference, $transformation, $loader, $transformer);
     }
 }

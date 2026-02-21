@@ -1,6 +1,6 @@
 <?php
 
-namespace Silarhi\PicassoBundle\Resolver;
+namespace Silarhi\PicassoBundle\Loader;
 
 use Vich\UploaderBundle\Mapping\PropertyMappingFactory;
 

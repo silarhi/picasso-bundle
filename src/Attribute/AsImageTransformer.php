@@ -3,7 +3,7 @@
 namespace Silarhi\PicassoBundle\Attribute;
 
 #[\Attribute(\Attribute::TARGET_CLASS)]
-class AsImageResolver
+class AsImageTransformer
 {
     public function __construct(
         public readonly string $name,

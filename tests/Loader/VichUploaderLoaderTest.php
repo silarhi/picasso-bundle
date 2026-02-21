@@ -1,15 +1,16 @@
 <?php
 
-namespace Silarhi\PicassoBundle\Tests\Resolver;
+namespace Silarhi\PicassoBundle\Tests\Loader;
 
 use PHPUnit\Framework\TestCase;
-use Silarhi\PicassoBundle\Resolver\VichMappingHelper;
-use Silarhi\PicassoBundle\Resolver\VichUploaderResolver;
+use Silarhi\PicassoBundle\Dto\ImageReference;
+use Silarhi\PicassoBundle\Loader\VichMappingHelper;
+use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
 use Vich\UploaderBundle\Storage\StorageInterface;
 
-class VichUploaderResolverTest extends TestCase
+class VichUploaderLoaderTest extends TestCase
 {
-    private VichUploaderResolver $resolver;
+    private VichUploaderLoader $loader;
     private StorageInterface $storage;
     private VichMappingHelper $mappingHelper;
 
@@ -21,19 +22,19 @@ class VichUploaderResolverTest extends TestCase
 
         $this->storage = $this->createMock(StorageInterface::class);
         $this->mappingHelper = $this->createMock(VichMappingHelper::class);
-        $this->resolver = new VichUploaderResolver($this->storage, $this->mappingHelper);
+        $this->loader = new VichUploaderLoader($this->storage, $this->mappingHelper);
     }
 
-    public function testResolveWithStringSource(): void
+    public function testLoadWithStringSource(): void
     {
-        $result = $this->resolver->resolve('/uploads/photo.jpg');
+        $image = $this->loader->load(new ImageReference('/uploads/photo.jpg'));
 
-        self::assertSame('uploads/photo.jpg', $result->path);
-        self::assertNull($result->width);
-        self::assertNull($result->height);
+        self::assertSame('uploads/photo.jpg', $image->path);
+        self::assertNull($image->width);
+        self::assertNull($image->height);
     }
 
-    public function testResolveWithEntityAndFieldContext(): void
+    public function testLoadWithEntityAndFieldContext(): void
     {
         $entity = new \stdClass();
 
@@ -45,15 +46,15 @@ class VichUploaderResolverTest extends TestCase
             ->with($entity, 'imageFile', null, true)
             ->willReturn('2024/february/photo.jpg');
 
-        $result = $this->resolver->resolve('photo.jpg', [
+        $image = $this->loader->load(new ImageReference('photo.jpg', [
             'entity' => $entity,
             'field' => 'imageFile',
-        ]);
+        ]));
 
-        self::assertSame('2024/february/photo.jpg', $result->path);
+        self::assertSame('2024/february/photo.jpg', $image->path);
     }
 
-    public function testResolveAutoDetectsFieldWhenNull(): void
+    public function testLoadAutoDetectsFieldWhenNull(): void
     {
         $entity = new \stdClass();
 
@@ -65,14 +66,14 @@ class VichUploaderResolverTest extends TestCase
             ->with($entity, 'imageFile', null, true)
             ->willReturn('auto/detected.jpg');
 
-        $result = $this->resolver->resolve('photo.jpg', [
+        $image = $this->loader->load(new ImageReference('photo.jpg', [
             'entity' => $entity,
-        ]);
+        ]));
 
-        self::assertSame('auto/detected.jpg', $result->path);
+        self::assertSame('auto/detected.jpg', $image->path);
     }
 
-    public function testResolveFallsBackWhenNoMappingFound(): void
+    public function testLoadFallsBackWhenNoMappingFound(): void
     {
         $entity = new \stdClass();
 
@@ -80,15 +81,15 @@ class VichUploaderResolverTest extends TestCase
             ->with($entity, null)
             ->willReturn(null);
 
-        $result = $this->resolver->resolve('photo.jpg', [
+        $image = $this->loader->load(new ImageReference('photo.jpg', [
             'entity' => $entity,
-        ]);
+        ]));
 
-        self::assertSame('photo.jpg', $result->path);
-        self::assertNull($result->width);
+        self::assertSame('photo.jpg', $image->path);
+        self::assertNull($image->width);
     }
 
-    public function testResolveWithEntityStripsLeadingSlash(): void
+    public function testLoadWithEntityStripsLeadingSlash(): void
     {
         $entity = new \stdClass();
 
@@ -99,15 +100,15 @@ class VichUploaderResolverTest extends TestCase
             ->with($entity, 'imageFile', null, true)
             ->willReturn('/photo.jpg');
 
-        $result = $this->resolver->resolve('photo.jpg', [
+        $image = $this->loader->load(new ImageReference('photo.jpg', [
             'entity' => $entity,
             'field' => 'imageFile',
-        ]);
+        ]));
 
-        self::assertSame('photo.jpg', $result->path);
+        self::assertSame('photo.jpg', $image->path);
     }
 
-    public function testResolveWithEntityReturnsEmptyOnNull(): void
+    public function testLoadWithEntityReturnsEmptyOnNull(): void
     {
         $entity = new \stdClass();
 
@@ -117,15 +118,15 @@ class VichUploaderResolverTest extends TestCase
         $this->storage->method('resolvePath')
             ->willReturn(null);
 
-        $result = $this->resolver->resolve('photo.jpg', [
+        $image = $this->loader->load(new ImageReference('photo.jpg', [
             'entity' => $entity,
             'field' => 'imageFile',
-        ]);
+        ]));
 
-        self::assertSame('', $result->path);
+        self::assertSame('', $image->path);
     }
 
-    public function testResolveDetectsDimensionsFromGetterMethod(): void
+    public function testLoadDetectsDimensionsFromGetterMethod(): void
     {
         $entity = new class {
             public function getImageFileDimensions(): array
@@ -139,16 +140,16 @@ class VichUploaderResolverTest extends TestCase
 
         $this->storage->method('resolvePath')->willReturn('photo.jpg');
 
-        $result = $this->resolver->resolve('photo.jpg', [
+        $image = $this->loader->load(new ImageReference('photo.jpg', [
             'entity' => $entity,
             'field' => 'imageFile',
-        ]);
+        ]));
 
-        self::assertSame(1920, $result->width);
-        self::assertSame(1080, $result->height);
+        self::assertSame(1920, $image->width);
+        self::assertSame(1080, $image->height);
     }
 
-    public function testResolveDetectsDimensionsFromEmbeddedFileObject(): void
+    public function testLoadDetectsDimensionsFromEmbeddedFileObject(): void
     {
         $file = new class {
             public function getDimensions(): array
@@ -173,34 +174,16 @@ class VichUploaderResolverTest extends TestCase
 
         $this->storage->method('resolvePath')->willReturn('photo.jpg');
 
-        $result = $this->resolver->resolve('photo.jpg', [
+        $image = $this->loader->load(new ImageReference('photo.jpg', [
             'entity' => $entity,
             'field' => 'imageFile',
-        ]);
+        ]));
 
-        self::assertSame(800, $result->width);
-        self::assertSame(600, $result->height);
+        self::assertSame(800, $image->width);
+        self::assertSame(600, $image->height);
     }
 
-    public function testResolveReturnsNullDimensionsWhenNoMethodAvailable(): void
-    {
-        $entity = new \stdClass();
-
-        $this->mappingHelper->method('getFilePropertyName')
-            ->willReturn('imageFile');
-
-        $this->storage->method('resolvePath')->willReturn('photo.jpg');
-
-        $result = $this->resolver->resolve('photo.jpg', [
-            'entity' => $entity,
-            'field' => 'imageFile',
-        ]);
-
-        self::assertNull($result->width);
-        self::assertNull($result->height);
-    }
-
-    public function testResolveSkipsDimensionDetectionWhenSourceDimensionsProvided(): void
+    public function testLoadSkipsDimensionDetectionWhenSourceDimensionsProvided(): void
     {
         $entity = new class {
             public function getImageFileDimensions(): array
@@ -214,23 +197,51 @@ class VichUploaderResolverTest extends TestCase
 
         $this->storage->method('resolvePath')->willReturn('photo.jpg');
 
-        $result = $this->resolver->resolve('photo.jpg', [
+        $image = $this->loader->load(new ImageReference('photo.jpg', [
             'entity' => $entity,
             'field' => 'imageFile',
             'sourceWidth' => 500,
             'sourceHeight' => 400,
-        ]);
+        ]));
 
-        self::assertSame(500, $result->width);
-        self::assertSame(400, $result->height);
+        self::assertSame(500, $image->width);
+        self::assertSame(400, $image->height);
     }
 
-    public function testResolveFallsBackToStringWhenNoEntity(): void
+    public function testLoadWithoutMetadataSkipsDimensionDetection(): void
     {
-        $result = $this->resolver->resolve('uploads/photo.jpg', [
-            'mapping' => 'products',
-        ]);
+        $entity = new class {
+            public function getImageFileDimensions(): array
+            {
+                return [1920, 1080];
+            }
+        };
 
-        self::assertSame('uploads/photo.jpg', $result->path);
+        $this->mappingHelper->method('getFilePropertyName')
+            ->willReturn('imageFile');
+
+        $this->storage->method('resolvePath')->willReturn('photo.jpg');
+
+        $image = $this->loader->load(new ImageReference('photo.jpg', [
+            'entity' => $entity,
+            'field' => 'imageFile',
+        ]), withMetadata: false);
+
+        self::assertSame('photo.jpg', $image->path);
+        self::assertNull($image->width);
+        self::assertNull($image->height);
+    }
+
+    public function testGetSourceThrowsWhenNotConfigured(): void
+    {
+        $this->expectException(\LogicException::class);
+        $this->loader->getSource();
+    }
+
+    public function testGetSourceReturnsConfiguredSource(): void
+    {
+        $loader = new VichUploaderLoader($this->storage, $this->mappingHelper, '/var/uploads');
+
+        self::assertSame('/var/uploads', $loader->getSource());
     }
 }

@@ -2,11 +2,9 @@
 
 namespace Silarhi\PicassoBundle\Controller;
 
-use League\Glide\Filesystem\FileNotFoundException;
-use League\Glide\Responses\SymfonyResponseFactory;
-use League\Glide\Server;
-use League\Glide\Signatures\SignatureException;
-use League\Glide\Signatures\SignatureFactory;
+use Psr\Container\ContainerInterface;
+use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
+use Silarhi\PicassoBundle\Transformer\LocalTransformerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -14,28 +12,31 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 class ImageController
 {
     public function __construct(
-        private readonly Server $glideServer,
-        private readonly string $signKey,
+        private readonly ContainerInterface $transformers,
+        private readonly ContainerInterface $loaders,
     ) {
     }
 
-    public function serve(string $path, Request $request): Response
+    public function __invoke(string $transformer, string $loader, string $path, Request $request): Response
     {
-        $params = $request->query->all();
-
-        try {
-            SignatureFactory::create($this->signKey)
-                ->validateRequest($path, $params);
-        } catch (SignatureException $e) {
-            throw new NotFoundHttpException('Invalid image signature.', $e);
+        if (!$this->transformers->has($transformer)) {
+            throw new NotFoundHttpException(sprintf('Transformer "%s" not found.', $transformer));
         }
 
-        $this->glideServer->setResponseFactory(new SymfonyResponseFactory($request));
-
-        try {
-            return $this->glideServer->getImageResponse($path, $params);
-        } catch (FileNotFoundException|\InvalidArgumentException $e) {
-            throw new NotFoundHttpException('Image not found.', $e);
+        $imageTransformer = $this->transformers->get($transformer);
+        if (!$imageTransformer instanceof LocalTransformerInterface) {
+            throw new NotFoundHttpException(sprintf('Transformer "%s" does not support serving.', $transformer));
         }
+
+        if (!$this->loaders->has($loader)) {
+            throw new NotFoundHttpException(sprintf('Loader "%s" not found.', $loader));
+        }
+
+        $imageLoader = $this->loaders->get($loader);
+        if (!$imageLoader instanceof ServableLoaderInterface) {
+            throw new NotFoundHttpException(sprintf('Loader "%s" does not support serving.', $loader));
+        }
+
+        return $imageTransformer->serve($imageLoader, $path, $request);
     }
 }

@@ -2,72 +2,111 @@
 
 namespace Silarhi\PicassoBundle\Tests\Controller;
 
-use League\Glide\Server;
-use League\Glide\Signatures\SignatureFactory;
 use PHPUnit\Framework\TestCase;
+use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Controller\ImageController;
+use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
+use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
+use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
+use Silarhi\PicassoBundle\Transformer\LocalTransformerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class ImageControllerTest extends TestCase
 {
-    private const SIGN_KEY = 'test-secret-key';
-
-    public function testServeReturnsImageResponse(): void
+    public function testInvokeServesImage(): void
     {
-        $path = 'photo.jpg';
-        $params = ['w' => '300', 'fm' => 'webp'];
-        $signature = SignatureFactory::create(self::SIGN_KEY)->generateSignature($path, $params);
-        $params['s'] = $signature;
-
-        $request = new Request($params);
+        $request = new Request();
         $expectedResponse = new Response('image-data', 200, ['Content-Type' => 'image/webp']);
 
-        $server = $this->createMock(Server::class);
-        $server->expects(self::once())
-            ->method('setResponseFactory');
-        $server->expects(self::once())
-            ->method('getImageResponse')
-            ->with($path, $params)
+        $loader = $this->createMock(ServableLoaderInterface::class);
+        $transformer = $this->createMock(LocalTransformerInterface::class);
+        $transformer->expects(self::once())
+            ->method('serve')
+            ->with($loader, 'photo.jpg', $request)
             ->willReturn($expectedResponse);
 
-        $controller = new ImageController($server, self::SIGN_KEY);
-        $response = $controller->serve($path, $request);
+        $transformers = $this->createMock(ContainerInterface::class);
+        $transformers->method('has')->with('glide')->willReturn(true);
+        $transformers->method('get')->with('glide')->willReturn($transformer);
+
+        $loaders = $this->createMock(ContainerInterface::class);
+        $loaders->method('has')->with('filesystem')->willReturn(true);
+        $loaders->method('get')->with('filesystem')->willReturn($loader);
+
+        $controller = new ImageController($transformers, $loaders);
+        $response = $controller->__invoke('glide', 'filesystem', 'photo.jpg', $request);
 
         self::assertSame(200, $response->getStatusCode());
     }
 
-    public function testServeThrowsNotFoundOnInvalidSignature(): void
+    public function testInvokeThrowsNotFoundForUnknownTransformer(): void
     {
-        $request = new Request(['w' => '300', 's' => 'invalid-signature']);
+        $transformers = $this->createMock(ContainerInterface::class);
+        $transformers->method('has')->with('unknown')->willReturn(false);
 
-        $server = $this->createMock(Server::class);
-        $server->expects(self::never())->method('getImageResponse');
+        $loaders = $this->createMock(ContainerInterface::class);
 
-        $controller = new ImageController($server, self::SIGN_KEY);
+        $controller = new ImageController($transformers, $loaders);
 
         $this->expectException(NotFoundHttpException::class);
-        $controller->serve('photo.jpg', $request);
+        $this->expectExceptionMessage('Transformer "unknown" not found.');
+        $controller->__invoke('unknown', 'filesystem', 'photo.jpg', new Request());
     }
 
-    public function testServeThrowsNotFoundOnMissingImage(): void
+    public function testInvokeThrowsNotFoundForNonLocalTransformer(): void
     {
-        $path = 'missing.jpg';
-        $params = ['w' => '300'];
-        $signature = SignatureFactory::create(self::SIGN_KEY)->generateSignature($path, $params);
-        $params['s'] = $signature;
+        $transformer = $this->createMock(ImageTransformerInterface::class);
 
-        $request = new Request($params);
+        $transformers = $this->createMock(ContainerInterface::class);
+        $transformers->method('has')->with('imgix')->willReturn(true);
+        $transformers->method('get')->with('imgix')->willReturn($transformer);
 
-        $server = $this->createMock(Server::class);
-        $server->method('setResponseFactory');
-        $server->method('getImageResponse')
-            ->willThrowException(new \InvalidArgumentException('File not found'));
+        $loaders = $this->createMock(ContainerInterface::class);
 
-        $controller = new ImageController($server, self::SIGN_KEY);
+        $controller = new ImageController($transformers, $loaders);
 
         $this->expectException(NotFoundHttpException::class);
-        $controller->serve($path, $request);
+        $this->expectExceptionMessage('does not support serving');
+        $controller->__invoke('imgix', 'filesystem', 'photo.jpg', new Request());
+    }
+
+    public function testInvokeThrowsNotFoundForUnknownLoader(): void
+    {
+        $transformer = $this->createMock(LocalTransformerInterface::class);
+
+        $transformers = $this->createMock(ContainerInterface::class);
+        $transformers->method('has')->with('glide')->willReturn(true);
+        $transformers->method('get')->with('glide')->willReturn($transformer);
+
+        $loaders = $this->createMock(ContainerInterface::class);
+        $loaders->method('has')->with('unknown')->willReturn(false);
+
+        $controller = new ImageController($transformers, $loaders);
+
+        $this->expectException(NotFoundHttpException::class);
+        $this->expectExceptionMessage('Loader "unknown" not found.');
+        $controller->__invoke('glide', 'unknown', 'photo.jpg', new Request());
+    }
+
+    public function testInvokeThrowsNotFoundForNonServableLoader(): void
+    {
+        $transformer = $this->createMock(LocalTransformerInterface::class);
+        $loader = $this->createMock(ImageLoaderInterface::class);
+
+        $transformers = $this->createMock(ContainerInterface::class);
+        $transformers->method('has')->with('glide')->willReturn(true);
+        $transformers->method('get')->with('glide')->willReturn($transformer);
+
+        $loaders = $this->createMock(ContainerInterface::class);
+        $loaders->method('has')->with('remote')->willReturn(true);
+        $loaders->method('get')->with('remote')->willReturn($loader);
+
+        $controller = new ImageController($transformers, $loaders);
+
+        $this->expectException(NotFoundHttpException::class);
+        $this->expectExceptionMessage('does not support serving');
+        $controller->__invoke('glide', 'remote', 'photo.jpg', new Request());
     }
 }
