@@ -16,9 +16,10 @@
         "vich/uploader-bundle": "^2.0"
     },
     "suggest": {
-        "league/glide": "Required for the Glide image provider (local image transformation)",
-        "league/glide-symfony": "Required for the Glide image provider",
-        "vich/uploader-bundle": "Required for the vich_uploader loader"
+        "league/glide": "Required for the Glide transformer (local image transformation)",
+        "league/glide-symfony": "Required for the Glide transformer",
+        "league/flysystem": "Required for the Flysystem loader",
+        "vich/uploader-bundle": "Required for the VichUploader loader"
     },
     "autoload": {
         "psr-4": {
