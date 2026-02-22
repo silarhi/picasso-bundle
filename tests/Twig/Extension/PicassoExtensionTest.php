@@ -25,7 +25,7 @@ class PicassoExtensionTest extends TestCase
             )
             ->willReturn('/picasso/glide/filesystem/photo.jpg?w=300&fm=webp&s=abc');
 
-        $extension = new PicassoExtension($pipeline);
+        $extension = new PicassoExtension($pipeline, 75, 'contain');
         $result = $extension->imageUrl('photo.jpg', ['width' => 300, 'format' => 'webp']);
 
         self::assertSame('/picasso/glide/filesystem/photo.jpg?w=300&fm=webp&s=abc', $result);
@@ -44,7 +44,7 @@ class PicassoExtensionTest extends TestCase
             )
             ->willReturn('https://cdn.imgix.net/photo.jpg?w=300');
 
-        $extension = new PicassoExtension($pipeline);
+        $extension = new PicassoExtension($pipeline, 75, 'contain');
         $result = $extension->imageUrl('photo.jpg', [
             'width' => 300,
             'loader' => 'vich',
@@ -57,11 +57,28 @@ class PicassoExtensionTest extends TestCase
     public function testRegistersTwigFunction(): void
     {
         $pipeline = $this->createMock(ImagePipeline::class);
-        $extension = new PicassoExtension($pipeline);
+        $extension = new PicassoExtension($pipeline, 75, 'contain');
 
         $functions = $extension->getFunctions();
 
         self::assertCount(1, $functions);
         self::assertSame('picasso_image_url', $functions[0]->getName());
+    }
+
+    public function testImageUrlUsesConfiguredDefaults(): void
+    {
+        $pipeline = $this->createMock(ImagePipeline::class);
+        $pipeline->expects(self::once())
+            ->method('url')
+            ->with(
+                self::isInstanceOf(ImageReference::class),
+                self::callback(static fn (ImageTransformation $t): bool => 90 === $t->quality && 'cover' === $t->fit),
+                null,
+                null,
+            )
+            ->willReturn('/img/photo.jpg');
+
+        $extension = new PicassoExtension($pipeline, 90, 'cover');
+        $extension->imageUrl('photo.jpg');
     }
 }

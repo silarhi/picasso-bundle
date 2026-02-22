@@ -8,7 +8,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
-use Silarhi\PicassoBundle\Loader\VichMappingHelper;
+use Silarhi\PicassoBundle\Loader\VichMappingHelperInterface;
 use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
 use Silarhi\PicassoBundle\Service\UrlEncryption;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
@@ -25,8 +25,8 @@ class VichMultipleMappingsTest extends TestCase
     private const SIGN_KEY = 'test-secret-key';
 
     private VichUploaderLoader $loader;
-    private MockObject $storage;
-    private MockObject $mappingHelper;
+    private MockObject&StorageInterface $storage;
+    private MockObject&VichMappingHelperInterface $mappingHelper;
     private UrlEncryption $encryption;
 
     protected function setUp(): void
@@ -36,7 +36,7 @@ class VichMultipleMappingsTest extends TestCase
         }
 
         $this->storage = $this->createMock(StorageInterface::class);
-        $this->mappingHelper = $this->createMock(VichMappingHelper::class);
+        $this->mappingHelper = $this->createMock(VichMappingHelperInterface::class);
         $this->loader = new VichUploaderLoader($this->storage, $this->mappingHelper);
         $this->encryption = new UrlEncryption(self::SIGN_KEY);
     }
@@ -62,6 +62,8 @@ class VichMultipleMappingsTest extends TestCase
                 [$entity, 'avatarFile', null, true, 'users/42/avatar.jpg'],
                 [$entity, 'coverFile', null, true, 'users/42/cover.png'],
             ]);
+
+        $this->storage->method('resolveStream')->willReturn(null);
 
         // Load avatar
         $avatarImage = $this->loader->load(new ImageReference('avatar.jpg', [
@@ -107,6 +109,8 @@ class VichMultipleMappingsTest extends TestCase
                 [$entity, 'coverFile', null, true, 'cover.png'],
             ]);
 
+        $this->storage->method('resolveStream')->willReturn(null);
+
         $avatarImage = $this->loader->load(new ImageReference('avatar.jpg', [
             'entity' => $entity,
             'field' => 'avatarFile',
@@ -118,8 +122,12 @@ class VichMultipleMappingsTest extends TestCase
         ]));
 
         // Encrypt both sources
-        $avatarEncrypted = $this->encryption->encrypt($avatarImage->metadata['_source']);
-        $coverEncrypted = $this->encryption->encrypt($coverImage->metadata['_source']);
+        $avatarSource = $avatarImage->metadata['_source'];
+        $coverSource = $coverImage->metadata['_source'];
+        self::assertIsString($avatarSource);
+        self::assertIsString($coverSource);
+        $avatarEncrypted = $this->encryption->encrypt($avatarSource);
+        $coverEncrypted = $this->encryption->encrypt($coverSource);
 
         // They should decrypt to different values
         self::assertSame('/var/uploads/avatars', $this->encryption->decrypt($avatarEncrypted));
@@ -148,6 +156,8 @@ class VichMultipleMappingsTest extends TestCase
                 [$entity, 'documentFile', null, true, 'docs/report.pdf'],
             ]);
 
+        $this->storage->method('resolveStream')->willReturn(null);
+
         $transformer = $this->createGlideTransformer();
 
         // Load both images
@@ -170,9 +180,15 @@ class VichMultipleMappingsTest extends TestCase
         self::assertStringContainsString('_source=', $documentUrl);
 
         // Extract and decrypt _source from each URL
-        parse_str(parse_url($avatarUrl, \PHP_URL_QUERY) ?? '', $avatarQuery);
-        parse_str(parse_url($documentUrl, \PHP_URL_QUERY) ?? '', $documentQuery);
+        $avatarQs = parse_url($avatarUrl, \PHP_URL_QUERY);
+        $documentQs = parse_url($documentUrl, \PHP_URL_QUERY);
+        self::assertIsString($avatarQs);
+        self::assertIsString($documentQs);
+        parse_str($avatarQs, $avatarQuery);
+        parse_str($documentQs, $documentQuery);
 
+        self::assertIsString($avatarQuery['_source']);
+        self::assertIsString($documentQuery['_source']);
         self::assertSame('/var/uploads/avatars', $this->encryption->decrypt($avatarQuery['_source']));
         self::assertSame('/var/uploads/documents', $this->encryption->decrypt($documentQuery['_source']));
     }
@@ -193,6 +209,8 @@ class VichMultipleMappingsTest extends TestCase
             ->with($entity, 'imageFile', null, true)
             ->willReturn('2024/photo.jpg');
 
+        $this->storage->method('resolveStream')->willReturn(null);
+
         $image = $this->loader->load(new ImageReference('photo.jpg', [
             'entity' => $entity,
             'field' => 'imageFile',
@@ -211,7 +229,6 @@ class VichMultipleMappingsTest extends TestCase
     {
         $entity = new \stdClass();
 
-        // Flysystem-backed storage returns a service-like identifier
         $this->mappingHelper->method('getFilePropertyName')
             ->with($entity, 'documentFile')
             ->willReturn('documentFile');
@@ -224,12 +241,13 @@ class VichMultipleMappingsTest extends TestCase
             ->with($entity, 'documentFile', null, true)
             ->willReturn('contracts/2024/agreement.pdf');
 
+        $this->storage->method('resolveStream')->willReturn(null);
+
         $image = $this->loader->load(new ImageReference('agreement.pdf', [
             'entity' => $entity,
             'field' => 'documentFile',
         ]));
 
-        // Flysystem adapter name as source
         self::assertSame('default.storage', $image->metadata['_source']);
 
         // Verify round-trip through encryption
@@ -241,8 +259,6 @@ class VichMultipleMappingsTest extends TestCase
     {
         $entity = new \stdClass();
 
-        // avatarFile → plain filesystem path
-        // documentFile → Flysystem adapter
         $this->mappingHelper->method('getFilePropertyName')
             ->willReturnMap([
                 [$entity, 'avatarFile', 'avatarFile'],
@@ -261,29 +277,32 @@ class VichMultipleMappingsTest extends TestCase
                 [$entity, 'documentFile', null, true, 'contracts/agreement.pdf'],
             ]);
 
+        $this->storage->method('resolveStream')->willReturn(null);
+
         $transformer = $this->createGlideTransformer();
 
-        // Load and generate URL for filesystem-backed image
         $avatarImage = $this->loader->load(new ImageReference('avatar.jpg', [
             'entity' => $entity,
             'field' => 'avatarFile',
         ]));
         $avatarUrl = $transformer->url($avatarImage, new ImageTransformation(width: 200), ['loader' => 'vich']);
 
-        // Load and generate URL for Flysystem-backed image
         $documentImage = $this->loader->load(new ImageReference('agreement.pdf', [
             'entity' => $entity,
             'field' => 'documentFile',
         ]));
         $documentUrl = $transformer->url($documentImage, new ImageTransformation(width: 800), ['loader' => 'vich']);
 
-        // Decrypt and verify each source type
-        parse_str(parse_url($avatarUrl, \PHP_URL_QUERY) ?? '', $avatarQuery);
-        parse_str(parse_url($documentUrl, \PHP_URL_QUERY) ?? '', $documentQuery);
+        $avatarQs = parse_url($avatarUrl, \PHP_URL_QUERY);
+        $documentQs = parse_url($documentUrl, \PHP_URL_QUERY);
+        self::assertIsString($avatarQs);
+        self::assertIsString($documentQs);
+        parse_str($avatarQs, $avatarQuery);
+        parse_str($documentQs, $documentQuery);
 
-        // Filesystem source
+        self::assertIsString($avatarQuery['_source']);
+        self::assertIsString($documentQuery['_source']);
         self::assertSame('/var/uploads/avatars', $this->encryption->decrypt($avatarQuery['_source']));
-        // Flysystem source
         self::assertSame('documents.storage', $this->encryption->decrypt($documentQuery['_source']));
     }
 
@@ -303,6 +322,8 @@ class VichMultipleMappingsTest extends TestCase
             ->with($entity, 'avatarFile', null, true)
             ->willReturn('users/42/avatar.jpg');
 
+        $this->storage->method('resolveStream')->willReturn(null);
+
         $image = $this->loader->load(new ImageReference('avatar.jpg', [
             'entity' => $entity,
         ]));
@@ -311,62 +332,19 @@ class VichMultipleMappingsTest extends TestCase
         self::assertSame('/var/uploads/avatars', $image->metadata['_source']);
     }
 
-    public function testDimensionsAndMetadataCoexist(): void
-    {
-        $entity = new class {
-            public function getAvatarFileDimensions(): array
-            {
-                return [200, 200];
-            }
-        };
-
-        $this->mappingHelper->method('getFilePropertyName')
-            ->willReturn('avatarFile');
-
-        $this->mappingHelper->method('getUploadDestination')
-            ->willReturn('/var/uploads/avatars');
-
-        $this->storage->method('resolvePath')->willReturn('avatar.jpg');
-
-        $image = $this->loader->load(new ImageReference('avatar.jpg', [
-            'entity' => $entity,
-            'field' => 'avatarFile',
-        ]));
-
-        self::assertSame(200, $image->width);
-        self::assertSame(200, $image->height);
-        self::assertSame('/var/uploads/avatars', $image->metadata['_source']);
-    }
-
-    public function testWithoutMetadataStillCarriesSource(): void
-    {
-        $entity = new \stdClass();
-
-        $this->mappingHelper->method('getFilePropertyName')
-            ->willReturn('imageFile');
-
-        $this->mappingHelper->method('getUploadDestination')
-            ->willReturn('/var/uploads/images');
-
-        $this->storage->method('resolvePath')->willReturn('photo.jpg');
-
-        $image = $this->loader->load(new ImageReference('photo.jpg', [
-            'entity' => $entity,
-            'field' => 'imageFile',
-        ]), withMetadata: false);
-
-        self::assertNull($image->width);
-        self::assertNull($image->height);
-        self::assertSame('/var/uploads/images', $image->metadata['_source']);
-    }
-
     private function createGlideTransformer(): GlideTransformer
     {
         $router = $this->createMock(UrlGeneratorInterface::class);
         $router->method('generate')
-            ->willReturnCallback(static fn (string $name, array $params): string => '/picasso/'.$params['transformer'].'/'.$params['loader'].'/'.$params['path'].'?'.http_build_query(
-                array_filter($params, static fn ($k): bool => !\in_array($k, ['transformer', 'loader', 'path'], true), \ARRAY_FILTER_USE_KEY),
-            ));
+            ->willReturnCallback(static function (string $name, array $params): string {
+                \assert(\is_string($params['transformer']));
+                \assert(\is_string($params['loader']));
+                \assert(\is_string($params['path']));
+
+                return '/picasso/'.$params['transformer'].'/'.$params['loader'].'/'.$params['path'].'?'.http_build_query(
+                    array_filter($params, static fn ($k): bool => !\in_array($k, ['transformer', 'loader', 'path'], true), \ARRAY_FILTER_USE_KEY),
+                );
+            });
 
         return new GlideTransformer($router, $this->encryption, self::SIGN_KEY, '/tmp/cache');
     }

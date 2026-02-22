@@ -14,6 +14,8 @@ class PicassoExtension extends AbstractExtension
 {
     public function __construct(
         private readonly ImagePipeline $pipeline,
+        private readonly int $defaultQuality,
+        private readonly string $defaultFit,
     ) {
     }
 
@@ -44,8 +46,8 @@ class PicassoExtension extends AbstractExtension
         $width = $params['width'] ?? null;
         $height = $params['height'] ?? null;
         $format = $params['format'] ?? null;
-        $quality = $params['quality'] ?? 75;
-        $fit = $params['fit'] ?? 'contain';
+        $quality = $params['quality'] ?? $this->defaultQuality;
+        $fit = $params['fit'] ?? $this->defaultFit;
         $blur = $params['blur'] ?? null;
         $dpr = $params['dpr'] ?? null;
 
@@ -53,8 +55,8 @@ class PicassoExtension extends AbstractExtension
             width: \is_int($width) ? $width : null,
             height: \is_int($height) ? $height : null,
             format: \is_string($format) ? $format : null,
-            quality: \is_int($quality) ? $quality : 75,
-            fit: \is_string($fit) ? $fit : 'contain',
+            quality: \is_int($quality) ? $quality : $this->defaultQuality,
+            fit: \is_string($fit) ? $fit : $this->defaultFit,
             blur: \is_int($blur) ? $blur : null,
             dpr: \is_int($dpr) ? $dpr : null,
         );

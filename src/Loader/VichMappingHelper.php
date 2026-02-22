@@ -6,10 +6,10 @@ namespace Silarhi\PicassoBundle\Loader;
 
 use Vich\UploaderBundle\Mapping\PropertyMappingFactory;
 
-class VichMappingHelper
+final readonly class VichMappingHelper implements VichMappingHelperInterface
 {
     public function __construct(
-        private readonly PropertyMappingFactory $factory,
+        private PropertyMappingFactory $factory,
     ) {
     }
 

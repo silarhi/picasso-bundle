@@ -7,15 +7,15 @@ namespace Silarhi\PicassoBundle\Tests\Loader;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\ImageReference;
-use Silarhi\PicassoBundle\Loader\VichMappingHelper;
+use Silarhi\PicassoBundle\Loader\VichMappingHelperInterface;
 use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
 use Vich\UploaderBundle\Storage\StorageInterface;
 
 class VichUploaderLoaderTest extends TestCase
 {
     private VichUploaderLoader $loader;
-    private MockObject $storage;
-    private MockObject $mappingHelper;
+    private MockObject&StorageInterface $storage;
+    private MockObject&VichMappingHelperInterface $mappingHelper;
 
     protected function setUp(): void
     {
@@ -24,7 +24,7 @@ class VichUploaderLoaderTest extends TestCase
         }
 
         $this->storage = $this->createMock(StorageInterface::class);
-        $this->mappingHelper = $this->createMock(VichMappingHelper::class);
+        $this->mappingHelper = $this->createMock(VichMappingHelperInterface::class);
         $this->loader = new VichUploaderLoader($this->storage, $this->mappingHelper);
     }
 
@@ -33,8 +33,7 @@ class VichUploaderLoaderTest extends TestCase
         $image = $this->loader->load(new ImageReference('/uploads/photo.jpg'));
 
         self::assertSame('uploads/photo.jpg', $image->path);
-        self::assertNull($image->width);
-        self::assertNull($image->height);
+        self::assertNull($image->stream);
         self::assertSame([], $image->metadata);
     }
 
@@ -53,6 +52,9 @@ class VichUploaderLoaderTest extends TestCase
         $this->storage->method('resolvePath')
             ->with($entity, 'imageFile', null, true)
             ->willReturn('2024/february/photo.jpg');
+
+        $this->storage->method('resolveStream')
+            ->willReturn(null);
 
         $image = $this->loader->load(new ImageReference('photo.jpg', [
             'entity' => $entity,
@@ -79,6 +81,9 @@ class VichUploaderLoaderTest extends TestCase
             ->with($entity, 'imageFile', null, true)
             ->willReturn('auto/detected.jpg');
 
+        $this->storage->method('resolveStream')
+            ->willReturn(null);
+
         $image = $this->loader->load(new ImageReference('photo.jpg', [
             'entity' => $entity,
         ]));
@@ -100,7 +105,6 @@ class VichUploaderLoaderTest extends TestCase
         ]));
 
         self::assertSame('photo.jpg', $image->path);
-        self::assertNull($image->width);
     }
 
     public function testLoadWithEntityStripsLeadingSlash(): void
@@ -116,6 +120,9 @@ class VichUploaderLoaderTest extends TestCase
         $this->storage->method('resolvePath')
             ->with($entity, 'imageFile', null, true)
             ->willReturn('/photo.jpg');
+
+        $this->storage->method('resolveStream')
+            ->willReturn(null);
 
         $image = $this->loader->load(new ImageReference('photo.jpg', [
             'entity' => $entity,
@@ -138,6 +145,9 @@ class VichUploaderLoaderTest extends TestCase
         $this->storage->method('resolvePath')
             ->willReturn(null);
 
+        $this->storage->method('resolveStream')
+            ->willReturn(null);
+
         $image = $this->loader->load(new ImageReference('photo.jpg', [
             'entity' => $entity,
             'field' => 'imageFile',
@@ -146,14 +156,11 @@ class VichUploaderLoaderTest extends TestCase
         self::assertSame('', $image->path);
     }
 
-    public function testLoadDetectsDimensionsFromGetterMethod(): void
+    public function testLoadProvidesStreamWhenAvailable(): void
     {
-        $entity = new class {
-            public function getImageFileDimensions(): array
-            {
-                return [1920, 1080];
-            }
-        };
+        $entity = new \stdClass();
+        $stream = fopen('php://memory', 'r+');
+        self::assertNotFalse($stream);
 
         $this->mappingHelper->method('getFilePropertyName')
             ->willReturn('imageFile');
@@ -162,36 +169,20 @@ class VichUploaderLoaderTest extends TestCase
             ->willReturn('/var/uploads');
 
         $this->storage->method('resolvePath')->willReturn('photo.jpg');
+        $this->storage->method('resolveStream')->willReturn($stream);
 
         $image = $this->loader->load(new ImageReference('photo.jpg', [
             'entity' => $entity,
             'field' => 'imageFile',
         ]));
 
-        self::assertSame(1920, $image->width);
-        self::assertSame(1080, $image->height);
+        self::assertSame($stream, $image->stream);
         self::assertSame('/var/uploads', $image->metadata['_source']);
     }
 
-    public function testLoadDetectsDimensionsFromEmbeddedFileObject(): void
+    public function testLoadHandlesStreamException(): void
     {
-        $file = new class {
-            public function getDimensions(): array
-            {
-                return [800, 600];
-            }
-        };
-
-        $entity = new class($file) {
-            public function __construct(private readonly object $file)
-            {
-            }
-
-            public function getImageFile(): object
-            {
-                return $this->file;
-            }
-        };
+        $entity = new \stdClass();
 
         $this->mappingHelper->method('getFilePropertyName')
             ->willReturn('imageFile');
@@ -200,70 +191,15 @@ class VichUploaderLoaderTest extends TestCase
             ->willReturn('/var/uploads');
 
         $this->storage->method('resolvePath')->willReturn('photo.jpg');
+        $this->storage->method('resolveStream')
+            ->willThrowException(new \RuntimeException('Stream not available'));
 
         $image = $this->loader->load(new ImageReference('photo.jpg', [
             'entity' => $entity,
             'field' => 'imageFile',
         ]));
 
-        self::assertSame(800, $image->width);
-        self::assertSame(600, $image->height);
-    }
-
-    public function testLoadSkipsDimensionDetectionWhenSourceDimensionsProvided(): void
-    {
-        $entity = new class {
-            public function getImageFileDimensions(): array
-            {
-                return [1920, 1080];
-            }
-        };
-
-        $this->mappingHelper->method('getFilePropertyName')
-            ->willReturn('imageFile');
-
-        $this->mappingHelper->method('getUploadDestination')
-            ->willReturn('/var/uploads');
-
-        $this->storage->method('resolvePath')->willReturn('photo.jpg');
-
-        $image = $this->loader->load(new ImageReference('photo.jpg', [
-            'entity' => $entity,
-            'field' => 'imageFile',
-            'sourceWidth' => 500,
-            'sourceHeight' => 400,
-        ]));
-
-        self::assertSame(500, $image->width);
-        self::assertSame(400, $image->height);
-        self::assertSame('/var/uploads', $image->metadata['_source']);
-    }
-
-    public function testLoadWithoutMetadataSkipsDimensionDetection(): void
-    {
-        $entity = new class {
-            public function getImageFileDimensions(): array
-            {
-                return [1920, 1080];
-            }
-        };
-
-        $this->mappingHelper->method('getFilePropertyName')
-            ->willReturn('imageFile');
-
-        $this->mappingHelper->method('getUploadDestination')
-            ->willReturn('/var/uploads');
-
-        $this->storage->method('resolvePath')->willReturn('photo.jpg');
-
-        $image = $this->loader->load(new ImageReference('photo.jpg', [
-            'entity' => $entity,
-            'field' => 'imageFile',
-        ]), withMetadata: false);
-
-        self::assertSame('photo.jpg', $image->path);
-        self::assertNull($image->width);
-        self::assertNull($image->height);
+        self::assertNull($image->stream);
         self::assertSame('/var/uploads', $image->metadata['_source']);
     }
 
@@ -285,6 +221,7 @@ class VichUploaderLoaderTest extends TestCase
             ->willReturn(null);
 
         $this->storage->method('resolvePath')->willReturn('photo.jpg');
+        $this->storage->method('resolveStream')->willReturn(null);
 
         $image = $this->loader->load(new ImageReference('photo.jpg', [
             'entity' => $entity,
@@ -298,7 +235,6 @@ class VichUploaderLoaderTest extends TestCase
     {
         $entity = new \stdClass();
 
-        // First call for 'avatarFile' field
         $this->mappingHelper->expects(self::once())
             ->method('getFilePropertyName')
             ->with($entity, 'avatarFile')
@@ -312,6 +248,8 @@ class VichUploaderLoaderTest extends TestCase
         $this->storage->method('resolvePath')
             ->with($entity, 'avatarFile', null, true)
             ->willReturn('users/avatar.jpg');
+
+        $this->storage->method('resolveStream')->willReturn(null);
 
         $image = $this->loader->load(new ImageReference('avatar.jpg', [
             'entity' => $entity,

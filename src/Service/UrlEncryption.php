@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Service;
 
-final class UrlEncryption
+final readonly class UrlEncryption
 {
     private const CIPHER = 'aes-256-gcm';
     private const IV_LENGTH = 12;
     private const TAG_LENGTH = 16;
 
     public function __construct(
-        private readonly string $key,
+        private string $key,
     ) {
     }
 

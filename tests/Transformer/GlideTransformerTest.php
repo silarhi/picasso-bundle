@@ -16,15 +16,21 @@ class GlideTransformerTest extends TestCase
     private const SIGN_KEY = 'test-secret-key';
 
     private GlideTransformer $transformer;
-    private \PHPUnit\Framework\MockObject\MockObject $router;
+    private \PHPUnit\Framework\MockObject\MockObject&UrlGeneratorInterface $router;
 
     protected function setUp(): void
     {
         $this->router = $this->createMock(UrlGeneratorInterface::class);
         $this->router->method('generate')
-            ->willReturnCallback(static fn (string $name, array $params): string => '/picasso/'.$params['transformer'].'/'.$params['loader'].'/'.$params['path'].'?'.http_build_query(
-                array_filter($params, static fn ($k): bool => !\in_array($k, ['transformer', 'loader', 'path'], true), \ARRAY_FILTER_USE_KEY),
-            ));
+            ->willReturnCallback(static function (string $name, array $params): string {
+                \assert(\is_string($params['transformer']));
+                \assert(\is_string($params['loader']));
+                \assert(\is_string($params['path']));
+
+                return '/picasso/'.$params['transformer'].'/'.$params['loader'].'/'.$params['path'].'?'.http_build_query(
+                    array_filter($params, static fn ($k): bool => !\in_array($k, ['transformer', 'loader', 'path'], true), \ARRAY_FILTER_USE_KEY),
+                );
+            });
 
         $this->transformer = new GlideTransformer(
             $this->router,
@@ -112,9 +118,12 @@ class GlideTransformerTest extends TestCase
         self::assertStringContainsString('/picasso/glide/vich/photo.jpg', $url);
 
         // Extract the _source param and verify it decrypts correctly
-        parse_str(parse_url($url, \PHP_URL_QUERY) ?? '', $query);
+        $queryString = parse_url($url, \PHP_URL_QUERY);
+        self::assertIsString($queryString);
+        parse_str($queryString, $query);
         self::assertArrayHasKey('_source', $query);
         $encryption = new UrlEncryption(self::SIGN_KEY);
+        self::assertIsString($query['_source']);
         self::assertSame('/var/uploads/images', $encryption->decrypt($query['_source']));
     }
 

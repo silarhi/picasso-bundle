@@ -9,6 +9,8 @@ use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Controller\ImageController;
 use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
+use Silarhi\PicassoBundle\Service\LoaderRegistry;
+use Silarhi\PicassoBundle\Service\TransformerRegistry;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 use Silarhi\PicassoBundle\Transformer\LocalTransformerInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -29,15 +31,10 @@ class ImageControllerTest extends TestCase
             ->with($loader, 'photo.jpg', $request)
             ->willReturn($expectedResponse);
 
-        $transformers = $this->createMock(ContainerInterface::class);
-        $transformers->method('has')->with('glide')->willReturn(true);
-        $transformers->method('get')->with('glide')->willReturn($transformer);
+        $transformerRegistry = $this->createRegistry(TransformerRegistry::class, 'glide', $transformer);
+        $loaderRegistry = $this->createRegistry(LoaderRegistry::class, 'filesystem', $loader);
 
-        $loaders = $this->createMock(ContainerInterface::class);
-        $loaders->method('has')->with('filesystem')->willReturn(true);
-        $loaders->method('get')->with('filesystem')->willReturn($loader);
-
-        $controller = new ImageController($transformers, $loaders);
+        $controller = new ImageController($transformerRegistry, $loaderRegistry);
         $response = $controller->__invoke('glide', 'filesystem', 'photo.jpg', $request);
 
         self::assertSame(200, $response->getStatusCode());
@@ -45,12 +42,14 @@ class ImageControllerTest extends TestCase
 
     public function testInvokeThrowsNotFoundForUnknownTransformer(): void
     {
-        $transformers = $this->createMock(ContainerInterface::class);
-        $transformers->method('has')->with('unknown')->willReturn(false);
+        $transformerContainer = $this->createMock(ContainerInterface::class);
+        $transformerContainer->method('has')->with('unknown')->willReturn(false);
+        $transformerRegistry = new TransformerRegistry($transformerContainer);
 
-        $loaders = $this->createMock(ContainerInterface::class);
+        $loaderContainer = $this->createMock(ContainerInterface::class);
+        $loaderRegistry = new LoaderRegistry($loaderContainer);
 
-        $controller = new ImageController($transformers, $loaders);
+        $controller = new ImageController($transformerRegistry, $loaderRegistry);
 
         $this->expectException(NotFoundHttpException::class);
         $this->expectExceptionMessage('Transformer "unknown" not found.');
@@ -60,14 +59,12 @@ class ImageControllerTest extends TestCase
     public function testInvokeThrowsNotFoundForNonLocalTransformer(): void
     {
         $transformer = $this->createMock(ImageTransformerInterface::class);
+        $transformerRegistry = $this->createRegistry(TransformerRegistry::class, 'imgix', $transformer);
 
-        $transformers = $this->createMock(ContainerInterface::class);
-        $transformers->method('has')->with('imgix')->willReturn(true);
-        $transformers->method('get')->with('imgix')->willReturn($transformer);
+        $loaderContainer = $this->createMock(ContainerInterface::class);
+        $loaderRegistry = new LoaderRegistry($loaderContainer);
 
-        $loaders = $this->createMock(ContainerInterface::class);
-
-        $controller = new ImageController($transformers, $loaders);
+        $controller = new ImageController($transformerRegistry, $loaderRegistry);
 
         $this->expectException(NotFoundHttpException::class);
         $this->expectExceptionMessage('does not support serving');
@@ -77,15 +74,13 @@ class ImageControllerTest extends TestCase
     public function testInvokeThrowsNotFoundForUnknownLoader(): void
     {
         $transformer = $this->createMock(LocalTransformerInterface::class);
+        $transformerRegistry = $this->createRegistry(TransformerRegistry::class, 'glide', $transformer);
 
-        $transformers = $this->createMock(ContainerInterface::class);
-        $transformers->method('has')->with('glide')->willReturn(true);
-        $transformers->method('get')->with('glide')->willReturn($transformer);
+        $loaderContainer = $this->createMock(ContainerInterface::class);
+        $loaderContainer->method('has')->with('unknown')->willReturn(false);
+        $loaderRegistry = new LoaderRegistry($loaderContainer);
 
-        $loaders = $this->createMock(ContainerInterface::class);
-        $loaders->method('has')->with('unknown')->willReturn(false);
-
-        $controller = new ImageController($transformers, $loaders);
+        $controller = new ImageController($transformerRegistry, $loaderRegistry);
 
         $this->expectException(NotFoundHttpException::class);
         $this->expectExceptionMessage('Loader "unknown" not found.');
@@ -97,18 +92,29 @@ class ImageControllerTest extends TestCase
         $transformer = $this->createMock(LocalTransformerInterface::class);
         $loader = $this->createMock(ImageLoaderInterface::class);
 
-        $transformers = $this->createMock(ContainerInterface::class);
-        $transformers->method('has')->with('glide')->willReturn(true);
-        $transformers->method('get')->with('glide')->willReturn($transformer);
+        $transformerRegistry = $this->createRegistry(TransformerRegistry::class, 'glide', $transformer);
+        $loaderRegistry = $this->createRegistry(LoaderRegistry::class, 'remote', $loader);
 
-        $loaders = $this->createMock(ContainerInterface::class);
-        $loaders->method('has')->with('remote')->willReturn(true);
-        $loaders->method('get')->with('remote')->willReturn($loader);
-
-        $controller = new ImageController($transformers, $loaders);
+        $controller = new ImageController($transformerRegistry, $loaderRegistry);
 
         $this->expectException(NotFoundHttpException::class);
         $this->expectExceptionMessage('does not support serving');
         $controller->__invoke('glide', 'remote', 'photo.jpg', new Request());
+    }
+
+    /**
+     * @template T of LoaderRegistry|TransformerRegistry
+     *
+     * @param class-string<T> $registryClass
+     *
+     * @return T
+     */
+    private function createRegistry(string $registryClass, string $name, object $service): LoaderRegistry|TransformerRegistry
+    {
+        $container = $this->createMock(ContainerInterface::class);
+        $container->method('has')->with($name)->willReturn(true);
+        $container->method('get')->with($name)->willReturn($service);
+
+        return new $registryClass($container);
     }
 }

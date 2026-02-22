@@ -14,7 +14,7 @@ use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 class SrcsetGeneratorTest extends TestCase
 {
     private SrcsetGenerator $generator;
-    private \PHPUnit\Framework\MockObject\MockObject $transformer;
+    private \PHPUnit\Framework\MockObject\MockObject&ImageTransformerInterface $transformer;
 
     protected function setUp(): void
     {

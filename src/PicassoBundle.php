@@ -13,7 +13,11 @@ use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
 use Silarhi\PicassoBundle\Loader\VichMappingHelper;
 use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
+use Silarhi\PicassoBundle\Service\LoaderRegistry;
+use Silarhi\PicassoBundle\Service\MetadataGuesser;
+use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
+use Silarhi\PicassoBundle\Service\TransformerRegistry;
 use Silarhi\PicassoBundle\Service\UrlEncryption;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
@@ -88,6 +92,10 @@ class PicassoBundle extends AbstractBundle
                 ->integerNode('default_quality')
                     ->defaultValue(75)
                     ->min(1)->max(100)
+                ->end()
+                ->scalarNode('default_fit')
+                    ->defaultValue('contain')
+                    ->info('Default fit mode (contain, cover, crop, fill).')
                 ->end()
                 ->arrayNode('placeholders')
                     ->addDefaultsIfNotSet()
@@ -174,6 +182,7 @@ class PicassoBundle extends AbstractBundle
          *     image_sizes: list<int>,
          *     formats: list<string>,
          *     default_quality: int,
+         *     default_fit: string,
          *     placeholders: array{blur: array{enabled: bool, size: int, blur: int, quality: int}},
          *     loaders: array{
          *         filesystem: array{enabled: bool, base_directory: string|null},
@@ -187,6 +196,12 @@ class PicassoBundle extends AbstractBundle
          * } $config
          */
         $services = $container->services();
+
+        // --- MetadataGuesser ---
+
+        $services->set('picasso.metadata_guesser', MetadataGuesser::class);
+        $services->alias(MetadataGuesser::class, 'picasso.metadata_guesser');
+        $services->alias(MetadataGuesserInterface::class, 'picasso.metadata_guesser');
 
         // --- Loaders ---
 
@@ -219,6 +234,16 @@ class PicassoBundle extends AbstractBundle
         // Alias default loader
         $services->alias('picasso.default_loader', 'picasso.loader.'.$config['default_loader']);
         $services->alias(ImageLoaderInterface::class, 'picasso.loader.'.$config['default_loader']);
+
+        // --- Registries ---
+
+        $services->set('picasso.loader_registry', LoaderRegistry::class)
+            ->args([tagged_locator('picasso.loader', 'key')]);
+        $services->alias(LoaderRegistry::class, 'picasso.loader_registry');
+
+        $services->set('picasso.transformer_registry', TransformerRegistry::class)
+            ->args([tagged_locator('picasso.transformer', 'key')]);
+        $services->alias(TransformerRegistry::class, 'picasso.transformer_registry');
 
         // --- Transformers ---
 
@@ -278,8 +303,8 @@ class PicassoBundle extends AbstractBundle
 
         $services->set('picasso.controller.image', ImageController::class)
             ->args([
-                tagged_locator('picasso.transformer', 'key'),
-                tagged_locator('picasso.loader', 'key'),
+                service('picasso.transformer_registry'),
+                service('picasso.loader_registry'),
             ])
             ->tag('controller.service_arguments')
             ->public();
@@ -309,7 +334,11 @@ class PicassoBundle extends AbstractBundle
         // --- Twig Extension ---
 
         $services->set('picasso.twig_extension', PicassoExtension::class)
-            ->args([service('picasso.pipeline')])
+            ->args([
+                service('picasso.pipeline'),
+                $config['default_quality'],
+                $config['default_fit'],
+            ])
             ->tag('twig.extension');
 
         // --- Image Component ---
@@ -321,10 +350,12 @@ class PicassoBundle extends AbstractBundle
                 service('picasso.srcset_generator'),
                 tagged_locator('picasso.loader', 'key'),
                 tagged_locator('picasso.transformer', 'key'),
+                service('picasso.metadata_guesser'),
                 $config['default_loader'],
                 $defaultTransformer,
                 $config['formats'],
                 $config['default_quality'],
+                $config['default_fit'],
                 $blurConfig['enabled'],
                 $blurConfig['size'],
                 $blurConfig['blur'],

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Tests\Service;
 
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Dto\Image;
@@ -15,8 +16,8 @@ use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 
 class ImagePipelineTest extends TestCase
 {
-    private \PHPUnit\Framework\MockObject\MockObject $loader;
-    private \PHPUnit\Framework\MockObject\MockObject $transformer;
+    private MockObject&ImageLoaderInterface $loader;
+    private MockObject&ImageTransformerInterface $transformer;
     private ImagePipeline $pipeline;
 
     protected function setUp(): void
@@ -26,14 +27,14 @@ class ImagePipelineTest extends TestCase
 
         $loaders = $this->createMock(ContainerInterface::class);
         $loaders->method('get')
-            ->willReturnCallback(fn (string $key): \PHPUnit\Framework\MockObject\MockObject => match ($key) {
+            ->willReturnCallback(fn (string $key): MockObject&ImageLoaderInterface => match ($key) {
                 'filesystem' => $this->loader,
                 default => throw new \InvalidArgumentException("Unknown loader: $key"),
             });
 
         $transformers = $this->createMock(ContainerInterface::class);
         $transformers->method('get')
-            ->willReturnCallback(fn (string $key): \PHPUnit\Framework\MockObject\MockObject => match ($key) {
+            ->willReturnCallback(fn (string $key): MockObject&ImageTransformerInterface => match ($key) {
                 'glide' => $this->transformer,
                 default => throw new \InvalidArgumentException("Unknown transformer: $key"),
             });
@@ -43,7 +44,7 @@ class ImagePipelineTest extends TestCase
 
     public function testUrlLoadsImageAndTransforms(): void
     {
-        $image = new Image(path: 'uploads/photo.jpg', width: 1920, height: 1080);
+        $image = new Image(path: 'uploads/photo.jpg');
         $reference = new ImageReference('uploads/photo.jpg');
         $transformation = new ImageTransformation(width: 300, format: 'webp');
 
@@ -64,28 +65,16 @@ class ImagePipelineTest extends TestCase
 
     public function testLoadReturnsImage(): void
     {
-        $image = new Image(path: 'photo.jpg', width: 800, height: 600);
+        $image = new Image(path: 'photo.jpg');
         $reference = new ImageReference('photo.jpg');
 
         $this->loader->expects(self::once())
             ->method('load')
-            ->with($reference, true)
+            ->with($reference)
             ->willReturn($image);
 
         $result = $this->pipeline->load($reference);
 
         self::assertSame($image, $result);
-    }
-
-    public function testLoadPassesWithMetadata(): void
-    {
-        $reference = new ImageReference('photo.jpg');
-
-        $this->loader->expects(self::once())
-            ->method('load')
-            ->with($reference, false)
-            ->willReturn(new Image(path: 'photo.jpg'));
-
-        $this->pipeline->load($reference, withMetadata: false);
     }
 }

@@ -14,38 +14,16 @@ class FilesystemLoader implements ServableLoaderInterface
     ) {
     }
 
-    public function load(ImageReference $reference, bool $withMetadata = true): Image
+    public function load(ImageReference $reference): Image
     {
         $path = ltrim($reference->path ?? '', '/');
-
-        if (!$withMetadata) {
-            return new Image(path: $path);
-        }
-
-        $width = null;
-        $height = null;
-        $mimeType = null;
-
         $absolutePath = rtrim($this->baseDirectory, '/').'/'.$path;
+        $stream = is_file($absolutePath) ? @fopen($absolutePath, 'r') : null;
 
-        if (is_file($absolutePath)) {
-            $info = @getimagesize($absolutePath);
-            if (false !== $info) {
-                $width = $info[0];
-                $height = $info[1];
-                $mimeType = $info['mime'];
-            }
-        }
-
-        return new Image(
-            path: $path,
-            width: $width,
-            height: $height,
-            mimeType: $mimeType,
-        );
+        return new Image(path: $path, stream: $stream ?: null);
     }
 
-    public function getSource(): object|string
+    public function getSource(): string
     {
         return $this->baseDirectory;
     }

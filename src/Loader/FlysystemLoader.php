@@ -15,12 +15,12 @@ class FlysystemLoader implements ServableLoaderInterface
     ) {
     }
 
-    public function load(ImageReference $reference, bool $withMetadata = true): Image
+    public function load(ImageReference $reference): Image
     {
         return new Image(path: ltrim($reference->path ?? '', '/'));
     }
 
-    public function getSource(): object|string
+    public function getSource(): FilesystemOperator
     {
         return $this->storage;
     }

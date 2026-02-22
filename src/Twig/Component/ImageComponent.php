@@ -9,6 +9,7 @@ use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Dto\ImageSource;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
+use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
@@ -47,8 +48,8 @@ class ImageComponent
     /** Override image quality (1-100). */
     public ?int $quality = null;
 
-    /** Fit mode ('contain', 'cover', 'fill', 'crop'). */
-    public string $fit = 'contain';
+    /** Fit mode ('contain', 'cover', 'fill', 'crop'). Null defaults to config value. */
+    public ?string $fit = null;
 
     /** Enable/disable blur placeholder for this image. */
     public ?bool $placeholder = null;
@@ -84,10 +85,12 @@ class ImageComponent
         private readonly SrcsetGenerator $srcsetGenerator,
         private readonly ContainerInterface $loaders,
         private readonly ContainerInterface $transformers,
+        private readonly MetadataGuesserInterface $metadataGuesser,
         private readonly string $defaultLoader,
         private readonly string $defaultTransformer,
         private readonly array $formats,
         private readonly int $defaultQuality,
+        private readonly string $defaultFit,
         private readonly bool $blurEnabled,
         private readonly int $blurSize,
         private readonly int $blurAmount,
@@ -112,15 +115,20 @@ class ImageComponent
         /** @var ImageLoaderInterface $imageLoader */
         $imageLoader = $this->loaders->get($loaderName);
 
-        $withMetadata = null === $this->sourceWidth || null === $this->sourceHeight;
         $reference = new ImageReference($this->src, $this->context);
-        $image = $imageLoader->load($reference, $withMetadata);
+        $image = $imageLoader->load($reference);
 
         $this->resolvedPath = $image->path ?? '';
 
-        // Resolve dimensions: explicit props > loader detection > display dims
-        $w = $this->sourceWidth ?? $image->width;
-        $h = $this->sourceHeight ?? $image->height;
+        // Resolve dimensions: explicit props > stream detection > display dims
+        $w = $this->sourceWidth;
+        $h = $this->sourceHeight;
+
+        if ((null === $w || null === $h) && null !== $image->stream) {
+            $guessed = $this->metadataGuesser->guess($image->stream);
+            $w ??= $guessed['width'];
+            $h ??= $guessed['height'];
+        }
 
         $resolvedWidth = $w ?? $this->width;
         $resolvedHeight = $h ?? $this->height;
@@ -133,6 +141,9 @@ class ImageComponent
         /** @var ImageTransformerInterface $imageTransformer */
         $imageTransformer = $this->transformers->get($transformerName);
         $transformerContext = ['loader' => $loaderName];
+
+        // Resolve fit from prop or config default
+        $fit = $this->fit ?? $this->defaultFit;
 
         // Generate blur placeholder URL via the transformer
         $shouldBlur = $this->placeholder ?? $this->blurEnabled;
@@ -168,7 +179,7 @@ class ImageComponent
                 height: $this->height,
                 sizes: $this->sizes,
                 quality: $quality,
-                fit: $this->fit,
+                fit: $fit,
                 context: $transformerContext,
             );
 
@@ -183,7 +194,7 @@ class ImageComponent
                     width: $this->width,
                     height: $this->height,
                     quality: $quality,
-                    fit: $this->fit,
+                    fit: $fit,
                     context: $transformerContext,
                 );
             } else {

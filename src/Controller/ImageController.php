@@ -4,18 +4,19 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Controller;
 
-use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
+use Silarhi\PicassoBundle\Service\LoaderRegistry;
+use Silarhi\PicassoBundle\Service\TransformerRegistry;
 use Silarhi\PicassoBundle\Transformer\LocalTransformerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
-class ImageController
+final readonly class ImageController
 {
     public function __construct(
-        private readonly ContainerInterface $transformers,
-        private readonly ContainerInterface $loaders,
+        private TransformerRegistry $transformers,
+        private LoaderRegistry $loaders,
     ) {
     }
 

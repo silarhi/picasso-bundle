@@ -49,13 +49,12 @@ class ImagePipeline
     public function load(
         ImageReference $reference,
         ?string $loader = null,
-        bool $withMetadata = true,
     ): Image {
         $loaderName = $loader ?? $this->defaultLoader;
 
         /** @var ImageLoaderInterface $imageLoader */
         $imageLoader = $this->loaders->get($loaderName);
 
-        return $imageLoader->load($reference, $withMetadata);
+        return $imageLoader->load($reference);
     }
 }
