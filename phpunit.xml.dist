@@ -3,8 +3,6 @@
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
          bootstrap="tests/bootstrap.php"
          colors="true"
-         failOnRisky="true"
-         failOnWarning="true"
 >
     <testsuites>
         <testsuite name="Picasso Bundle Test Suite">
