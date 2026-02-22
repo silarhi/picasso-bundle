@@ -9,6 +9,7 @@ use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Loader\VichMappingHelperInterface;
 use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
+use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
 use Vich\UploaderBundle\Storage\StorageInterface;
 
 class VichUploaderLoaderTest extends TestCase
@@ -16,6 +17,7 @@ class VichUploaderLoaderTest extends TestCase
     private VichUploaderLoader $loader;
     private MockObject&StorageInterface $storage;
     private MockObject&VichMappingHelperInterface $mappingHelper;
+    private MockObject&MetadataGuesserInterface $metadataGuesser;
 
     protected function setUp(): void
     {
@@ -25,7 +27,8 @@ class VichUploaderLoaderTest extends TestCase
 
         $this->storage = $this->createMock(StorageInterface::class);
         $this->mappingHelper = $this->createMock(VichMappingHelperInterface::class);
-        $this->loader = new VichUploaderLoader($this->storage, $this->mappingHelper);
+        $this->metadataGuesser = $this->createMock(MetadataGuesserInterface::class);
+        $this->loader = new VichUploaderLoader($this->storage, $this->mappingHelper, $this->metadataGuesser);
     }
 
     public function testLoadWithStringSource(): void
@@ -258,5 +261,73 @@ class VichUploaderLoaderTest extends TestCase
 
         self::assertSame('users/avatar.jpg', $image->path);
         self::assertSame('/var/uploads/avatars', $image->metadata['_source']);
+    }
+
+    public function testLoadWithMetadataUsesGuesser(): void
+    {
+        $entity = new \stdClass();
+        $stream = fopen('php://memory', 'r+');
+        self::assertNotFalse($stream);
+
+        $this->mappingHelper->method('getFilePropertyName')->willReturn('imageFile');
+        $this->mappingHelper->method('getUploadDestination')->willReturn('/var/uploads');
+        $this->storage->method('resolvePath')->willReturn('photo.jpg');
+        $this->storage->method('resolveStream')->willReturn($stream);
+
+        $this->metadataGuesser->expects(self::once())
+            ->method('guess')
+            ->with($stream)
+            ->willReturn(['width' => 1024, 'height' => 768, 'mimeType' => 'image/jpeg']);
+
+        $image = $this->loader->load(new ImageReference('photo.jpg', [
+            'entity' => $entity,
+            'field' => 'imageFile',
+        ]), withMetadata: true);
+
+        self::assertSame(1024, $image->width);
+        self::assertSame(768, $image->height);
+        self::assertSame('image/jpeg', $image->mimeType);
+    }
+
+    public function testLoadWithMetadataSkipsWhenNoStream(): void
+    {
+        $entity = new \stdClass();
+
+        $this->mappingHelper->method('getFilePropertyName')->willReturn('imageFile');
+        $this->mappingHelper->method('getUploadDestination')->willReturn('/var/uploads');
+        $this->storage->method('resolvePath')->willReturn('photo.jpg');
+        $this->storage->method('resolveStream')->willReturn(null);
+
+        $this->metadataGuesser->expects(self::never())->method('guess');
+
+        $image = $this->loader->load(new ImageReference('photo.jpg', [
+            'entity' => $entity,
+            'field' => 'imageFile',
+        ]), withMetadata: true);
+
+        self::assertNull($image->width);
+        self::assertNull($image->height);
+    }
+
+    public function testLoadWithoutMetadataSkipsGuesser(): void
+    {
+        $entity = new \stdClass();
+        $stream = fopen('php://memory', 'r+');
+        self::assertNotFalse($stream);
+
+        $this->mappingHelper->method('getFilePropertyName')->willReturn('imageFile');
+        $this->mappingHelper->method('getUploadDestination')->willReturn('/var/uploads');
+        $this->storage->method('resolvePath')->willReturn('photo.jpg');
+        $this->storage->method('resolveStream')->willReturn($stream);
+
+        $this->metadataGuesser->expects(self::never())->method('guess');
+
+        $image = $this->loader->load(new ImageReference('photo.jpg', [
+            'entity' => $entity,
+            'field' => 'imageFile',
+        ]));
+
+        self::assertNull($image->width);
+        self::assertSame($stream, $image->stream);
     }
 }

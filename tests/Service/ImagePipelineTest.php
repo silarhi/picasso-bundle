@@ -70,11 +70,27 @@ class ImagePipelineTest extends TestCase
 
         $this->loader->expects(self::once())
             ->method('load')
-            ->with($reference)
+            ->with($reference, false)
             ->willReturn($image);
 
         $result = $this->pipeline->load($reference);
 
         self::assertSame($image, $result);
+    }
+
+    public function testLoadPassesWithMetadata(): void
+    {
+        $image = new Image(path: 'photo.jpg', width: 800, height: 600);
+        $reference = new ImageReference('photo.jpg');
+
+        $this->loader->expects(self::once())
+            ->method('load')
+            ->with($reference, true)
+            ->willReturn($image);
+
+        $result = $this->pipeline->load($reference, withMetadata: true);
+
+        self::assertSame(800, $result->width);
+        self::assertSame(600, $result->height);
     }
 }

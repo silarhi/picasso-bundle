@@ -116,13 +116,14 @@ class ImageComponent
         $imageLoader = $this->loaders->get($loaderName);
 
         $reference = new ImageReference($this->src, $this->context);
-        $image = $imageLoader->load($reference);
+        $needsMetadata = null === $this->sourceWidth || null === $this->sourceHeight;
+        $image = $imageLoader->load($reference, $needsMetadata);
 
         $this->resolvedPath = $image->path ?? '';
 
-        // Resolve dimensions: explicit props > stream detection > display dims
-        $w = $this->sourceWidth;
-        $h = $this->sourceHeight;
+        // Resolve dimensions: explicit props > loader metadata > stream detection > display dims
+        $w = $this->sourceWidth ?? $image->width;
+        $h = $this->sourceHeight ?? $image->height;
 
         if ((null === $w || null === $h) && null !== $image->stream) {
             $guessed = $this->metadataGuesser->guess($image->stream);

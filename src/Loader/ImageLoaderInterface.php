@@ -9,5 +9,5 @@ use Silarhi\PicassoBundle\Dto\ImageReference;
 
 interface ImageLoaderInterface
 {
-    public function load(ImageReference $reference): Image;
+    public function load(ImageReference $reference, bool $withMetadata = false): Image;
 }

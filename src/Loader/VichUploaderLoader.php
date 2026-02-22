@@ -6,6 +6,7 @@ namespace Silarhi\PicassoBundle\Loader;
 
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
+use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
 use Vich\UploaderBundle\Storage\StorageInterface;
 
 class VichUploaderLoader implements ServableLoaderInterface
@@ -13,10 +14,11 @@ class VichUploaderLoader implements ServableLoaderInterface
     public function __construct(
         private readonly StorageInterface $storage,
         private readonly VichMappingHelperInterface $mappingHelper,
+        private readonly MetadataGuesserInterface $metadataGuesser,
     ) {
     }
 
-    public function load(ImageReference $reference): Image
+    public function load(ImageReference $reference, bool $withMetadata = false): Image
     {
         $entity = $reference->context['entity'] ?? null;
 
@@ -45,9 +47,23 @@ class VichUploaderLoader implements ServableLoaderInterface
             // Stream not available
         }
 
+        $width = null;
+        $height = null;
+        $mimeType = null;
+
+        if ($withMetadata && null !== $stream) {
+            $guessed = $this->metadataGuesser->guess($stream);
+            $width = $guessed['width'];
+            $height = $guessed['height'];
+            $mimeType = $guessed['mimeType'];
+        }
+
         return new Image(
             path: ltrim($path ?? '', '/'),
             stream: $stream,
+            width: $width,
+            height: $height,
+            mimeType: $mimeType,
             metadata: $metadata,
         );
     }

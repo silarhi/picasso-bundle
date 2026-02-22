@@ -10,6 +10,7 @@ use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Loader\VichMappingHelperInterface;
 use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
+use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
 use Silarhi\PicassoBundle\Service\UrlEncryption;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
@@ -37,7 +38,8 @@ class VichMultipleMappingsTest extends TestCase
 
         $this->storage = $this->createMock(StorageInterface::class);
         $this->mappingHelper = $this->createMock(VichMappingHelperInterface::class);
-        $this->loader = new VichUploaderLoader($this->storage, $this->mappingHelper);
+        $metadataGuesser = $this->createMock(MetadataGuesserInterface::class);
+        $this->loader = new VichUploaderLoader($this->storage, $this->mappingHelper, $metadataGuesser);
         $this->encryption = new UrlEncryption(self::SIGN_KEY);
     }
 

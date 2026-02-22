@@ -61,4 +61,50 @@ class FilesystemLoaderTest extends TestCase
             @rmdir($tmpDir);
         }
     }
+
+    public function testLoadWithMetadataDetectsDimensions(): void
+    {
+        $tmpDir = sys_get_temp_dir().'/picasso_test_'.uniqid();
+        mkdir($tmpDir, 0o777, true);
+
+        // Create a minimal 1x1 GIF
+        $gif = base64_decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
+        self::assertNotFalse($gif);
+        file_put_contents($tmpDir.'/pixel.gif', $gif);
+
+        try {
+            $loader = new FilesystemLoader($tmpDir);
+            $image = $loader->load(new ImageReference('pixel.gif'), withMetadata: true);
+
+            self::assertSame(1, $image->width);
+            self::assertSame(1, $image->height);
+            self::assertSame('image/gif', $image->mimeType);
+        } finally {
+            @unlink($tmpDir.'/pixel.gif');
+            @rmdir($tmpDir);
+        }
+    }
+
+    public function testLoadWithoutMetadataSkipsDetection(): void
+    {
+        $tmpDir = sys_get_temp_dir().'/picasso_test_'.uniqid();
+        mkdir($tmpDir, 0o777, true);
+
+        $gif = base64_decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
+        self::assertNotFalse($gif);
+        file_put_contents($tmpDir.'/pixel.gif', $gif);
+
+        try {
+            $loader = new FilesystemLoader($tmpDir);
+            $image = $loader->load(new ImageReference('pixel.gif'));
+
+            self::assertNull($image->width);
+            self::assertNull($image->height);
+            self::assertNull($image->mimeType);
+            self::assertNotNull($image->stream);
+        } finally {
+            @unlink($tmpDir.'/pixel.gif');
+            @rmdir($tmpDir);
+        }
+    }
 }

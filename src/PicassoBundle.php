@@ -215,7 +215,10 @@ class PicassoBundle extends AbstractBundle
 
         if ($loaderConfig['flysystem']['enabled'] && null !== $loaderConfig['flysystem']['service']) {
             $services->set('picasso.loader.flysystem', FlysystemLoader::class)
-                ->args([service($loaderConfig['flysystem']['service'])])
+                ->args([
+                    service($loaderConfig['flysystem']['service']),
+                    service('picasso.metadata_guesser'),
+                ])
                 ->tag('picasso.loader', ['key' => 'flysystem']);
         }
 
@@ -227,6 +230,7 @@ class PicassoBundle extends AbstractBundle
                 ->args([
                     service(VichStorageInterface::class),
                     service('picasso.vich_mapping_helper'),
+                    service('picasso.metadata_guesser'),
                 ])
                 ->tag('picasso.loader', ['key' => 'vich']);
         }

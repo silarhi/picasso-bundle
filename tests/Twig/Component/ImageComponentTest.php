@@ -97,7 +97,9 @@ class ImageComponentTest extends TestCase
 
     public function testComputeImageDataUsesSourceWidthHeight(): void
     {
-        $this->filesystemLoader->method('load')
+        $this->filesystemLoader->expects(self::once())
+            ->method('load')
+            ->with(self::anything(), false)
             ->willReturn(new Image(path: 'photo.jpg'));
         $this->metadataGuesser->expects(self::never())->method('guess');
         $this->configureSrcsetGenerator();
@@ -111,6 +113,24 @@ class ImageComponentTest extends TestCase
 
         self::assertSame(800, $component->width);
         self::assertSame(600, $component->height);
+    }
+
+    public function testComputeImageDataUsesLoaderMetadata(): void
+    {
+        $this->filesystemLoader->expects(self::once())
+            ->method('load')
+            ->with(self::anything(), true)
+            ->willReturn(new Image(path: 'photo.jpg', width: 1600, height: 900));
+        $this->metadataGuesser->expects(self::never())->method('guess');
+        $this->configureSrcsetGenerator();
+
+        $component = $this->createComponent();
+        $component->src = 'photo.jpg';
+        $component->sizes = '100vw';
+        $component->computeImageData();
+
+        self::assertSame(1600, $component->width);
+        self::assertSame(900, $component->height);
     }
 
     public function testComputeImageDataUsesMetadataGuesserForDimensions(): void
