@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Silarhi\PicassoBundle\Service;
 
 use Silarhi\PicassoBundle\Dto\Image;
@@ -29,14 +31,14 @@ class SrcsetGenerator
      */
     public function getWidths(?string $sizes, ?int $width): array
     {
-        if ($sizes !== null) {
+        if (null !== $sizes) {
             $widths = array_merge($this->deviceSizes, $this->imageSizes);
             sort($widths);
 
             return array_values(array_unique($widths));
         }
 
-        if ($width !== null) {
+        if (null !== $width) {
             return [$width, $width * 2];
         }
 
@@ -66,12 +68,12 @@ class SrcsetGenerator
     ): array {
         $quality ??= $this->defaultQuality;
         $widths = $this->getWidths($sizes, $width);
-        $isFixed = $sizes === null && $width !== null;
+        $isFixed = null === $sizes && null !== $width;
         $entries = [];
 
         foreach ($widths as $index => $w) {
             $h = null;
-            if ($isFixed && $width > 0 && $height !== null && $height > 0) {
+            if ($isFixed && $width > 0 && null !== $height && $height > 0) {
                 $h = (int) round($w * $height / $width);
             }
 
@@ -100,7 +102,7 @@ class SrcsetGenerator
     public function buildSrcsetString(array $entries): string
     {
         return implode(', ', array_map(
-            static fn (SrcsetEntry $entry) => $entry->toString(),
+            static fn (SrcsetEntry $entry): string => $entry->toString(),
             $entries,
         ));
     }

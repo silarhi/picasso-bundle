@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Silarhi\PicassoBundle\Loader;
 
 use Vich\UploaderBundle\Mapping\PropertyMappingFactory;
@@ -17,7 +19,7 @@ class VichMappingHelper
      */
     public function getFilePropertyName(object $entity, ?string $field): ?string
     {
-        if ($field !== null) {
+        if (null !== $field) {
             $mapping = $this->factory->fromField($entity, $field);
 
             return $mapping?->getFilePropertyName();
@@ -26,5 +28,21 @@ class VichMappingHelper
         $mappings = $this->factory->fromObject($entity);
 
         return isset($mappings[0]) ? $mappings[0]->getFilePropertyName() : null;
+    }
+
+    /**
+     * Returns the upload destination directory for an entity's mapping.
+     */
+    public function getUploadDestination(object $entity, ?string $field): ?string
+    {
+        if (null !== $field) {
+            $mapping = $this->factory->fromField($entity, $field);
+
+            return $mapping?->getUploadDestination();
+        }
+
+        $mappings = $this->factory->fromObject($entity);
+
+        return isset($mappings[0]) ? $mappings[0]->getUploadDestination() : null;
     }
 }

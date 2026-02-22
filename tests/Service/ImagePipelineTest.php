@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Silarhi\PicassoBundle\Tests\Service;
 
 use PHPUnit\Framework\TestCase;
@@ -13,8 +15,8 @@ use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 
 class ImagePipelineTest extends TestCase
 {
-    private ImageLoaderInterface $loader;
-    private ImageTransformerInterface $transformer;
+    private \PHPUnit\Framework\MockObject\MockObject $loader;
+    private \PHPUnit\Framework\MockObject\MockObject $transformer;
     private ImagePipeline $pipeline;
 
     protected function setUp(): void
@@ -24,14 +26,14 @@ class ImagePipelineTest extends TestCase
 
         $loaders = $this->createMock(ContainerInterface::class);
         $loaders->method('get')
-            ->willReturnCallback(fn (string $key) => match ($key) {
+            ->willReturnCallback(fn (string $key): \PHPUnit\Framework\MockObject\MockObject => match ($key) {
                 'filesystem' => $this->loader,
                 default => throw new \InvalidArgumentException("Unknown loader: $key"),
             });
 
         $transformers = $this->createMock(ContainerInterface::class);
         $transformers->method('get')
-            ->willReturnCallback(fn (string $key) => match ($key) {
+            ->willReturnCallback(fn (string $key): \PHPUnit\Framework\MockObject\MockObject => match ($key) {
                 'glide' => $this->transformer,
                 default => throw new \InvalidArgumentException("Unknown transformer: $key"),
             });

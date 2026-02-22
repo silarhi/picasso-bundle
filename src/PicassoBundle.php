@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Silarhi\PicassoBundle;
 
 use Silarhi\PicassoBundle\Attribute\AsImageLoader;
@@ -21,11 +23,12 @@ use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
-use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
-use Vich\UploaderBundle\Storage\StorageInterface as VichStorageInterface;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_locator;
+
+use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
+use Vich\UploaderBundle\Storage\StorageInterface as VichStorageInterface;
 
 class PicassoBundle extends AbstractBundle
 {
@@ -120,7 +123,6 @@ class PicassoBundle extends AbstractBundle
                             ->addDefaultsIfNotSet()
                             ->children()
                                 ->booleanNode('enabled')->defaultFalse()->end()
-                                ->scalarNode('source')->defaultNull()->info('Source path or Flysystem service for Glide serving')->end()
                             ->end()
                         ->end()
                     ->end()
@@ -159,8 +161,30 @@ class PicassoBundle extends AbstractBundle
         ;
     }
 
+    /**
+     * @param array<string, mixed> $config
+     */
     public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
     {
+        /** @var array{
+         *     default_loader: string,
+         *     default_transformer: string|null,
+         *     device_sizes: list<int>,
+         *     image_sizes: list<int>,
+         *     formats: list<string>,
+         *     default_quality: int,
+         *     placeholders: array{blur: array{enabled: bool, size: int, blur: int, quality: int}},
+         *     loaders: array{
+         *         filesystem: array{enabled: bool, base_directory: string|null},
+         *         flysystem: array{enabled: bool, service: string|null},
+         *         vich: array{enabled: bool}
+         *     },
+         *     transformers: array{
+         *         glide: array{enabled: bool, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null},
+         *         imgix: array{enabled: bool, domain: string|null, sign_key: string|null, use_https: bool}
+         *     }
+         * } $config
+         */
         $services = $container->services();
 
         // --- Loaders ---
@@ -173,7 +197,7 @@ class PicassoBundle extends AbstractBundle
                 ->tag('picasso.loader', ['key' => 'filesystem']);
         }
 
-        if ($loaderConfig['flysystem']['enabled'] && $loaderConfig['flysystem']['service'] !== null) {
+        if ($loaderConfig['flysystem']['enabled'] && null !== $loaderConfig['flysystem']['service']) {
             $services->set('picasso.loader.flysystem', FlysystemLoader::class)
                 ->args([service($loaderConfig['flysystem']['service'])])
                 ->tag('picasso.loader', ['key' => 'flysystem']);
@@ -181,18 +205,13 @@ class PicassoBundle extends AbstractBundle
 
         if ($loaderConfig['vich']['enabled'] && interface_exists(VichStorageInterface::class)) {
             $services->set('picasso.vich_mapping_helper', VichMappingHelper::class)
-                ->args([service('Vich\\UploaderBundle\\Mapping\\PropertyMappingFactory')]);
-
-            $vichArgs = [
-                service('Vich\\UploaderBundle\\Storage\\StorageInterface'),
-                service('picasso.vich_mapping_helper'),
-            ];
-
-            $vichSource = $loaderConfig['vich']['source'];
-            $vichArgs[] = $vichSource;
+                ->args([service(\Vich\UploaderBundle\Mapping\PropertyMappingFactory::class)]);
 
             $services->set('picasso.loader.vich', VichUploaderLoader::class)
-                ->args($vichArgs)
+                ->args([
+                    service(VichStorageInterface::class),
+                    service('picasso.vich_mapping_helper'),
+                ])
                 ->tag('picasso.loader', ['key' => 'vich']);
         }
 
@@ -208,7 +227,7 @@ class PicassoBundle extends AbstractBundle
 
         // Determine default transformer
         $defaultTransformer = $config['default_transformer'];
-        if ($defaultTransformer === null) {
+        if (null === $defaultTransformer) {
             if ($hasGlide && !$hasImgix) {
                 $defaultTransformer = 'glide';
             } elseif ($hasImgix && !$hasGlide) {

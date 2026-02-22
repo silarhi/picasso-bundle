@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Silarhi\PicassoBundle\Transformer;
 
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;

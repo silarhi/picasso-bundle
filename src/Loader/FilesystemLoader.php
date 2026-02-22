@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Silarhi\PicassoBundle\Loader;
 
 use Silarhi\PicassoBundle\Dto\Image;
@@ -28,10 +30,10 @@ class FilesystemLoader implements ServableLoaderInterface
 
         if (is_file($absolutePath)) {
             $info = @getimagesize($absolutePath);
-            if ($info !== false) {
+            if (false !== $info) {
                 $width = $info[0];
                 $height = $info[1];
-                $mimeType = $info['mime'] ?? null;
+                $mimeType = $info['mime'];
             }
         }
 

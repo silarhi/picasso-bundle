@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Silarhi\PicassoBundle\Tests\Twig\Component;
 
 use PHPUnit\Framework\TestCase;
@@ -15,11 +17,11 @@ use Silarhi\PicassoBundle\Twig\Component\ImageComponent;
 
 class ImageComponentTest extends TestCase
 {
-    private SrcsetGenerator $srcsetGenerator;
-    private ContainerInterface $loaders;
-    private ContainerInterface $transformers;
-    private ImageLoaderInterface $filesystemLoader;
-    private ImageTransformerInterface $glideTransformer;
+    private \PHPUnit\Framework\MockObject\MockObject $srcsetGenerator;
+    private \PHPUnit\Framework\MockObject\MockObject $loaders;
+    private \PHPUnit\Framework\MockObject\MockObject $transformers;
+    private \PHPUnit\Framework\MockObject\MockObject $filesystemLoader;
+    private \PHPUnit\Framework\MockObject\MockObject $glideTransformer;
 
     protected function setUp(): void
     {
@@ -124,14 +126,12 @@ class ImageComponentTest extends TestCase
         $this->glideTransformer->method('url')
             ->with(
                 self::isInstanceOf(Image::class),
-                self::callback(function (ImageTransformation $t): bool {
-                    return $t->width === 10
-                        && $t->height === 6
-                        && $t->format === 'jpg'
-                        && $t->quality === 30
-                        && $t->fit === 'crop'
-                        && $t->blur === 50;
-                }),
+                self::callback(static fn (ImageTransformation $t): bool => 10 === $t->width
+                    && 6 === $t->height
+                    && 'jpg' === $t->format
+                    && 30 === $t->quality
+                    && 'crop' === $t->fit
+                    && 50 === $t->blur),
                 ['loader' => 'filesystem'],
             )
             ->willReturn('/picasso/glide/filesystem/photo.jpg?w=10&h=6&fm=jpg&q=30&blur=50');
@@ -181,20 +181,16 @@ class ImageComponentTest extends TestCase
             ->willReturn(new Image(path: 'photo.jpg'));
 
         $this->srcsetGenerator->method('generateSrcset')
-            ->willReturnCallback(function (ImageTransformerInterface $t, Image $img, string $format): array {
-                return [
-                    new SrcsetEntry("/img/{$img->path}?fm={$format}&w=640", '640w'),
-                    new SrcsetEntry("/img/{$img->path}?fm={$format}&w=1080", '1080w'),
-                ];
-            });
+            ->willReturnCallback(static fn (ImageTransformerInterface $t, Image $img, string $format): array => [
+                new SrcsetEntry("/img/{$img->path}?fm={$format}&w=640", '640w'),
+                new SrcsetEntry("/img/{$img->path}?fm={$format}&w=1080", '1080w'),
+            ]);
 
         $this->srcsetGenerator->method('buildSrcsetString')
-            ->willReturnCallback(function (array $entries): string {
-                return implode(', ', array_map(
-                    static fn (SrcsetEntry $e) => $e->toString(),
-                    $entries,
-                ));
-            });
+            ->willReturnCallback(static fn (array $entries): string => implode(', ', array_map(
+                static fn (SrcsetEntry $e): string => $e->toString(),
+                $entries,
+            )));
 
         $this->srcsetGenerator->method('getFallbackUrl')
             ->willReturn('/img/photo.jpg?fm=jpg&w=800');

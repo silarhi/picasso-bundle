@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Silarhi\PicassoBundle\Tests\Dto;
 
 use PHPUnit\Framework\TestCase;
@@ -17,6 +19,7 @@ class ImageTest extends TestCase
         self::assertNull($image->width);
         self::assertNull($image->height);
         self::assertNull($image->mimeType);
+        self::assertSame([], $image->metadata);
     }
 
     public function testWithPath(): void
@@ -43,14 +46,18 @@ class ImageTest extends TestCase
         self::assertSame('image/webp', $image->mimeType);
     }
 
+    public function testWithMetadata(): void
+    {
+        $image = new Image(path: 'photo.jpg', metadata: ['_source' => '/var/uploads']);
+
+        self::assertSame('/var/uploads', $image->metadata['_source']);
+    }
+
     public function testReadonlyProperties(): void
     {
         $image = new Image(path: 'photo.jpg');
         $reflection = new \ReflectionClass($image);
 
-        self::assertTrue($reflection->getProperty('path')->isReadOnly());
-        self::assertTrue($reflection->getProperty('width')->isReadOnly());
-        self::assertTrue($reflection->getProperty('height')->isReadOnly());
-        self::assertTrue($reflection->getProperty('mimeType')->isReadOnly());
+        self::assertTrue($reflection->isReadOnly());
     }
 }

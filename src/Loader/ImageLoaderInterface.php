@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Silarhi\PicassoBundle\Loader;
 
 use Silarhi\PicassoBundle\Dto\Image;

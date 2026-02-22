@@ -1,17 +1,23 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Silarhi\PicassoBundle\Dto;
 
-final class Image
+final readonly class Image
 {
+    /**
+     * @param array<string, mixed> $metadata
+     */
     public function __construct(
-        public readonly ?string $path = null,
-        public readonly ?string $url = null,
+        public ?string $path = null,
+        public ?string $url = null,
         /** @var resource|null */
-        public readonly mixed $stream = null,
-        public readonly ?int $width = null,
-        public readonly ?int $height = null,
-        public readonly ?string $mimeType = null,
+        public mixed $stream = null,
+        public ?int $width = null,
+        public ?int $height = null,
+        public ?string $mimeType = null,
+        public array $metadata = [],
     ) {
     }
 }

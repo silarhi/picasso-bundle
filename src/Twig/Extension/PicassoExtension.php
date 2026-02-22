@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Silarhi\PicassoBundle\Twig\Extension;
 
 use Silarhi\PicassoBundle\Dto\ImageReference;
@@ -33,20 +35,28 @@ class PicassoExtension extends AbstractExtension
      */
     public function imageUrl(string $path, array $params = []): string
     {
-        $loader = $params['loader'] ?? null;
-        $transformer = $params['transformer'] ?? null;
+        $loader = isset($params['loader']) && \is_string($params['loader']) ? $params['loader'] : null;
+        $transformer = isset($params['transformer']) && \is_string($params['transformer']) ? $params['transformer'] : null;
         unset($params['loader'], $params['transformer']);
 
         $reference = new ImageReference($path);
 
+        $width = $params['width'] ?? null;
+        $height = $params['height'] ?? null;
+        $format = $params['format'] ?? null;
+        $quality = $params['quality'] ?? 75;
+        $fit = $params['fit'] ?? 'contain';
+        $blur = $params['blur'] ?? null;
+        $dpr = $params['dpr'] ?? null;
+
         $transformation = new ImageTransformation(
-            width: $params['width'] ?? null,
-            height: $params['height'] ?? null,
-            format: $params['format'] ?? null,
-            quality: $params['quality'] ?? 75,
-            fit: $params['fit'] ?? 'contain',
-            blur: $params['blur'] ?? null,
-            dpr: $params['dpr'] ?? null,
+            width: \is_int($width) ? $width : null,
+            height: \is_int($height) ? $height : null,
+            format: \is_string($format) ? $format : null,
+            quality: \is_int($quality) ? $quality : 75,
+            fit: \is_string($fit) ? $fit : 'contain',
+            blur: \is_int($blur) ? $blur : null,
+            dpr: \is_int($dpr) ? $dpr : null,
         );
 
         return $this->pipeline->url($reference, $transformation, $loader, $transformer);

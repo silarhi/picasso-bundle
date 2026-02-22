@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Silarhi\PicassoBundle\Transformer;
 
 use Silarhi\PicassoBundle\Dto\Image;
@@ -19,45 +21,45 @@ class ImgixTransformer implements ImageTransformerInterface
 
     public function url(Image $image, ImageTransformation $transformation, array $context = []): string
     {
-        $imgixParams = self::mapToImgixParams($transformation);
+        $imgixParams = $this->mapToImgixParams($transformation);
 
         $path = '/'.ltrim($image->path ?? '', '/');
         $queryString = http_build_query($imgixParams);
 
-        if ($this->signKey !== null) {
-            $signature = self::generateSignature($this->signKey, $path, $queryString);
-            $queryString .= ($queryString !== '' ? '&' : '').'s='.$signature;
+        if (null !== $this->signKey) {
+            $signature = $this->generateSignature($this->signKey, $path, $queryString);
+            $queryString .= ('' !== $queryString ? '&' : '').'s='.$signature;
         }
 
         $scheme = $this->useHttps ? 'https' : 'http';
 
-        return $scheme.'://'.$this->domain.$path.($queryString !== '' ? '?'.$queryString : '');
+        return $scheme.'://'.$this->domain.$path.('' !== $queryString ? '?'.$queryString : '');
     }
 
     /**
      * @return array<string, int|string>
      */
-    private static function mapToImgixParams(ImageTransformation $transformation): array
+    private function mapToImgixParams(ImageTransformation $transformation): array
     {
         $imgix = [];
 
-        if ($transformation->width !== null) {
+        if (null !== $transformation->width) {
             $imgix['w'] = $transformation->width;
         }
-        if ($transformation->height !== null) {
+        if (null !== $transformation->height) {
             $imgix['h'] = $transformation->height;
         }
-        if ($transformation->format !== null) {
+        if (null !== $transformation->format) {
             $imgix['fm'] = $transformation->format;
         }
 
         $imgix['q'] = $transformation->quality;
-        $imgix['fit'] = self::mapFit($transformation->fit);
+        $imgix['fit'] = $this->mapFit($transformation->fit);
 
-        if ($transformation->blur !== null) {
+        if (null !== $transformation->blur) {
             $imgix['blur'] = $transformation->blur;
         }
-        if ($transformation->dpr !== null) {
+        if (null !== $transformation->dpr) {
             $imgix['dpr'] = $transformation->dpr;
         }
 
@@ -67,7 +69,7 @@ class ImgixTransformer implements ImageTransformerInterface
     /**
      * @see https://docs.imgix.com/apis/rendering/size/resize-fit-mode
      */
-    private static function mapFit(string $fit): string
+    private function mapFit(string $fit): string
     {
         return match ($fit) {
             'contain' => 'clip',
@@ -80,10 +82,10 @@ class ImgixTransformer implements ImageTransformerInterface
     /**
      * @see https://docs.imgix.com/setup/securing-images
      */
-    private static function generateSignature(string $signKey, string $path, string $queryString): string
+    private function generateSignature(string $signKey, string $path, string $queryString): string
     {
         $data = $signKey.$path;
-        if ($queryString !== '') {
+        if ('' !== $queryString) {
             $data .= '?'.$queryString;
         }
 

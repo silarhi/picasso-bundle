@@ -1,10 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Silarhi\PicassoBundle\Tests\Transformer;
 
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
+use Silarhi\PicassoBundle\Service\UrlEncryption;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
@@ -13,17 +16,15 @@ class GlideTransformerTest extends TestCase
     private const SIGN_KEY = 'test-secret-key';
 
     private GlideTransformer $transformer;
-    private UrlGeneratorInterface $router;
+    private \PHPUnit\Framework\MockObject\MockObject $router;
 
     protected function setUp(): void
     {
         $this->router = $this->createMock(UrlGeneratorInterface::class);
         $this->router->method('generate')
-            ->willReturnCallback(function (string $name, array $params): string {
-                return '/picasso/'.$params['transformer'].'/'.$params['loader'].'/'.$params['path'].'?'.http_build_query(
-                    array_filter($params, fn ($k) => !\in_array($k, ['transformer', 'loader', 'path'], true), ARRAY_FILTER_USE_KEY),
-                );
-            });
+            ->willReturnCallback(static fn (string $name, array $params): string => '/picasso/'.$params['transformer'].'/'.$params['loader'].'/'.$params['path'].'?'.http_build_query(
+                array_filter($params, static fn ($k): bool => !\in_array($k, ['transformer', 'loader', 'path'], true), \ARRAY_FILTER_USE_KEY),
+            ));
 
         $this->transformer = new GlideTransformer(
             $this->router,
@@ -97,5 +98,31 @@ class GlideTransformerTest extends TestCase
         self::assertStringContainsString('fit=crop', $url);
         self::assertStringContainsString('blur=10', $url);
         self::assertStringContainsString('dpr=2', $url);
+    }
+
+    public function testUrlIncludesEncryptedSourceFromMetadata(): void
+    {
+        $image = new Image(path: 'photo.jpg', metadata: ['_source' => '/var/uploads/images']);
+        $transformation = new ImageTransformation(width: 300);
+
+        $url = $this->transformer->url($image, $transformation, ['loader' => 'vich']);
+
+        self::assertStringContainsString('_source=', $url);
+        self::assertStringContainsString('/picasso/glide/vich/photo.jpg', $url);
+
+        // Extract the _source param and verify it decrypts correctly
+        parse_str(parse_url($url, \PHP_URL_QUERY) ?? '', $query);
+        self::assertArrayHasKey('_source', $query);
+        self::assertSame('/var/uploads/images', UrlEncryption::decrypt($query['_source'], self::SIGN_KEY));
+    }
+
+    public function testUrlOmitsSourceWhenNoMetadata(): void
+    {
+        $image = new Image(path: 'photo.jpg');
+        $transformation = new ImageTransformation(width: 300);
+
+        $url = $this->transformer->url($image, $transformation);
+
+        self::assertStringNotContainsString('_source=', $url);
     }
 }

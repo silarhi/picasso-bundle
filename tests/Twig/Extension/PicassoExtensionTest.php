@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Silarhi\PicassoBundle\Tests\Twig\Extension;
 
 use PHPUnit\Framework\TestCase;
@@ -16,8 +18,8 @@ class PicassoExtensionTest extends TestCase
         $pipeline->expects(self::once())
             ->method('url')
             ->with(
-                self::callback(fn (ImageReference $r) => $r->path === 'photo.jpg'),
-                self::callback(fn (ImageTransformation $t) => $t->width === 300 && $t->format === 'webp'),
+                self::callback(static fn (ImageReference $r): bool => 'photo.jpg' === $r->path),
+                self::callback(static fn (ImageTransformation $t): bool => 300 === $t->width && 'webp' === $t->format),
                 null,
                 null,
             )

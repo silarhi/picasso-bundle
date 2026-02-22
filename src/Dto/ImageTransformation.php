@@ -1,17 +1,19 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Silarhi\PicassoBundle\Dto;
 
-final class ImageTransformation
+final readonly class ImageTransformation
 {
     public function __construct(
-        public readonly ?int $width = null,
-        public readonly ?int $height = null,
-        public readonly ?string $format = null,
-        public readonly int $quality = 75,
-        public readonly string $fit = 'contain',
-        public readonly ?int $blur = null,
-        public readonly ?int $dpr = null,
+        public ?int $width = null,
+        public ?int $height = null,
+        public ?string $format = null,
+        public int $quality = 75,
+        public string $fit = 'contain',
+        public ?int $blur = null,
+        public ?int $dpr = null,
     ) {
     }
 }

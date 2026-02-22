@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Silarhi\PicassoBundle\Twig\Component;
 
 use Psr\Container\ContainerInterface;
@@ -18,7 +20,7 @@ class ImageComponent
     /** The image source path (null renders nothing). */
     public ?string $src = null;
 
-    /** Extra context passed to the loader (e.g. entity, field for Vich). */
+    /** @var array<string, mixed> Extra context passed to the loader (e.g. entity, field for Vich). */
     public array $context = [];
 
     /** Explicit source width in pixels (skips metadata detection). */
@@ -75,6 +77,9 @@ class ImageComponent
     /** @internal */
     public string $fallbackSrcset = '';
 
+    /**
+     * @param string[] $formats
+     */
     public function __construct(
         private readonly SrcsetGenerator $srcsetGenerator,
         private readonly ContainerInterface $loaders,
@@ -93,7 +98,7 @@ class ImageComponent
     #[PostMount]
     public function computeImageData(): void
     {
-        if ($this->src === null) {
+        if (null === $this->src) {
             return;
         }
 
@@ -107,7 +112,7 @@ class ImageComponent
         /** @var ImageLoaderInterface $imageLoader */
         $imageLoader = $this->loaders->get($loaderName);
 
-        $withMetadata = $this->sourceWidth === null || $this->sourceHeight === null;
+        $withMetadata = null === $this->sourceWidth || null === $this->sourceHeight;
         $reference = new ImageReference($this->src, $this->context);
         $image = $imageLoader->load($reference, $withMetadata);
 
@@ -135,7 +140,7 @@ class ImageComponent
             $tinyWidth = $this->blurSize;
             $tinyHeight = $this->blurSize;
 
-            if ($resolvedWidth !== null && $resolvedHeight !== null && $resolvedWidth > 0) {
+            if (null !== $resolvedWidth && null !== $resolvedHeight && $resolvedWidth > 0) {
                 $tinyHeight = max(1, (int) round($tinyWidth * $resolvedHeight / $resolvedWidth));
             }
 
@@ -183,14 +188,14 @@ class ImageComponent
                 );
             } else {
                 $this->sources[] = new ImageSource(
-                    type: self::getMimeType($format),
+                    type: $this->getMimeType($format),
                     srcset: $srcsetString,
                 );
             }
         }
     }
 
-    private static function getMimeType(string $format): string
+    private function getMimeType(string $format): string
     {
         return match ($format) {
             'avif' => 'image/avif',

@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Silarhi\PicassoBundle\Tests\Loader;
 
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Loader\VichMappingHelper;
@@ -11,8 +14,8 @@ use Vich\UploaderBundle\Storage\StorageInterface;
 class VichUploaderLoaderTest extends TestCase
 {
     private VichUploaderLoader $loader;
-    private StorageInterface $storage;
-    private VichMappingHelper $mappingHelper;
+    private MockObject $storage;
+    private MockObject $mappingHelper;
 
     protected function setUp(): void
     {
@@ -32,6 +35,7 @@ class VichUploaderLoaderTest extends TestCase
         self::assertSame('uploads/photo.jpg', $image->path);
         self::assertNull($image->width);
         self::assertNull($image->height);
+        self::assertSame([], $image->metadata);
     }
 
     public function testLoadWithEntityAndFieldContext(): void
@@ -41,6 +45,10 @@ class VichUploaderLoaderTest extends TestCase
         $this->mappingHelper->method('getFilePropertyName')
             ->with($entity, 'imageFile')
             ->willReturn('imageFile');
+
+        $this->mappingHelper->method('getUploadDestination')
+            ->with($entity, 'imageFile')
+            ->willReturn('/var/uploads/images');
 
         $this->storage->method('resolvePath')
             ->with($entity, 'imageFile', null, true)
@@ -52,6 +60,7 @@ class VichUploaderLoaderTest extends TestCase
         ]));
 
         self::assertSame('2024/february/photo.jpg', $image->path);
+        self::assertSame('/var/uploads/images', $image->metadata['_source']);
     }
 
     public function testLoadAutoDetectsFieldWhenNull(): void
@@ -62,6 +71,10 @@ class VichUploaderLoaderTest extends TestCase
             ->with($entity, null)
             ->willReturn('imageFile');
 
+        $this->mappingHelper->method('getUploadDestination')
+            ->with($entity, null)
+            ->willReturn('/var/uploads');
+
         $this->storage->method('resolvePath')
             ->with($entity, 'imageFile', null, true)
             ->willReturn('auto/detected.jpg');
@@ -71,6 +84,7 @@ class VichUploaderLoaderTest extends TestCase
         ]));
 
         self::assertSame('auto/detected.jpg', $image->path);
+        self::assertSame('/var/uploads', $image->metadata['_source']);
     }
 
     public function testLoadFallsBackWhenNoMappingFound(): void
@@ -96,6 +110,9 @@ class VichUploaderLoaderTest extends TestCase
         $this->mappingHelper->method('getFilePropertyName')
             ->willReturn('imageFile');
 
+        $this->mappingHelper->method('getUploadDestination')
+            ->willReturn(null);
+
         $this->storage->method('resolvePath')
             ->with($entity, 'imageFile', null, true)
             ->willReturn('/photo.jpg');
@@ -114,6 +131,9 @@ class VichUploaderLoaderTest extends TestCase
 
         $this->mappingHelper->method('getFilePropertyName')
             ->willReturn('imageFile');
+
+        $this->mappingHelper->method('getUploadDestination')
+            ->willReturn(null);
 
         $this->storage->method('resolvePath')
             ->willReturn(null);
@@ -138,6 +158,9 @@ class VichUploaderLoaderTest extends TestCase
         $this->mappingHelper->method('getFilePropertyName')
             ->willReturn('imageFile');
 
+        $this->mappingHelper->method('getUploadDestination')
+            ->willReturn('/var/uploads');
+
         $this->storage->method('resolvePath')->willReturn('photo.jpg');
 
         $image = $this->loader->load(new ImageReference('photo.jpg', [
@@ -147,6 +170,7 @@ class VichUploaderLoaderTest extends TestCase
 
         self::assertSame(1920, $image->width);
         self::assertSame(1080, $image->height);
+        self::assertSame('/var/uploads', $image->metadata['_source']);
     }
 
     public function testLoadDetectsDimensionsFromEmbeddedFileObject(): void
@@ -172,6 +196,9 @@ class VichUploaderLoaderTest extends TestCase
         $this->mappingHelper->method('getFilePropertyName')
             ->willReturn('imageFile');
 
+        $this->mappingHelper->method('getUploadDestination')
+            ->willReturn('/var/uploads');
+
         $this->storage->method('resolvePath')->willReturn('photo.jpg');
 
         $image = $this->loader->load(new ImageReference('photo.jpg', [
@@ -195,6 +222,9 @@ class VichUploaderLoaderTest extends TestCase
         $this->mappingHelper->method('getFilePropertyName')
             ->willReturn('imageFile');
 
+        $this->mappingHelper->method('getUploadDestination')
+            ->willReturn('/var/uploads');
+
         $this->storage->method('resolvePath')->willReturn('photo.jpg');
 
         $image = $this->loader->load(new ImageReference('photo.jpg', [
@@ -206,6 +236,7 @@ class VichUploaderLoaderTest extends TestCase
 
         self::assertSame(500, $image->width);
         self::assertSame(400, $image->height);
+        self::assertSame('/var/uploads', $image->metadata['_source']);
     }
 
     public function testLoadWithoutMetadataSkipsDimensionDetection(): void
@@ -220,6 +251,9 @@ class VichUploaderLoaderTest extends TestCase
         $this->mappingHelper->method('getFilePropertyName')
             ->willReturn('imageFile');
 
+        $this->mappingHelper->method('getUploadDestination')
+            ->willReturn('/var/uploads');
+
         $this->storage->method('resolvePath')->willReturn('photo.jpg');
 
         $image = $this->loader->load(new ImageReference('photo.jpg', [
@@ -230,18 +264,61 @@ class VichUploaderLoaderTest extends TestCase
         self::assertSame('photo.jpg', $image->path);
         self::assertNull($image->width);
         self::assertNull($image->height);
+        self::assertSame('/var/uploads', $image->metadata['_source']);
     }
 
-    public function testGetSourceThrowsWhenNotConfigured(): void
+    public function testGetSourceAlwaysThrows(): void
     {
         $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('encrypted URL metadata');
         $this->loader->getSource();
     }
 
-    public function testGetSourceReturnsConfiguredSource(): void
+    public function testLoadWithNullUploadDestinationReturnsEmptyMetadata(): void
     {
-        $loader = new VichUploaderLoader($this->storage, $this->mappingHelper, '/var/uploads');
+        $entity = new \stdClass();
 
-        self::assertSame('/var/uploads', $loader->getSource());
+        $this->mappingHelper->method('getFilePropertyName')
+            ->willReturn('imageFile');
+
+        $this->mappingHelper->method('getUploadDestination')
+            ->willReturn(null);
+
+        $this->storage->method('resolvePath')->willReturn('photo.jpg');
+
+        $image = $this->loader->load(new ImageReference('photo.jpg', [
+            'entity' => $entity,
+            'field' => 'imageFile',
+        ]));
+
+        self::assertSame([], $image->metadata);
+    }
+
+    public function testLoadWithMultipleMappingsUsesCorrectDestination(): void
+    {
+        $entity = new \stdClass();
+
+        // First call for 'avatarFile' field
+        $this->mappingHelper->expects(self::once())
+            ->method('getFilePropertyName')
+            ->with($entity, 'avatarFile')
+            ->willReturn('avatarFile');
+
+        $this->mappingHelper->expects(self::once())
+            ->method('getUploadDestination')
+            ->with($entity, 'avatarFile')
+            ->willReturn('/var/uploads/avatars');
+
+        $this->storage->method('resolvePath')
+            ->with($entity, 'avatarFile', null, true)
+            ->willReturn('users/avatar.jpg');
+
+        $image = $this->loader->load(new ImageReference('avatar.jpg', [
+            'entity' => $entity,
+            'field' => 'avatarFile',
+        ]));
+
+        self::assertSame('users/avatar.jpg', $image->path);
+        self::assertSame('/var/uploads/avatars', $image->metadata['_source']);
     }
 }

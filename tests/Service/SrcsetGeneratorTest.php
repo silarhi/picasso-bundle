@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Silarhi\PicassoBundle\Tests\Service;
 
 use PHPUnit\Framework\TestCase;
@@ -12,21 +14,21 @@ use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 class SrcsetGeneratorTest extends TestCase
 {
     private SrcsetGenerator $generator;
-    private ImageTransformerInterface $transformer;
+    private \PHPUnit\Framework\MockObject\MockObject $transformer;
 
     protected function setUp(): void
     {
         $this->transformer = $this->createMock(ImageTransformerInterface::class);
         $this->transformer->method('url')
-            ->willReturnCallback(function (Image $image, ImageTransformation $t, array $context): string {
+            ->willReturnCallback(static function (Image $image, ImageTransformation $t, array $context): string {
                 $query = [];
-                if ($t->width !== null) {
+                if (null !== $t->width) {
                     $query['w'] = $t->width;
                 }
-                if ($t->height !== null) {
+                if (null !== $t->height) {
                     $query['h'] = $t->height;
                 }
-                if ($t->format !== null) {
+                if (null !== $t->format) {
                     $query['fm'] = $t->format;
                 }
                 $query['q'] = $t->quality;
@@ -223,7 +225,7 @@ class SrcsetGeneratorTest extends TestCase
         $contextReceived = [];
         $transformer = $this->createMock(ImageTransformerInterface::class);
         $transformer->method('url')
-            ->willReturnCallback(function (Image $image, ImageTransformation $t, array $context) use (&$contextReceived): string {
+            ->willReturnCallback(static function (Image $image, ImageTransformation $t, array $context) use (&$contextReceived): string {
                 $contextReceived = $context;
 
                 return '/url';

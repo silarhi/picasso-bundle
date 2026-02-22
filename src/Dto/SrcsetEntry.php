@@ -1,15 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Silarhi\PicassoBundle\Dto;
 
 /**
  * Immutable value object representing a single srcset entry (url + descriptor).
  */
-final class SrcsetEntry
+final readonly class SrcsetEntry
 {
     public function __construct(
-        public readonly string $url,
-        public readonly string $descriptor,
+        public string $url,
+        public string $descriptor,
     ) {
     }
 
