@@ -28,6 +28,7 @@ class GlideTransformerTest extends TestCase
 
         $this->transformer = new GlideTransformer(
             $this->router,
+            new UrlEncryption(self::SIGN_KEY),
             self::SIGN_KEY,
             '/tmp/cache',
         );
@@ -113,7 +114,8 @@ class GlideTransformerTest extends TestCase
         // Extract the _source param and verify it decrypts correctly
         parse_str(parse_url($url, \PHP_URL_QUERY) ?? '', $query);
         self::assertArrayHasKey('_source', $query);
-        self::assertSame('/var/uploads/images', UrlEncryption::decrypt($query['_source'], self::SIGN_KEY));
+        $encryption = new UrlEncryption(self::SIGN_KEY);
+        self::assertSame('/var/uploads/images', $encryption->decrypt($query['_source']));
     }
 
     public function testUrlOmitsSourceWhenNoMetadata(): void

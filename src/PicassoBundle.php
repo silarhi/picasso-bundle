@@ -14,6 +14,7 @@ use Silarhi\PicassoBundle\Loader\VichMappingHelper;
 use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
+use Silarhi\PicassoBundle\Service\UrlEncryption;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 use Silarhi\PicassoBundle\Transformer\ImgixTransformer;
@@ -241,9 +242,15 @@ class PicassoBundle extends AbstractBundle
 
         if ($hasGlide) {
             $glide = $transformerConfig['glide'];
+
+            $services->set('picasso.url_encryption', UrlEncryption::class)
+                ->args([$glide['sign_key']]);
+            $services->alias(UrlEncryption::class, 'picasso.url_encryption');
+
             $services->set('picasso.transformer.glide', GlideTransformer::class)
                 ->args([
                     service('router'),
+                    service('picasso.url_encryption'),
                     $glide['sign_key'],
                     $glide['cache'] ?? '%kernel.project_dir%/var/glide-cache',
                     $glide['driver'],

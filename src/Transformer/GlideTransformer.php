@@ -22,6 +22,7 @@ class GlideTransformer implements LocalTransformerInterface
 {
     public function __construct(
         private readonly UrlGeneratorInterface $router,
+        private readonly UrlEncryption $urlEncryption,
         private readonly string $signKey,
         private readonly string $cache,
         private readonly string $driver = 'gd',
@@ -38,7 +39,7 @@ class GlideTransformer implements LocalTransformerInterface
         if (isset($image->metadata['_source'])) {
             /** @var string $source */
             $source = $image->metadata['_source'];
-            $glideParams['_source'] = UrlEncryption::encrypt($source, $this->signKey);
+            $glideParams['_source'] = $this->urlEncryption->encrypt($source);
         }
 
         $signature = SignatureFactory::create($this->signKey)
@@ -71,7 +72,7 @@ class GlideTransformer implements LocalTransformerInterface
             try {
                 /** @var string $encryptedSource */
                 $encryptedSource = $params['_source'];
-                $source = UrlEncryption::decrypt($encryptedSource, $this->signKey);
+                $source = $this->urlEncryption->decrypt($encryptedSource);
             } catch (\RuntimeException $e) {
                 throw new NotFoundHttpException('Invalid source parameter.', $e);
             }

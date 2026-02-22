@@ -11,18 +11,25 @@ class UrlEncryptionTest extends TestCase
 {
     private const KEY = 'test-secret-key';
 
+    private UrlEncryption $encryption;
+
+    protected function setUp(): void
+    {
+        $this->encryption = new UrlEncryption(self::KEY);
+    }
+
     public function testEncryptDecryptRoundTrip(): void
     {
         $plaintext = '/var/uploads/images';
-        $encrypted = UrlEncryption::encrypt($plaintext, self::KEY);
+        $encrypted = $this->encryption->encrypt($plaintext);
 
         self::assertNotSame($plaintext, $encrypted);
-        self::assertSame($plaintext, UrlEncryption::decrypt($encrypted, self::KEY));
+        self::assertSame($plaintext, $this->encryption->decrypt($encrypted));
     }
 
     public function testEncryptProducesUrlSafeOutput(): void
     {
-        $encrypted = UrlEncryption::encrypt('/some/path/with spaces', self::KEY);
+        $encrypted = $this->encryption->encrypt('/some/path/with spaces');
 
         self::assertMatchesRegularExpression('/^[A-Za-z0-9_-]+$/', $encrypted);
     }
@@ -30,34 +37,35 @@ class UrlEncryptionTest extends TestCase
     public function testEncryptProducesDifferentCiphertextEachTime(): void
     {
         $plaintext = '/var/uploads';
-        $a = UrlEncryption::encrypt($plaintext, self::KEY);
-        $b = UrlEncryption::encrypt($plaintext, self::KEY);
+        $a = $this->encryption->encrypt($plaintext);
+        $b = $this->encryption->encrypt($plaintext);
 
         self::assertNotSame($a, $b);
-        self::assertSame($plaintext, UrlEncryption::decrypt($a, self::KEY));
-        self::assertSame($plaintext, UrlEncryption::decrypt($b, self::KEY));
+        self::assertSame($plaintext, $this->encryption->decrypt($a));
+        self::assertSame($plaintext, $this->encryption->decrypt($b));
     }
 
     public function testDecryptWithWrongKeyThrows(): void
     {
-        $encrypted = UrlEncryption::encrypt('/var/uploads', self::KEY);
+        $encrypted = $this->encryption->encrypt('/var/uploads');
+        $wrongKey = new UrlEncryption('wrong-key');
 
         $this->expectException(\RuntimeException::class);
-        UrlEncryption::decrypt($encrypted, 'wrong-key');
+        $wrongKey->decrypt($encrypted);
     }
 
     public function testDecryptWithTamperedDataThrows(): void
     {
-        $encrypted = UrlEncryption::encrypt('/var/uploads', self::KEY);
+        $encrypted = $this->encryption->encrypt('/var/uploads');
         $tampered = $encrypted.'x';
 
         $this->expectException(\RuntimeException::class);
-        UrlEncryption::decrypt($tampered, self::KEY);
+        $this->encryption->decrypt($tampered);
     }
 
     public function testDecryptWithTooShortDataThrows(): void
     {
         $this->expectException(\RuntimeException::class);
-        UrlEncryption::decrypt('abc', self::KEY);
+        $this->encryption->decrypt('abc');
     }
 }

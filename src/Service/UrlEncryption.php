@@ -10,9 +10,14 @@ final class UrlEncryption
     private const IV_LENGTH = 12;
     private const TAG_LENGTH = 16;
 
-    public static function encrypt(string $plaintext, string $key): string
+    public function __construct(
+        private readonly string $key,
+    ) {
+    }
+
+    public function encrypt(string $plaintext): string
     {
-        $derivedKey = hash('sha256', $key, true);
+        $derivedKey = hash('sha256', $this->key, true);
         $iv = random_bytes(self::IV_LENGTH);
         $tag = '';
 
@@ -25,9 +30,9 @@ final class UrlEncryption
         return rtrim(strtr(base64_encode($iv.$tag.$ciphertext), '+/', '-_'), '=');
     }
 
-    public static function decrypt(string $encoded, string $key): string
+    public function decrypt(string $encoded): string
     {
-        $derivedKey = hash('sha256', $key, true);
+        $derivedKey = hash('sha256', $this->key, true);
         $data = base64_decode(strtr($encoded, '-_', '+/'), true);
 
         if (false === $data || \strlen($data) < self::IV_LENGTH + self::TAG_LENGTH) {
