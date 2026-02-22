@@ -9,15 +9,11 @@
         "symfony/ux-twig-component": "^2.13"
     },
     "require-dev": {
-        "phpunit/phpunit": "^10.0 || ^11.0",
+        "phpunit/phpunit": "^11.0",
         "symfony/twig-bundle": "^6.4 || ^7.0",
         "league/glide": "^2.0",
         "league/glide-symfony": "^2.0",
-        "vich/uploader-bundle": "^2.0",
-        "rector/rector": "^2.3",
-        "friendsofphp/php-cs-fixer": "^3.94",
-        "phpstan/phpstan": "^2.1",
-        "vincentlanglet/twig-cs-fixer": "^3.13"
+        "vich/uploader-bundle": "^2.0"
     },
     "suggest": {
         "league/glide": "Required for the Glide transformer (local image transformation)",
