@@ -1,0 +1,34 @@
+{% if fallbackSrc %}
+{% if unoptimized %}
+    <img
+        src="{{ fallbackSrc }}"
+        {% if width %}width="{{ width }}"{% endif %}
+        {% if height %}height="{{ height }}"{% endif %}
+        {{ attributes }}
+    />
+{% else %}
+<picture>
+    {% for source in sources %}
+        <source
+            type="{{ source.type }}"
+            srcset="{{ source.srcset }}"
+            {% if sizes %}sizes="{{ sizes }}"{% endif %}
+        />
+    {% endfor %}
+
+    {% set userStyle = attributes.all.style|default('') %}
+    {% set blurStyle = blurDataUri ? 'background-size:cover;background-position:center;background-repeat:no-repeat;background-image:url(' ~ blurDataUri ~ ');' : '' %}
+    {% set fullStyle = blurStyle ~ userStyle %}
+
+    <img
+        src="{{ fallbackSrc }}"
+        srcset="{{ fallbackSrcset }}"
+        {% if sizes %}sizes="{{ sizes }}"{% endif %}
+        {% if width %}width="{{ width }}"{% endif %}
+        {% if height %}height="{{ height }}"{% endif %}
+        {% if fullStyle %}style="{{ fullStyle }}"{% endif %}
+        {{ attributes.without('style') }}
+    />
+</picture>
+{% endif %}
+{% endif %}

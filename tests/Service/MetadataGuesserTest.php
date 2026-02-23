@@ -1,0 +1,115 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Silarhi\PicassoBundle\Tests\Service;
+
+use PHPUnit\Framework\TestCase;
+use Silarhi\PicassoBundle\Service\MetadataGuesser;
+
+class MetadataGuesserTest extends TestCase
+{
+    private MetadataGuesser $guesser;
+
+    protected function setUp(): void
+    {
+        $this->guesser = new MetadataGuesser();
+    }
+
+    public function testGuessGifImage(): void
+    {
+        $gif = base64_decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
+        $stream = $this->createStream($gif);
+
+        $result = $this->guesser->guess($stream);
+
+        self::assertSame(1, $result['width']);
+        self::assertSame(1, $result['height']);
+        self::assertSame('image/gif', $result['mimeType']);
+    }
+
+    public function testGuessPngImage(): void
+    {
+        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAIAAAADCAYAAACo2gZnAAAADklEQVQI12P4z8BQDwAEgAF/QualzQAAAABJRU5ErkJggg==');
+        $stream = $this->createStream($png);
+
+        $result = $this->guesser->guess($stream);
+
+        self::assertSame(2, $result['width']);
+        self::assertSame(3, $result['height']);
+        self::assertSame('image/png', $result['mimeType']);
+    }
+
+    public function testGuessJpegImage(): void
+    {
+        if (!\function_exists('imagecreatetruecolor')) {
+            self::markTestSkipped('GD extension not available.');
+        }
+
+        $img = imagecreatetruecolor(100, 50);
+        self::assertNotFalse($img);
+        ob_start();
+        imagejpeg($img);
+        $jpeg = ob_get_clean();
+        imagedestroy($img);
+
+        self::assertNotFalse($jpeg);
+        $stream = $this->createStream($jpeg);
+
+        $result = $this->guesser->guess($stream);
+
+        self::assertSame(100, $result['width']);
+        self::assertSame(50, $result['height']);
+        self::assertSame('image/jpeg', $result['mimeType']);
+    }
+
+    public function testGuessEmptyStreamReturnsNulls(): void
+    {
+        $stream = $this->createStream('');
+
+        $result = $this->guesser->guess($stream);
+
+        self::assertNull($result['width']);
+        self::assertNull($result['height']);
+        self::assertNull($result['mimeType']);
+    }
+
+    public function testGuessInvalidDataReturnsNulls(): void
+    {
+        $stream = $this->createStream('this is not an image');
+
+        $result = $this->guesser->guess($stream);
+
+        self::assertNull($result['width']);
+        self::assertNull($result['height']);
+        self::assertNull($result['mimeType']);
+    }
+
+    public function testGuessReadsFromOffset(): void
+    {
+        $gif = base64_decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
+        $stream = $this->createStream($gif);
+
+        // Advance the stream position
+        fread($stream, 5);
+
+        // guess() should still work (reads from offset 0)
+        $result = $this->guesser->guess($stream);
+
+        self::assertSame(1, $result['width']);
+        self::assertSame(1, $result['height']);
+    }
+
+    /**
+     * @return resource
+     */
+    private function createStream(string $data)
+    {
+        $stream = fopen('php://memory', 'r+');
+        self::assertNotFalse($stream);
+        fwrite($stream, $data);
+        rewind($stream);
+
+        return $stream;
+    }
+}

@@ -1,0 +1,20 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Silarhi\PicassoBundle\Transformer;
+
+use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+
+/**
+ * A transformer that can serve images locally (e.g. Glide).
+ *
+ * The controller delegates serving to this interface, passing the loader
+ * so the transformer can access the source filesystem.
+ */
+interface LocalTransformerInterface extends ImageTransformerInterface
+{
+    public function serve(ServableLoaderInterface $loader, string $path, Request $request): Response;
+}
