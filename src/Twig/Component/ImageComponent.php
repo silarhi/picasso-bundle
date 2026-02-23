@@ -60,7 +60,7 @@ class ImageComponent
     // --- Computed state (set in PostMount, used by template) ---
 
     /** @internal */
-    public string $resolvedPath = '';
+    public ?string $resolvedPath = null;
 
     /** @internal */
     public ?string $blurDataUri = null;
@@ -73,10 +73,10 @@ class ImageComponent
     public array $sources = [];
 
     /** @internal */
-    public string $fallbackSrc = '';
+    public ?string $fallbackSrc = null;
 
     /** @internal */
-    public string $fallbackSrcset = '';
+    public ?string $fallbackSrcset = null;
 
     /**
      * @param string[] $formats

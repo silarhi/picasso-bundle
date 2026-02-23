@@ -1,34 +1,36 @@
-{% if fallbackSrc %}
-{% if unoptimized %}
-    <img
-        src="{{ fallbackSrc }}"
-        {% if width %}width="{{ width }}"{% endif %}
-        {% if height %}height="{{ height }}"{% endif %}
-        {{ attributes }}
-    />
-{% else %}
-<picture>
-    {% for source in sources %}
-        <source
-            type="{{ source.type }}"
-            srcset="{{ source.srcset }}"
-            {% if sizes %}sizes="{{ sizes }}"{% endif %}
+{% if this.fallbackSrc %}
+    {% if this.unoptimized %}
+        <img
+            src="{{ this.fallbackSrc }}"
+            {% if this.width %}width="{{ this.width }}"{% endif %}
+            {% if this.height %}height="{{ this.height }}"{% endif %}
+            {{ attributes }}
         />
-    {% endfor %}
+    {% else %}
+        <picture>
+            {% for source in this.sources %}
+                <source
+                    type="{{ source.type }}"
+                    srcset="{{ source.srcset }}"
+                    {% if this.sizes %}sizes="{{ this.sizes }}"{% endif %}
+                />
+            {% endfor %}
 
-    {% set userStyle = attributes.all.style|default('') %}
-    {% set blurStyle = blurDataUri ? 'background-size:cover;background-position:center;background-repeat:no-repeat;background-image:url(' ~ blurDataUri ~ ');' : '' %}
-    {% set fullStyle = blurStyle ~ userStyle %}
+            {% set userStyle = attributes.all.style|default('') %}
+            {% set blurStyle = this.blurDataUri ? 'background-size:cover;background-position:center;background-repeat:no-repeat;background-image:url(' ~ this.blurDataUri ~ ');' : '' %}
+            {% set fullStyle = blurStyle ~ userStyle %}
 
-    <img
-        src="{{ fallbackSrc }}"
-        srcset="{{ fallbackSrcset }}"
-        {% if sizes %}sizes="{{ sizes }}"{% endif %}
-        {% if width %}width="{{ width }}"{% endif %}
-        {% if height %}height="{{ height }}"{% endif %}
-        {% if fullStyle %}style="{{ fullStyle }}"{% endif %}
-        {{ attributes.without('style') }}
-    />
-</picture>
-{% endif %}
+            <img
+                src="{{ this.fallbackSrc }}"
+                srcset="{{ this.fallbackSrcset }}"
+                {% if this.sizes %}sizes="{{ this.sizes }}"{% endif %}
+                {% if this.width %}width="{{ this.width }}"{% endif %}
+                {% if this.height %}height="{{ this.height }}"{% endif %}
+                {% if fullStyle %}style="{{ fullStyle }}"{% endif %}
+                {{ attributes.without('style') }}
+            />
+        </picture>
+    {% endif %}
+{% else %}
+    {{ dump(this) }}
 {% endif %}
