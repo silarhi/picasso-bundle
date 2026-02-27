@@ -15,7 +15,6 @@ use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Service\MetadataGuesser;
-use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
 use Silarhi\PicassoBundle\Service\UrlEncryption;
@@ -35,7 +34,7 @@ use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_lo
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 use Vich\UploaderBundle\Storage\StorageInterface as VichStorageInterface;
 
-class PicassoBundle extends AbstractBundle
+final class PicassoBundle extends AbstractBundle
 {
     private const ALLOWED_FORMATS = ['avif', 'webp', 'jpg', 'jpeg', 'pjpg', 'png', 'gif'];
 
@@ -199,55 +198,51 @@ class PicassoBundle extends AbstractBundle
 
         // --- MetadataGuesser ---
 
-        $services->set('picasso.metadata_guesser', MetadataGuesser::class);
-        $services->alias(MetadataGuesser::class, 'picasso.metadata_guesser');
-        $services->alias(MetadataGuesserInterface::class, 'picasso.metadata_guesser');
+        $services->set('.picasso.metadata_guesser', MetadataGuesser::class);
 
         // --- Loaders ---
 
         $loaderConfig = $config['loaders'];
 
         if ($loaderConfig['filesystem']['enabled']) {
-            $services->set('picasso.loader.filesystem', FilesystemLoader::class)
+            $services->set('.picasso.loader.filesystem', FilesystemLoader::class)
                 ->args([$loaderConfig['filesystem']['base_directory'] ?? '%kernel.project_dir%/public/uploads'])
                 ->tag('picasso.loader', ['key' => 'filesystem']);
         }
 
         if ($loaderConfig['flysystem']['enabled'] && null !== $loaderConfig['flysystem']['service']) {
-            $services->set('picasso.loader.flysystem', FlysystemLoader::class)
+            $services->set('.picasso.loader.flysystem', FlysystemLoader::class)
                 ->args([
                     service($loaderConfig['flysystem']['service']),
-                    service('picasso.metadata_guesser'),
+                    service('.picasso.metadata_guesser'),
                 ])
                 ->tag('picasso.loader', ['key' => 'flysystem']);
         }
 
         if ($loaderConfig['vich']['enabled'] && interface_exists(VichStorageInterface::class)) {
-            $services->set('picasso.vich_mapping_helper', VichMappingHelper::class)
+            $services->set('.picasso.vich_mapping_helper', VichMappingHelper::class)
                 ->args([service(\Vich\UploaderBundle\Mapping\PropertyMappingFactory::class)]);
 
-            $services->set('picasso.loader.vich', VichUploaderLoader::class)
+            $services->set('.picasso.loader.vich', VichUploaderLoader::class)
                 ->args([
                     service(VichStorageInterface::class),
-                    service('picasso.vich_mapping_helper'),
-                    service('picasso.metadata_guesser'),
+                    service('.picasso.vich_mapping_helper'),
+                    service('.picasso.metadata_guesser'),
                 ])
                 ->tag('picasso.loader', ['key' => 'vich']);
         }
 
         // Alias default loader
-        $services->alias('picasso.default_loader', 'picasso.loader.'.$config['default_loader']);
-        $services->alias(ImageLoaderInterface::class, 'picasso.loader.'.$config['default_loader']);
+        $services->alias('picasso.default_loader', '.picasso.loader.'.$config['default_loader']);
+        $services->alias(ImageLoaderInterface::class, '.picasso.loader.'.$config['default_loader']);
 
         // --- Registries ---
 
-        $services->set('picasso.loader_registry', LoaderRegistry::class)
+        $services->set('.picasso.loader_registry', LoaderRegistry::class)
             ->args([tagged_locator('picasso.loader', 'key')]);
-        $services->alias(LoaderRegistry::class, 'picasso.loader_registry');
 
-        $services->set('picasso.transformer_registry', TransformerRegistry::class)
+        $services->set('.picasso.transformer_registry', TransformerRegistry::class)
             ->args([tagged_locator('picasso.transformer', 'key')]);
-        $services->alias(TransformerRegistry::class, 'picasso.transformer_registry');
 
         // --- Transformers ---
 
@@ -272,14 +267,13 @@ class PicassoBundle extends AbstractBundle
         if ($hasGlide) {
             $glide = $transformerConfig['glide'];
 
-            $services->set('picasso.url_encryption', UrlEncryption::class)
+            $services->set('.picasso.url_encryption', UrlEncryption::class)
                 ->args([$glide['sign_key']]);
-            $services->alias(UrlEncryption::class, 'picasso.url_encryption');
 
-            $services->set('picasso.transformer.glide', GlideTransformer::class)
+            $services->set('.picasso.transformer.glide', GlideTransformer::class)
                 ->args([
                     service('router'),
-                    service('picasso.url_encryption'),
+                    service('.picasso.url_encryption'),
                     $glide['sign_key'],
                     $glide['cache'] ?? '%kernel.project_dir%/var/glide-cache',
                     $glide['driver'],
@@ -290,7 +284,7 @@ class PicassoBundle extends AbstractBundle
 
         if ($hasImgix) {
             $imgix = $transformerConfig['imgix'];
-            $services->set('picasso.transformer.imgix', ImgixTransformer::class)
+            $services->set('.picasso.transformer.imgix', ImgixTransformer::class)
                 ->args([
                     $imgix['domain'],
                     $imgix['sign_key'],
@@ -300,15 +294,15 @@ class PicassoBundle extends AbstractBundle
         }
 
         // Alias default transformer
-        $services->alias('picasso.default_transformer', 'picasso.transformer.'.$defaultTransformer);
-        $services->alias(ImageTransformerInterface::class, 'picasso.transformer.'.$defaultTransformer);
+        $services->alias('picasso.default_transformer', '.picasso.transformer.'.$defaultTransformer);
+        $services->alias(ImageTransformerInterface::class, '.picasso.transformer.'.$defaultTransformer);
 
         // --- Controller ---
 
         $services->set('picasso.controller.image', ImageController::class)
             ->args([
-                service('picasso.transformer_registry'),
-                service('picasso.loader_registry'),
+                service('.picasso.transformer_registry'),
+                service('.picasso.loader_registry'),
             ])
             ->tag('controller.service_arguments')
             ->public();
@@ -337,7 +331,7 @@ class PicassoBundle extends AbstractBundle
 
         // --- Twig Extension ---
 
-        $services->set('picasso.twig_extension', PicassoExtension::class)
+        $services->set('.picasso.twig_extension', PicassoExtension::class)
             ->args([
                 service('picasso.pipeline'),
                 $config['default_quality'],
@@ -349,12 +343,12 @@ class PicassoBundle extends AbstractBundle
 
         $blurConfig = $config['placeholders']['blur'];
 
-        $services->set('picasso.image_component', ImageComponent::class)
+        $services->set('.picasso.image_component', ImageComponent::class)
             ->args([
                 service('picasso.srcset_generator'),
                 tagged_locator('picasso.loader', 'key'),
                 tagged_locator('picasso.transformer', 'key'),
-                service('picasso.metadata_guesser'),
+                service('.picasso.metadata_guesser'),
                 $config['default_loader'],
                 $defaultTransformer,
                 $config['formats'],
