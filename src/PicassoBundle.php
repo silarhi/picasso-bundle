@@ -126,14 +126,6 @@ final class PicassoBundle extends AbstractBundle
                                 ->defaultValue([])
                                 ->info('Base directories for filesystem loaders.')
                             ->end()
-                            ->scalarNode('storage')
-                                ->defaultNull()
-                                ->info('Flysystem storage service ID.')
-                            ->end()
-                        ->end()
-                        ->validate()
-                            ->ifTrue(static fn (array $v): bool => 'flysystem' === $v['type'] && (null === $v['storage'] || '' === $v['storage']))
-                            ->thenInvalid('A flysystem loader requires a "storage" service ID.')
                         ->end()
                     ->end()
                 ->end()
@@ -185,7 +177,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_quality: int,
          *     default_fit: string,
          *     placeholders: array{blur: array{enabled: bool, size: int, blur: int, quality: int}},
-         *     loaders: array<string, array{type: string|null, paths: list<string>, storage: string|null}>,
+         *     loaders: array<string, array{type: string|null, paths: list<string>}>,
          *     transformers: array{
          *         glide: array{enabled: bool, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null},
          *         imgix: array{enabled: bool, domain: string|null, sign_key: string|null, use_https: bool}
@@ -220,10 +212,9 @@ final class PicassoBundle extends AbstractBundle
                     break;
 
                 case 'flysystem':
-                    \assert(\is_string($loaderConfig['storage']));
                     $services->set('picasso.loader.'.$name, FlysystemLoader::class)
                         ->args([
-                            service($loaderConfig['storage']),
+                            service($name),
                             service('picasso.metadata_guesser'),
                         ])
                         ->tag('picasso.loader', ['key' => $name]);
