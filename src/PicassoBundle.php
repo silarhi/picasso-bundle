@@ -241,11 +241,13 @@ final class PicassoBundle extends AbstractBundle
 
         // --- Registries ---
 
-        $services->set('.picasso.loader_registry', LoaderRegistry::class)
+        $services->set('picasso.loader_registry', LoaderRegistry::class)
             ->args([tagged_locator('picasso.loader', 'key')]);
+        $services->alias(LoaderRegistry::class, 'picasso.loader_registry');
 
-        $services->set('.picasso.transformer_registry', TransformerRegistry::class)
+        $services->set('picasso.transformer_registry', TransformerRegistry::class)
             ->args([tagged_locator('picasso.transformer', 'key')]);
+        $services->alias(TransformerRegistry::class, 'picasso.transformer_registry');
 
         // --- Transformers ---
 
@@ -270,13 +272,14 @@ final class PicassoBundle extends AbstractBundle
         if ($hasGlide) {
             $glide = $transformerConfig['glide'];
 
-            $services->set('.picasso.url_encryption', UrlEncryption::class)
+            $services->set('picasso.url_encryption', UrlEncryption::class)
                 ->args([$glide['sign_key']]);
+            $services->alias(UrlEncryption::class, 'picasso.url_encryption');
 
             $services->set('picasso.transformer.glide', GlideTransformer::class)
                 ->args([
                     service('router'),
-                    service('.picasso.url_encryption'),
+                    service('picasso.url_encryption'),
                     $glide['sign_key'],
                     $glide['cache'] ?? '%kernel.project_dir%/var/glide-cache',
                     $glide['driver'],
@@ -304,8 +307,8 @@ final class PicassoBundle extends AbstractBundle
 
         $services->set('picasso.controller.image', ImageController::class)
             ->args([
-                service('.picasso.transformer_registry'),
-                service('.picasso.loader_registry'),
+                service('picasso.transformer_registry'),
+                service('picasso.loader_registry'),
             ])
             ->tag('controller.service_arguments')
             ->public();
