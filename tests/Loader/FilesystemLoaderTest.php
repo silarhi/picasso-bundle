@@ -10,6 +10,13 @@ use Silarhi\PicassoBundle\Loader\FilesystemLoader;
 
 class FilesystemLoaderTest extends TestCase
 {
+    private static string $fixturesDir;
+
+    public static function setUpBeforeClass(): void
+    {
+        self::$fixturesDir = \dirname(__DIR__).'/Fixtures';
+    }
+
     public function testLoadStripsLeadingSlash(): void
     {
         $loader = new FilesystemLoader(['/tmp/nonexistent']);
@@ -45,67 +52,33 @@ class FilesystemLoaderTest extends TestCase
 
     public function testLoadExistingFileHasStream(): void
     {
-        $tmpDir = sys_get_temp_dir().'/picasso_test_'.uniqid();
-        mkdir($tmpDir, 0o777, true);
-        file_put_contents($tmpDir.'/test.txt', 'hello');
+        $loader = new FilesystemLoader([self::$fixturesDir]);
+        $image = $loader->load(new ImageReference('test.txt'));
 
-        try {
-            $loader = new FilesystemLoader([$tmpDir]);
-            $image = $loader->load(new ImageReference('test.txt'));
-
-            self::assertSame('test.txt', $image->path);
-            self::assertNotNull($image->stream);
-            self::assertIsResource($image->stream);
-        } finally {
-            @unlink($tmpDir.'/test.txt');
-            @rmdir($tmpDir);
-        }
+        self::assertSame('test.txt', $image->path);
+        self::assertNotNull($image->stream);
+        self::assertIsResource($image->stream);
     }
 
     public function testLoadWithMetadataDetectsDimensions(): void
     {
-        $tmpDir = sys_get_temp_dir().'/picasso_test_'.uniqid();
-        mkdir($tmpDir, 0o777, true);
+        $loader = new FilesystemLoader([self::$fixturesDir]);
+        $image = $loader->load(new ImageReference('pixel.gif'), withMetadata: true);
 
-        // Create a minimal 1x1 GIF
-        $gif = base64_decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
-        self::assertNotFalse($gif);
-        file_put_contents($tmpDir.'/pixel.gif', $gif);
-
-        try {
-            $loader = new FilesystemLoader([$tmpDir]);
-            $image = $loader->load(new ImageReference('pixel.gif'), withMetadata: true);
-
-            self::assertSame(1, $image->width);
-            self::assertSame(1, $image->height);
-            self::assertSame('image/gif', $image->mimeType);
-        } finally {
-            @unlink($tmpDir.'/pixel.gif');
-            @rmdir($tmpDir);
-        }
+        self::assertSame(1, $image->width);
+        self::assertSame(1, $image->height);
+        self::assertSame('image/gif', $image->mimeType);
     }
 
     public function testLoadWithoutMetadataSkipsDetection(): void
     {
-        $tmpDir = sys_get_temp_dir().'/picasso_test_'.uniqid();
-        mkdir($tmpDir, 0o777, true);
+        $loader = new FilesystemLoader([self::$fixturesDir]);
+        $image = $loader->load(new ImageReference('pixel.gif'));
 
-        $gif = base64_decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
-        self::assertNotFalse($gif);
-        file_put_contents($tmpDir.'/pixel.gif', $gif);
-
-        try {
-            $loader = new FilesystemLoader([$tmpDir]);
-            $image = $loader->load(new ImageReference('pixel.gif'));
-
-            self::assertNull($image->width);
-            self::assertNull($image->height);
-            self::assertNull($image->mimeType);
-            self::assertNotNull($image->stream);
-        } finally {
-            @unlink($tmpDir.'/pixel.gif');
-            @rmdir($tmpDir);
-        }
+        self::assertNull($image->width);
+        self::assertNull($image->height);
+        self::assertNull($image->mimeType);
+        self::assertNotNull($image->stream);
     }
 
     public function testLoadSearchesMultiplePaths(): void

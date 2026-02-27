@@ -1,0 +1,91 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Silarhi\PicassoBundle\Tests\Functional;
+
+use Silarhi\PicassoBundle\PicassoBundle;
+use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
+use Symfony\Bundle\TwigBundle\TwigBundle;
+use Symfony\Component\Config\Loader\LoaderInterface;
+use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\HttpKernel\Kernel;
+
+class PicassoTestKernel extends Kernel
+{
+    public function registerBundles(): iterable
+    {
+        return [
+            new FrameworkBundle(),
+            new TwigBundle(),
+            new PicassoBundle(),
+        ];
+    }
+
+    public function registerContainerConfiguration(LoaderInterface $loader): void
+    {
+        $loader->load(static function (ContainerBuilder $container): void {
+            $container->loadFromExtension('framework', [
+                'test' => true,
+                'secret' => 'test-secret',
+                'router' => [
+                    'resource' => '%kernel.project_dir%/config/routes.php',
+                ],
+                'http_method_override' => false,
+                'handle_all_throwables' => true,
+                'php_errors' => ['log' => true],
+            ]);
+
+            $container->loadFromExtension('twig', [
+                'default_path' => '%kernel.project_dir%/templates',
+            ]);
+
+            $container->loadFromExtension('picasso', [
+                'loaders' => [
+                    'filesystem' => [
+                        'paths' => [\dirname(__DIR__).'/Fixtures'],
+                    ],
+                ],
+                'transformers' => [
+                    'glide' => [
+                        'enabled' => true,
+                        'sign_key' => 'integration-test-key',
+                        'cache' => '%kernel.cache_dir%/glide',
+                    ],
+                ],
+            ]);
+        });
+    }
+
+    protected function build(ContainerBuilder $container): void
+    {
+        // Prevent these services from being inlined/removed during compilation
+        // so they remain accessible via test.service_container.
+        $container->addCompilerPass(new class implements CompilerPassInterface {
+            public function process(ContainerBuilder $container): void
+            {
+                foreach ($container->getDefinitions() as $id => $definition) {
+                    if (str_starts_with($id, 'picasso.') || str_starts_with($id, '.picasso.')) {
+                        $definition->setPublic(true);
+                    }
+                }
+            }
+        });
+    }
+
+    public function getProjectDir(): string
+    {
+        return \dirname(__DIR__, 2);
+    }
+
+    public function getCacheDir(): string
+    {
+        return sys_get_temp_dir().'/picasso_test/cache/'.$this->environment;
+    }
+
+    public function getLogDir(): string
+    {
+        return sys_get_temp_dir().'/picasso_test/log';
+    }
+}

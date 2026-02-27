@@ -90,8 +90,8 @@ class ImageComponentTest extends TestCase
         $component = $this->createComponent();
         $component->computeImageData();
 
-        self::assertSame('', $component->resolvedPath);
-        self::assertSame('', $component->fallbackSrc);
+        self::assertNull($component->resolvedPath);
+        self::assertNull($component->fallbackSrc);
         self::assertSame([], $component->sources);
     }
 
@@ -257,6 +257,7 @@ class ImageComponentTest extends TestCase
         self::assertSame('image/webp', $component->sources[1]->type);
 
         self::assertSame('/img/photo.jpg?fm=jpg&w=800', $component->fallbackSrc);
+        self::assertNotNull($component->fallbackSrcset);
         self::assertStringContainsString('fm=jpg', $component->fallbackSrcset);
     }
 
@@ -315,7 +316,7 @@ class ImageComponentTest extends TestCase
         $component->computeImageData();
 
         self::assertSame('/images/logo.svg', $component->fallbackSrc);
-        self::assertSame('', $component->fallbackSrcset);
+        self::assertNull($component->fallbackSrcset);
         self::assertSame([], $component->sources);
         self::assertNull($component->blurDataUri);
     }
@@ -377,7 +378,8 @@ class ImageComponentTest extends TestCase
         $this->filesystemLoader->method('load')
             ->willReturn(new Image(path: 'photo.jpg'));
 
-        $this->srcsetGenerator->method('generateSrcset')
+        $this->srcsetGenerator->expects(self::atLeastOnce())
+            ->method('generateSrcset')
             ->with(
                 self::anything(),
                 self::anything(),

@@ -42,17 +42,7 @@ class MetadataGuesserTest extends TestCase
 
     public function testGuessJpegImage(): void
     {
-        if (!\function_exists('imagecreatetruecolor')) {
-            self::markTestSkipped('GD extension not available.');
-        }
-
-        $img = imagecreatetruecolor(100, 50);
-        self::assertNotFalse($img);
-        ob_start();
-        imagejpeg($img);
-        $jpeg = ob_get_clean();
-        imagedestroy($img);
-
+        $jpeg = file_get_contents(\dirname(__DIR__).'/Fixtures/photo.jpg');
         self::assertNotFalse($jpeg);
         $stream = $this->createStream($jpeg);
 

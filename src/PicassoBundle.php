@@ -401,10 +401,12 @@ final class PicassoBundle extends AbstractBundle
 
     public function prependExtension(ContainerConfigurator $container, ContainerBuilder $builder): void
     {
-        $builder->prependExtensionConfig('twig', [
-            'paths' => [
-                \dirname(__DIR__).'/templates' => 'Picasso',
-            ],
-        ]);
+        if ($builder->hasExtension('twig')) {
+            $builder->prependExtensionConfig('twig', [
+                'paths' => [
+                    \dirname(__DIR__).'/templates' => 'Picasso',
+                ],
+            ]);
+        }
     }
 }
