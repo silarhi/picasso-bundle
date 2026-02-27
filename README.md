@@ -48,21 +48,32 @@ composer require league/glide league/glide-symfony
 
 ## Configuration
 
+The bundle works out of the box with sensible defaults. A minimal setup with Glide:
+
 ```yaml
 # config/packages/picasso.yaml
 picasso:
-    default_loader: filesystem
-    # default_transformer: glide  # auto-detected when only one is enabled
+    transformers:
+        glide:
+            enabled: true
+            sign_key: '%env(PICASSO_SIGN_KEY)%'
+```
 
-    # Responsive breakpoints
+That's it — images are loaded from `public/uploads` by default and transformed locally via Glide.
+
+<details>
+<summary>Full configuration reference</summary>
+
+```yaml
+picasso:
+    default_loader: filesystem
+    default_transformer: ~          # auto-detected when only one is enabled
+
     device_sizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840]
     image_sizes: [16, 32, 48, 64, 96, 128, 256, 384]
-
-    # Output formats (last entry is the <img> fallback)
-    formats: [avif, webp, jpg]
-
-    default_quality: 75      # 1–100
-    default_fit: contain      # contain | cover | crop | fill
+    formats: [avif, webp, jpg]      # last entry is the <img> fallback
+    default_quality: 75             # 1–100
+    default_fit: contain            # contain | cover | crop | fill
 
     placeholders:
         blur:
@@ -77,23 +88,25 @@ picasso:
             base_directory: '%kernel.project_dir%/public/uploads'
         flysystem:
             enabled: false
-            service: ~        # Flysystem storage service ID
+            service: ~              # Flysystem storage service ID
         vich:
             enabled: false
 
     transformers:
         glide:
-            enabled: true
-            sign_key: '%env(PICASSO_SIGN_KEY)%'
+            enabled: false
+            sign_key: ~
             cache: '%kernel.project_dir%/var/glide-cache'
-            driver: gd        # gd | imagick
+            driver: gd              # gd | imagick
             max_image_size: ~
         imgix:
             enabled: false
-            domain: ~         # your-source.imgix.net
+            domain: ~               # your-source.imgix.net
             sign_key: ~
             use_https: true
 ```
+
+</details>
 
 ## Usage
 
