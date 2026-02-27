@@ -113,9 +113,7 @@ final class PicassoBundle extends AbstractBundle
                 ->end()
                 ->arrayNode('loaders')
                     ->useAttributeAsKey('name')
-                    ->defaultValue([
-                        'filesystem' => ['type' => null, 'paths' => []],
-                    ])
+                    ->defaultValue([])
                     ->arrayPrototype()
                         ->children()
                             ->enumNode('type')
