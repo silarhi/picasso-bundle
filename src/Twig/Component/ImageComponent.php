@@ -86,7 +86,7 @@ class ImageComponent
         private readonly ContainerInterface $loaders,
         private readonly ContainerInterface $transformers,
         private readonly MetadataGuesserInterface $metadataGuesser,
-        private readonly string $defaultLoader,
+        private readonly ?string $defaultLoader,
         private readonly string $defaultTransformer,
         private readonly array $formats,
         private readonly int $defaultQuality,
@@ -111,7 +111,7 @@ class ImageComponent
             return;
         }
 
-        $loaderName = $this->loader ?? $this->defaultLoader;
+        $loaderName = $this->loader ?? $this->defaultLoader ?? throw new \LogicException('No loader specified and no default_loader configured.');
         /** @var ImageLoaderInterface $imageLoader */
         $imageLoader = $this->loaders->get($loaderName);
 

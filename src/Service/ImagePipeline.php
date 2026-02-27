@@ -16,7 +16,7 @@ class ImagePipeline
     public function __construct(
         private readonly ContainerInterface $loaders,
         private readonly ContainerInterface $transformers,
-        private readonly string $defaultLoader,
+        private readonly ?string $defaultLoader,
         private readonly string $defaultTransformer,
     ) {
     }
@@ -30,7 +30,7 @@ class ImagePipeline
         ?string $loader = null,
         ?string $transformer = null,
     ): string {
-        $loaderName = $loader ?? $this->defaultLoader;
+        $loaderName = $loader ?? $this->defaultLoader ?? throw new \LogicException('No loader specified and no default_loader configured.');
         $transformerName = $transformer ?? $this->defaultTransformer;
 
         /** @var ImageLoaderInterface $imageLoader */
@@ -51,7 +51,7 @@ class ImagePipeline
         ?string $loader = null,
         bool $withMetadata = false,
     ): Image {
-        $loaderName = $loader ?? $this->defaultLoader;
+        $loaderName = $loader ?? $this->defaultLoader ?? throw new \LogicException('No loader specified and no default_loader configured.');
 
         /** @var ImageLoaderInterface $imageLoader */
         $imageLoader = $this->loaders->get($loaderName);

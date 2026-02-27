@@ -9,40 +9,56 @@ use Silarhi\PicassoBundle\Dto\ImageReference;
 
 class FilesystemLoader implements ServableLoaderInterface
 {
-    public function __construct(
-        private readonly string $baseDirectory,
-    ) {
+    /** @var list<string> */
+    private readonly array $paths;
+
+    /**
+     * @param list<string> $paths
+     */
+    public function __construct(array $paths)
+    {
+        $this->paths = $paths;
     }
 
     public function load(ImageReference $reference, bool $withMetadata = false): Image
     {
         $path = ltrim($reference->path ?? '', '/');
-        $absolutePath = rtrim($this->baseDirectory, '/').'/'.$path;
 
-        if (!is_file($absolutePath)) {
-            return new Image(path: $path);
-        }
+        foreach ($this->paths as $basePath) {
+            $absolutePath = rtrim($basePath, '/').'/'.$path;
 
-        $stream = @fopen($absolutePath, 'r') ?: null;
-        $width = null;
-        $height = null;
-        $mimeType = null;
-
-        if ($withMetadata) {
-            $info = @getimagesize($absolutePath);
-
-            if (false !== $info) {
-                $width = $info[0];
-                $height = $info[1];
-                $mimeType = $info['mime'];
+            if (!is_file($absolutePath)) {
+                continue;
             }
+
+            $stream = @fopen($absolutePath, 'r') ?: null;
+            $width = null;
+            $height = null;
+            $mimeType = null;
+            $metadata = [];
+
+            if (\count($this->paths) > 1) {
+                $metadata['_source'] = $basePath;
+            }
+
+            if ($withMetadata) {
+                $info = @getimagesize($absolutePath);
+
+                if (false !== $info) {
+                    $width = $info[0];
+                    $height = $info[1];
+                    $mimeType = $info['mime'];
+                }
+            }
+
+            return new Image(path: $path, stream: $stream, width: $width, height: $height, mimeType: $mimeType, metadata: $metadata);
         }
 
-        return new Image(path: $path, stream: $stream, width: $width, height: $height, mimeType: $mimeType);
+        return new Image(path: $path);
     }
 
     public function getSource(): string
     {
-        return $this->baseDirectory;
+        return $this->paths[0] ?? '';
     }
 }

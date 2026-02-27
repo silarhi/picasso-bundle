@@ -65,7 +65,7 @@ final class PicassoBundle extends AbstractBundle
         $definition->rootNode()
             ->children()
                 ->scalarNode('default_loader')
-                    ->defaultValue('filesystem')
+                    ->defaultNull()
                     ->info('Default loader name.')
                 ->end()
                 ->scalarNode('default_transformer')
@@ -114,7 +114,7 @@ final class PicassoBundle extends AbstractBundle
                 ->arrayNode('loaders')
                     ->useAttributeAsKey('name')
                     ->defaultValue([
-                        'filesystem' => ['type' => null, 'base_directory' => null, 'storage' => null],
+                        'filesystem' => ['type' => null, 'paths' => []],
                     ])
                     ->arrayPrototype()
                         ->children()
@@ -123,9 +123,10 @@ final class PicassoBundle extends AbstractBundle
                                 ->defaultNull()
                                 ->info('Loader type. Inferred from name when it matches a known type.')
                             ->end()
-                            ->scalarNode('base_directory')
-                                ->defaultNull()
-                                ->info('Base directory for filesystem loaders.')
+                            ->arrayNode('paths')
+                                ->scalarPrototype()->end()
+                                ->defaultValue([])
+                                ->info('Base directories for filesystem loaders.')
                             ->end()
                             ->scalarNode('storage')
                                 ->defaultNull()
@@ -178,7 +179,7 @@ final class PicassoBundle extends AbstractBundle
     public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
     {
         /** @var array{
-         *     default_loader: string,
+         *     default_loader: string|null,
          *     default_transformer: string|null,
          *     device_sizes: list<int>,
          *     image_sizes: list<int>,
@@ -186,7 +187,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_quality: int,
          *     default_fit: string,
          *     placeholders: array{blur: array{enabled: bool, size: int, blur: int, quality: int}},
-         *     loaders: array<string, array{type: string|null, base_directory: string|null, storage: string|null}>,
+         *     loaders: array<string, array{type: string|null, paths: list<string>, storage: string|null}>,
          *     transformers: array{
          *         glide: array{enabled: bool, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null},
          *         imgix: array{enabled: bool, domain: string|null, sign_key: string|null, use_https: bool}
@@ -216,7 +217,7 @@ final class PicassoBundle extends AbstractBundle
             switch ($type) {
                 case 'filesystem':
                     $services->set('picasso.loader.'.$name, FilesystemLoader::class)
-                        ->args([$loaderConfig['base_directory'] ?? '%kernel.project_dir%/public/uploads'])
+                        ->args([$loaderConfig['paths']])
                         ->tag('picasso.loader', ['key' => $name]);
                     break;
 
@@ -251,8 +252,10 @@ final class PicassoBundle extends AbstractBundle
         }
 
         // Alias default loader
-        $services->alias('picasso.default_loader', 'picasso.loader.'.$config['default_loader']);
-        $services->alias(ImageLoaderInterface::class, 'picasso.loader.'.$config['default_loader']);
+        if (null !== $config['default_loader']) {
+            $services->alias('picasso.default_loader', 'picasso.loader.'.$config['default_loader']);
+            $services->alias(ImageLoaderInterface::class, 'picasso.loader.'.$config['default_loader']);
+        }
 
         // --- Registries ---
 
