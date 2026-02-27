@@ -112,27 +112,64 @@ final class PicassoBundle extends AbstractBundle
                     ->end()
                 ->end()
                 ->arrayNode('loaders')
-                    ->addDefaultsIfNotSet()
-                    ->children()
-                        ->arrayNode('filesystem')
-                            ->addDefaultsIfNotSet()
-                            ->children()
-                                ->booleanNode('enabled')->defaultTrue()->end()
-                                ->scalarNode('base_directory')->defaultNull()->end()
+                    ->beforeNormalization()
+                        ->ifTrue(static function ($v): bool {
+                            if (!\is_array($v)) {
+                                return false;
+                            }
+                            // Detect old format: entries with 'enabled' key but no 'type' key
+                            foreach ($v as $entry) {
+                                if (\is_array($entry) && \array_key_exists('enabled', $entry) && !\array_key_exists('type', $entry)) {
+                                    return true;
+                                }
+                            }
+
+                            return false;
+                        })
+                        ->then(static function (array $v): array {
+                            /** @var array<string, array<string, mixed>> $v */
+                            $result = [];
+                            if (!empty($v['filesystem']['enabled'])) {
+                                $result['filesystem'] = [
+                                    'type' => 'filesystem',
+                                    'base_directory' => $v['filesystem']['base_directory'] ?? null,
+                                ];
+                            }
+                            if (!empty($v['flysystem']['enabled']) && \is_string($v['flysystem']['service'] ?? null)) {
+                                $result['flysystem'] = [
+                                    'type' => 'flysystem',
+                                    'storage' => $v['flysystem']['service'],
+                                ];
+                            }
+                            if (!empty($v['vich']['enabled'])) {
+                                $result['vich'] = ['type' => 'vich'];
+                            }
+
+                            return $result;
+                        })
+                    ->end()
+                    ->useAttributeAsKey('name')
+                    ->defaultValue([
+                        'filesystem' => ['type' => 'filesystem', 'base_directory' => null, 'storage' => null],
+                    ])
+                    ->arrayPrototype()
+                        ->children()
+                            ->enumNode('type')
+                                ->values(['filesystem', 'flysystem', 'vich'])
+                                ->isRequired()
+                            ->end()
+                            ->scalarNode('base_directory')
+                                ->defaultNull()
+                                ->info('Base directory for filesystem loaders.')
+                            ->end()
+                            ->scalarNode('storage')
+                                ->defaultNull()
+                                ->info('Flysystem storage service ID.')
                             ->end()
                         ->end()
-                        ->arrayNode('flysystem')
-                            ->addDefaultsIfNotSet()
-                            ->children()
-                                ->booleanNode('enabled')->defaultFalse()->end()
-                                ->scalarNode('service')->defaultNull()->info('Flysystem storage service ID')->end()
-                            ->end()
-                        ->end()
-                        ->arrayNode('vich')
-                            ->addDefaultsIfNotSet()
-                            ->children()
-                                ->booleanNode('enabled')->defaultFalse()->end()
-                            ->end()
+                        ->validate()
+                            ->ifTrue(static fn (array $v): bool => 'flysystem' === $v['type'] && (null === $v['storage'] || '' === $v['storage']))
+                            ->thenInvalid('A flysystem loader requires a "storage" service ID.')
                         ->end()
                     ->end()
                 ->end()
@@ -184,11 +221,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_quality: int,
          *     default_fit: string,
          *     placeholders: array{blur: array{enabled: bool, size: int, blur: int, quality: int}},
-         *     loaders: array{
-         *         filesystem: array{enabled: bool, base_directory: string|null},
-         *         flysystem: array{enabled: bool, service: string|null},
-         *         vich: array{enabled: bool}
-         *     },
+         *     loaders: array<string, array{type: string, base_directory: string|null, storage: string|null}>,
          *     transformers: array{
          *         glide: array{enabled: bool, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null},
          *         imgix: array{enabled: bool, domain: string|null, sign_key: string|null, use_https: bool}
@@ -205,34 +238,44 @@ final class PicassoBundle extends AbstractBundle
 
         // --- Loaders ---
 
-        $loaderConfig = $config['loaders'];
+        $vichHelperRegistered = false;
 
-        if ($loaderConfig['filesystem']['enabled']) {
-            $services->set('picasso.loader.filesystem', FilesystemLoader::class)
-                ->args([$loaderConfig['filesystem']['base_directory'] ?? '%kernel.project_dir%/public/uploads'])
-                ->tag('picasso.loader', ['key' => 'filesystem']);
-        }
+        foreach ($config['loaders'] as $name => $loaderConfig) {
+            switch ($loaderConfig['type']) {
+                case 'filesystem':
+                    $services->set('picasso.loader.'.$name, FilesystemLoader::class)
+                        ->args([$loaderConfig['base_directory'] ?? '%kernel.project_dir%/public/uploads'])
+                        ->tag('picasso.loader', ['key' => $name]);
+                    break;
 
-        if ($loaderConfig['flysystem']['enabled'] && null !== $loaderConfig['flysystem']['service']) {
-            $services->set('picasso.loader.flysystem', FlysystemLoader::class)
-                ->args([
-                    service($loaderConfig['flysystem']['service']),
-                    service('picasso.metadata_guesser'),
-                ])
-                ->tag('picasso.loader', ['key' => 'flysystem']);
-        }
+                case 'flysystem':
+                    \assert(\is_string($loaderConfig['storage']));
+                    $services->set('picasso.loader.'.$name, FlysystemLoader::class)
+                        ->args([
+                            service($loaderConfig['storage']),
+                            service('picasso.metadata_guesser'),
+                        ])
+                        ->tag('picasso.loader', ['key' => $name]);
+                    break;
 
-        if ($loaderConfig['vich']['enabled'] && interface_exists(VichStorageInterface::class)) {
-            $services->set('.picasso.vich_mapping_helper', VichMappingHelper::class)
-                ->args([service(\Vich\UploaderBundle\Mapping\PropertyMappingFactory::class)]);
+                case 'vich':
+                    if (interface_exists(VichStorageInterface::class)) {
+                        if (!$vichHelperRegistered) {
+                            $services->set('.picasso.vich_mapping_helper', VichMappingHelper::class)
+                                ->args([service(\Vich\UploaderBundle\Mapping\PropertyMappingFactory::class)]);
+                            $vichHelperRegistered = true;
+                        }
 
-            $services->set('picasso.loader.vich', VichUploaderLoader::class)
-                ->args([
-                    service(VichStorageInterface::class),
-                    service('.picasso.vich_mapping_helper'),
-                    service('picasso.metadata_guesser'),
-                ])
-                ->tag('picasso.loader', ['key' => 'vich']);
+                        $services->set('picasso.loader.'.$name, VichUploaderLoader::class)
+                            ->args([
+                                service(VichStorageInterface::class),
+                                service('.picasso.vich_mapping_helper'),
+                                service('picasso.metadata_guesser'),
+                            ])
+                            ->tag('picasso.loader', ['key' => $name]);
+                    }
+                    break;
+            }
         }
 
         // Alias default loader
