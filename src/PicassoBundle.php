@@ -250,9 +250,17 @@ final class PicassoBundle extends AbstractBundle
         }
 
         // Alias default loader
-        if (null !== $config['default_loader']) {
-            $services->alias('picasso.default_loader', 'picasso.loader.'.$config['default_loader']);
-            $services->alias(ImageLoaderInterface::class, 'picasso.loader.'.$config['default_loader']);
+        $defaultLoader = $config['default_loader'];
+        if (null === $defaultLoader) {
+            $loaderNames = array_keys($config['loaders']);
+            if (1 === \count($loaderNames)) {
+                $defaultLoader = $loaderNames[0];
+            }
+        }
+
+        if (null !== $defaultLoader) {
+            $services->alias('picasso.default_loader', 'picasso.loader.'.$defaultLoader);
+            $services->alias(ImageLoaderInterface::class, 'picasso.loader.'.$defaultLoader);
         }
 
         // --- Registries ---
@@ -335,7 +343,7 @@ final class PicassoBundle extends AbstractBundle
             ->args([
                 tagged_locator('picasso.loader', 'key'),
                 tagged_locator('picasso.transformer', 'key'),
-                $config['default_loader'],
+                $defaultLoader,
                 $defaultTransformer,
             ]);
         $services->alias(ImagePipeline::class, 'picasso.pipeline');
@@ -371,7 +379,7 @@ final class PicassoBundle extends AbstractBundle
                 tagged_locator('picasso.loader', 'key'),
                 tagged_locator('picasso.transformer', 'key'),
                 service('picasso.metadata_guesser'),
-                $config['default_loader'],
+                $defaultLoader,
                 $defaultTransformer,
                 $config['formats'],
                 $config['default_quality'],
