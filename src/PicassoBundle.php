@@ -35,7 +35,7 @@ use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_lo
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 use Vich\UploaderBundle\Storage\StorageInterface as VichStorageInterface;
 
-class PicassoBundle extends AbstractBundle
+final class PicassoBundle extends AbstractBundle
 {
     private const ALLOWED_FORMATS = ['avif', 'webp', 'jpg', 'jpeg', 'pjpg', 'png', 'gif'];
 
@@ -223,13 +223,13 @@ class PicassoBundle extends AbstractBundle
         }
 
         if ($loaderConfig['vich']['enabled'] && interface_exists(VichStorageInterface::class)) {
-            $services->set('picasso.vich_mapping_helper', VichMappingHelper::class)
+            $services->set('.picasso.vich_mapping_helper', VichMappingHelper::class)
                 ->args([service(\Vich\UploaderBundle\Mapping\PropertyMappingFactory::class)]);
 
             $services->set('picasso.loader.vich', VichUploaderLoader::class)
                 ->args([
                     service(VichStorageInterface::class),
-                    service('picasso.vich_mapping_helper'),
+                    service('.picasso.vich_mapping_helper'),
                     service('picasso.metadata_guesser'),
                 ])
                 ->tag('picasso.loader', ['key' => 'vich']);
@@ -337,7 +337,7 @@ class PicassoBundle extends AbstractBundle
 
         // --- Twig Extension ---
 
-        $services->set('picasso.twig_extension', PicassoExtension::class)
+        $services->set('.picasso.twig_extension', PicassoExtension::class)
             ->args([
                 service('picasso.pipeline'),
                 $config['default_quality'],
@@ -349,7 +349,7 @@ class PicassoBundle extends AbstractBundle
 
         $blurConfig = $config['placeholders']['blur'];
 
-        $services->set('picasso.image_component', ImageComponent::class)
+        $services->set('.picasso.image_component', ImageComponent::class)
             ->args([
                 service('picasso.srcset_generator'),
                 tagged_locator('picasso.loader', 'key'),
