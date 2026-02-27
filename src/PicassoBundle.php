@@ -112,51 +112,16 @@ final class PicassoBundle extends AbstractBundle
                     ->end()
                 ->end()
                 ->arrayNode('loaders')
-                    ->beforeNormalization()
-                        ->ifTrue(static function ($v): bool {
-                            if (!\is_array($v)) {
-                                return false;
-                            }
-                            // Detect old format: entries with 'enabled' key but no 'type' key
-                            foreach ($v as $entry) {
-                                if (\is_array($entry) && \array_key_exists('enabled', $entry) && !\array_key_exists('type', $entry)) {
-                                    return true;
-                                }
-                            }
-
-                            return false;
-                        })
-                        ->then(static function (array $v): array {
-                            /** @var array<string, array<string, mixed>> $v */
-                            $result = [];
-                            if (!empty($v['filesystem']['enabled'])) {
-                                $result['filesystem'] = [
-                                    'type' => 'filesystem',
-                                    'base_directory' => $v['filesystem']['base_directory'] ?? null,
-                                ];
-                            }
-                            if (!empty($v['flysystem']['enabled']) && \is_string($v['flysystem']['service'] ?? null)) {
-                                $result['flysystem'] = [
-                                    'type' => 'flysystem',
-                                    'storage' => $v['flysystem']['service'],
-                                ];
-                            }
-                            if (!empty($v['vich']['enabled'])) {
-                                $result['vich'] = ['type' => 'vich'];
-                            }
-
-                            return $result;
-                        })
-                    ->end()
                     ->useAttributeAsKey('name')
                     ->defaultValue([
-                        'filesystem' => ['type' => 'filesystem', 'base_directory' => null, 'storage' => null],
+                        'filesystem' => ['type' => null, 'base_directory' => null, 'storage' => null],
                     ])
                     ->arrayPrototype()
                         ->children()
                             ->enumNode('type')
                                 ->values(['filesystem', 'flysystem', 'vich'])
-                                ->isRequired()
+                                ->defaultNull()
+                                ->info('Loader type. Inferred from name when it matches a known type.')
                             ->end()
                             ->scalarNode('base_directory')
                                 ->defaultNull()
@@ -221,7 +186,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_quality: int,
          *     default_fit: string,
          *     placeholders: array{blur: array{enabled: bool, size: int, blur: int, quality: int}},
-         *     loaders: array<string, array{type: string, base_directory: string|null, storage: string|null}>,
+         *     loaders: array<string, array{type: string|null, base_directory: string|null, storage: string|null}>,
          *     transformers: array{
          *         glide: array{enabled: bool, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null},
          *         imgix: array{enabled: bool, domain: string|null, sign_key: string|null, use_https: bool}
@@ -238,10 +203,17 @@ final class PicassoBundle extends AbstractBundle
 
         // --- Loaders ---
 
+        $knownTypes = ['filesystem', 'flysystem', 'vich'];
         $vichHelperRegistered = false;
 
         foreach ($config['loaders'] as $name => $loaderConfig) {
-            switch ($loaderConfig['type']) {
+            $type = $loaderConfig['type'] ?? (\in_array($name, $knownTypes, true) ? $name : null);
+
+            if (null === $type) {
+                throw new \LogicException(\sprintf('Loader "%s" must specify a "type" (filesystem, flysystem, or vich).', $name));
+            }
+
+            switch ($type) {
                 case 'filesystem':
                     $services->set('picasso.loader.'.$name, FilesystemLoader::class)
                         ->args([$loaderConfig['base_directory'] ?? '%kernel.project_dir%/public/uploads'])
