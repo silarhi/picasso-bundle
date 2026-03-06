@@ -47,6 +47,7 @@ final class GlideTransformer implements LocalTransformerInterface
         $path = $image->path ?? '';
         $glideParams = $this->mapToGlideParams($transformation);
         $loaderName = $context['loader'] ?? 'filesystem';
+        $transformerName = $context['transformer'] ?? 'glide';
 
         if ([] !== $image->metadata) {
             $glideParams['_metadata'] = $this->urlEncryption->encrypt(json_encode($image->metadata, \JSON_THROW_ON_ERROR));
@@ -56,7 +57,7 @@ final class GlideTransformer implements LocalTransformerInterface
             ->generateSignature($path, $glideParams);
 
         return $this->router->generate('picasso_image', [
-            'transformer' => 'glide',
+            'transformer' => $transformerName,
             'loader' => $loaderName,
             'path' => $path,
             ...$glideParams,

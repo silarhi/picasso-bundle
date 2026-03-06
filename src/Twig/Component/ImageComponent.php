@@ -168,7 +168,7 @@ class ImageComponent
         // Resolve transformer
         $transformerName = $this->pipeline->resolveTransformerName($this->transformer);
         $imageTransformer = $this->transformerRegistry->get($transformerName);
-        $transformerContext = ['loader' => $loaderName];
+        $transformerContext = ['loader' => $loaderName, 'transformer' => $transformerName];
 
         // Resolve fit from prop or config default
         $fit = $this->fit ?? $this->defaultFit;

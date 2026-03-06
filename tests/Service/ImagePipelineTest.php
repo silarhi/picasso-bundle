@@ -72,7 +72,7 @@ class ImagePipelineTest extends TestCase
 
         $this->transformer->expects(self::once())
             ->method('url')
-            ->with($image, $transformation, ['loader' => 'filesystem'])
+            ->with($image, $transformation, ['loader' => 'filesystem', 'transformer' => 'glide'])
             ->willReturn('/picasso/glide/filesystem/uploads/photo.jpg?w=300&fm=webp&s=abc');
 
         $url = $this->pipeline->url($reference, $transformation);

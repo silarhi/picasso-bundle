@@ -32,7 +32,7 @@ class EndToEndImageServingTest extends KernelTestCase
 
     protected static function getKernelClass(): string
     {
-        return MultiConfigKernel::class;
+        return FullConfigKernel::class;
     }
 
     public static function setUpBeforeClass(): void
@@ -135,17 +135,33 @@ class EndToEndImageServingTest extends KernelTestCase
     {
         $rendered = $this->renderTwigComponent('Picasso:Image', [
             'src' => 'pixel.gif',
-            'loader' => 'secondary',
+            'loader' => 'secondary_fs',
             'sizes' => '100vw',
         ]);
         $html = $rendered->toString();
 
         $srcUrl = $this->parseSrcFromImg($html);
-        self::assertStringContainsString('secondary', $srcUrl);
+        self::assertStringContainsString('secondary_fs', $srcUrl);
 
         $response = self::handleRequest($srcUrl);
         self::assertSame(200, $response->getStatusCode(), 'Secondary loader image serving failed');
         self::assertStringContainsString('image/', (string) $response->headers->get('Content-Type'));
+    }
+
+    public function testGeneratedUrlUsesRegisteredTransformerName(): void
+    {
+        // FullConfigKernel registers the Glide transformer as 'local_glide', not 'glide'
+        $rendered = $this->renderTwigComponent('Picasso:Image', [
+            'src' => 'photo.jpg',
+            'sizes' => '100vw',
+        ]);
+        $html = $rendered->toString();
+
+        $srcUrl = $this->parseSrcFromImg($html);
+        self::assertStringContainsString('/image/local_glide/', $srcUrl);
+
+        $response = self::handleRequest($srcUrl);
+        self::assertSame(200, $response->getStatusCode());
     }
 
     public function testTamperedSignatureReturns404(): void
