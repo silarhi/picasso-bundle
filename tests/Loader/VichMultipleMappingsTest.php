@@ -190,8 +190,8 @@ class VichMultipleMappingsTest extends TestCase
         ]));
 
         // Generate URLs
-        $avatarUrl = $transformer->url($avatarImage, new ImageTransformation(width: 100), ['loader' => 'vich']);
-        $documentUrl = $transformer->url($documentImage, new ImageTransformation(width: 800), ['loader' => 'vich']);
+        $avatarUrl = $transformer->url($avatarImage, new ImageTransformation(width: 100), ['loader' => 'vich', 'transformer' => 'glide']);
+        $documentUrl = $transformer->url($documentImage, new ImageTransformation(width: 800), ['loader' => 'vich', 'transformer' => 'glide']);
 
         // Both URLs should contain _metadata
         self::assertStringContainsString('_metadata=', $avatarUrl);
@@ -307,13 +307,13 @@ class VichMultipleMappingsTest extends TestCase
             'entity' => $entity,
             'field' => 'avatarFile',
         ]));
-        $avatarUrl = $transformer->url($avatarImage, new ImageTransformation(width: 200), ['loader' => 'vich']);
+        $avatarUrl = $transformer->url($avatarImage, new ImageTransformation(width: 200), ['loader' => 'vich', 'transformer' => 'glide']);
 
         $documentImage = $this->loader->load(new ImageReference('agreement.pdf', [
             'entity' => $entity,
             'field' => 'documentFile',
         ]));
-        $documentUrl = $transformer->url($documentImage, new ImageTransformation(width: 800), ['loader' => 'vich']);
+        $documentUrl = $transformer->url($documentImage, new ImageTransformation(width: 800), ['loader' => 'vich', 'transformer' => 'glide']);
 
         $avatarQs = parse_url($avatarUrl, \PHP_URL_QUERY);
         $documentQs = parse_url($documentUrl, \PHP_URL_QUERY);

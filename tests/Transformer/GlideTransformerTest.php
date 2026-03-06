@@ -17,6 +17,7 @@ use function assert;
 use function in_array;
 use function is_string;
 
+use LogicException;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
@@ -58,7 +59,7 @@ class GlideTransformerTest extends TestCase
         $image = new Image(path: 'uploads/photo.jpg');
         $transformation = new ImageTransformation(width: 300, format: 'webp');
 
-        $url = $this->transformer->url($image, $transformation, ['loader' => 'filesystem']);
+        $url = $this->transformer->url($image, $transformation, ['loader' => 'filesystem', 'transformer' => 'glide']);
 
         self::assertStringContainsString('/picasso/glide/filesystem/uploads/photo.jpg', $url);
         self::assertStringContainsString('w=300', $url);
@@ -66,14 +67,53 @@ class GlideTransformerTest extends TestCase
         self::assertStringContainsString('s=', $url);
     }
 
-    public function testUrlDefaultsLoaderToFilesystem(): void
+    public function testUrlUsesCustomTransformerName(): void
     {
         $image = new Image(path: 'photo.jpg');
         $transformation = new ImageTransformation(width: 100);
 
-        $url = $this->transformer->url($image, $transformation);
+        $url = $this->transformer->url($image, $transformation, ['loader' => 'filesystem', 'transformer' => 'my_glide']);
 
-        self::assertStringContainsString('/picasso/glide/filesystem/photo.jpg', $url);
+        self::assertStringContainsString('/picasso/my_glide/filesystem/photo.jpg', $url);
+    }
+
+    public function testUrlUsesCustomLoaderName(): void
+    {
+        $image = new Image(path: 'photo.jpg');
+        $transformation = new ImageTransformation(width: 100);
+
+        $url = $this->transformer->url($image, $transformation, ['loader' => 'my_loader', 'transformer' => 'glide']);
+
+        self::assertStringContainsString('/picasso/glide/my_loader/photo.jpg', $url);
+    }
+
+    public function testUrlThrowsWhenLoaderMissing(): void
+    {
+        $image = new Image(path: 'photo.jpg');
+        $transformation = new ImageTransformation(width: 100);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('loader');
+        $this->transformer->url($image, $transformation, ['transformer' => 'glide']);
+    }
+
+    public function testUrlThrowsWhenTransformerMissing(): void
+    {
+        $image = new Image(path: 'photo.jpg');
+        $transformation = new ImageTransformation(width: 100);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('transformer');
+        $this->transformer->url($image, $transformation, ['loader' => 'filesystem']);
+    }
+
+    public function testUrlThrowsWhenContextEmpty(): void
+    {
+        $image = new Image(path: 'photo.jpg');
+        $transformation = new ImageTransformation(width: 100);
+
+        $this->expectException(LogicException::class);
+        $this->transformer->url($image, $transformation);
     }
 
     public function testUrlIncludesQuality(): void
@@ -81,7 +121,7 @@ class GlideTransformerTest extends TestCase
         $image = new Image(path: 'photo.jpg');
         $transformation = new ImageTransformation(quality: 90);
 
-        $url = $this->transformer->url($image, $transformation);
+        $url = $this->transformer->url($image, $transformation, ['loader' => 'filesystem', 'transformer' => 'glide']);
 
         self::assertStringContainsString('q=90', $url);
     }
@@ -91,7 +131,7 @@ class GlideTransformerTest extends TestCase
         $image = new Image(path: 'photo.jpg');
         $transformation = new ImageTransformation(blur: 50);
 
-        $url = $this->transformer->url($image, $transformation);
+        $url = $this->transformer->url($image, $transformation, ['loader' => 'filesystem', 'transformer' => 'glide']);
 
         self::assertStringContainsString('blur=50', $url);
     }
@@ -109,7 +149,7 @@ class GlideTransformerTest extends TestCase
             dpr: 2,
         );
 
-        $url = $this->transformer->url($image, $transformation);
+        $url = $this->transformer->url($image, $transformation, ['loader' => 'filesystem', 'transformer' => 'glide']);
 
         self::assertStringContainsString('w=300', $url);
         self::assertStringContainsString('h=200', $url);
@@ -125,7 +165,7 @@ class GlideTransformerTest extends TestCase
         $image = new Image(path: 'photo.jpg', metadata: ['upload_destination' => '/var/uploads/images']);
         $transformation = new ImageTransformation(width: 300);
 
-        $url = $this->transformer->url($image, $transformation, ['loader' => 'vich']);
+        $url = $this->transformer->url($image, $transformation, ['loader' => 'vich', 'transformer' => 'glide']);
 
         self::assertStringContainsString('_metadata=', $url);
         self::assertStringContainsString('/picasso/glide/vich/photo.jpg', $url);
@@ -146,7 +186,7 @@ class GlideTransformerTest extends TestCase
         $image = new Image(path: 'photo.jpg');
         $transformation = new ImageTransformation(width: 300);
 
-        $url = $this->transformer->url($image, $transformation);
+        $url = $this->transformer->url($image, $transformation, ['loader' => 'filesystem', 'transformer' => 'glide']);
 
         self::assertStringNotContainsString('_metadata=', $url);
     }

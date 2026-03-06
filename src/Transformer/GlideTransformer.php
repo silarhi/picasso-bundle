@@ -20,6 +20,7 @@ use League\Glide\Responses\SymfonyResponseFactory;
 use League\Glide\ServerFactory;
 use League\Glide\Signatures\SignatureException;
 use League\Glide\Signatures\SignatureFactory;
+use LogicException;
 use RuntimeException;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
@@ -46,8 +47,8 @@ final class GlideTransformer implements LocalTransformerInterface
     {
         $path = $image->path ?? '';
         $glideParams = $this->mapToGlideParams($transformation);
-        $loaderName = $context['loader'] ?? 'filesystem';
-        $transformerName = $context['transformer'] ?? 'glide';
+        $loaderName = $context['loader'] ?? throw new LogicException('The "loader" key is required in the context array.');
+        $transformerName = $context['transformer'] ?? throw new LogicException('The "transformer" key is required in the context array.');
 
         if ([] !== $image->metadata) {
             $glideParams['_metadata'] = $this->urlEncryption->encrypt(json_encode($image->metadata, \JSON_THROW_ON_ERROR));
