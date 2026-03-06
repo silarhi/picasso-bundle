@@ -2,9 +2,19 @@
 
 declare(strict_types=1);
 
+/*
+ * This file is part of the Picasso Bundle package.
+ *
+ * (c) SILARHI <dev@silarhi.fr>
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
+
 namespace Silarhi\PicassoBundle\Tests\Service;
 
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Silarhi\PicassoBundle\Service\UrlEncryption;
 
 class UrlEncryptionTest extends TestCase
@@ -50,22 +60,22 @@ class UrlEncryptionTest extends TestCase
         $encrypted = $this->encryption->encrypt('/var/uploads');
         $wrongKey = new UrlEncryption('wrong-key');
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $wrongKey->decrypt($encrypted);
     }
 
     public function testDecryptWithTamperedDataThrows(): void
     {
         $encrypted = $this->encryption->encrypt('/var/uploads');
-        $tampered = $encrypted.'x';
+        $tampered = $encrypted . 'x';
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $this->encryption->decrypt($tampered);
     }
 
     public function testDecryptWithTooShortDataThrows(): void
     {
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $this->encryption->decrypt('abc');
     }
 }

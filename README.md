@@ -2,7 +2,8 @@
 
 Responsive image component for Symfony, inspired by [Next.js Image](https://nextjs.org/docs/app/api-reference/components/image).
 
-PicassoBundle automatically generates optimized, responsive `<picture>` elements with multiple formats (AVIF, WebP, JPEG), srcset generation, and blur placeholders — all from a single Twig component.
+PicassoBundle automatically generates optimized, responsive `<picture>` elements with multiple formats (AVIF, WebP, JPEG),
+srcset generation, and blur placeholders — all from a single Twig component.
 
 ## Features
 
@@ -67,13 +68,13 @@ That's it — images are loaded from `public/uploads` by default and transformed
 ```yaml
 picasso:
     default_loader: filesystem
-    default_transformer: ~          # auto-detected when only one is enabled
+    default_transformer: ~ # auto-detected when only one is enabled
 
     device_sizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840]
     image_sizes: [16, 32, 48, 64, 96, 128, 256, 384]
-    formats: [avif, webp, jpg]      # last entry is the <img> fallback
-    default_quality: 75             # 1–100
-    default_fit: contain            # contain | cover | crop | fill
+    formats: [avif, webp, jpg] # last entry is the <img> fallback
+    default_quality: 75 # 1–100
+    default_fit: contain # contain | cover | crop | fill
 
     placeholders:
         blur:
@@ -88,7 +89,7 @@ picasso:
             base_directory: '%kernel.project_dir%/public/uploads'
         flysystem:
             enabled: false
-            service: ~              # Flysystem storage service ID
+            service: ~ # Flysystem storage service ID
         vich:
             enabled: false
 
@@ -97,11 +98,11 @@ picasso:
             enabled: false
             sign_key: ~
             cache: '%kernel.project_dir%/var/glide-cache'
-            driver: gd              # gd | imagick
+            driver: gd # gd | imagick
             max_image_size: ~
         imgix:
             enabled: false
-            domain: ~               # your-source.imgix.net
+            domain: ~ # your-source.imgix.net
             sign_key: ~
             use_https: true
 ```
@@ -126,21 +127,21 @@ This renders a `<picture>` element with `<source>` tags for each configured form
 
 ### Component Properties
 
-| Property | Type | Description |
-|---|---|---|
-| `src` | `string` | Image path relative to the loader's base |
-| `width` | `int` | Display width in pixels |
-| `height` | `int` | Display height in pixels |
-| `sizes` | `string` | Responsive `sizes` attribute |
-| `sourceWidth` | `int` | Explicit source width (skips detection) |
-| `sourceHeight` | `int` | Explicit source height (skips detection) |
-| `loader` | `string` | Override default loader (`filesystem`, `vich`, `flysystem`) |
-| `transformer` | `string` | Override default transformer (`glide`, `imgix`) |
-| `quality` | `int` | Override quality (1–100) |
-| `fit` | `string` | Fit mode: `contain`, `cover`, `crop`, `fill` |
-| `placeholder` | `bool` | Enable/disable blur placeholder |
-| `unoptimized` | `bool` | Serve the original image without transformation |
-| `context` | `array` | Extra context for the loader (e.g. Vich entity/field) |
+| Property       | Type     | Description                                                 |
+| -------------- | -------- | ----------------------------------------------------------- |
+| `src`          | `string` | Image path relative to the loader's base                    |
+| `width`        | `int`    | Display width in pixels                                     |
+| `height`       | `int`    | Display height in pixels                                    |
+| `sizes`        | `string` | Responsive `sizes` attribute                                |
+| `sourceWidth`  | `int`    | Explicit source width (skips detection)                     |
+| `sourceHeight` | `int`    | Explicit source height (skips detection)                    |
+| `loader`       | `string` | Override default loader (`filesystem`, `vich`, `flysystem`) |
+| `transformer`  | `string` | Override default transformer (`glide`, `imgix`)             |
+| `quality`      | `int`    | Override quality (1–100)                                    |
+| `fit`          | `string` | Fit mode: `contain`, `cover`, `crop`, `fill`                |
+| `placeholder`  | `bool`   | Enable/disable blur placeholder                             |
+| `unoptimized`  | `bool`   | Serve the original image without transformation             |
+| `context`      | `array`  | Extra context for the loader (e.g. Vich entity/field)       |
 
 ### Twig Function
 
@@ -186,7 +187,7 @@ picasso:
     loaders:
         flysystem:
             enabled: true
-            service: 'default.storage'  # Your Flysystem service ID
+            service: 'default.storage' # Your Flysystem service ID
 ```
 
 ## Custom Loaders and Transformers

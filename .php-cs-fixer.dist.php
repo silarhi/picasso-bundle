@@ -2,31 +2,52 @@
 
 declare(strict_types=1);
 
+/*
+ * This file is part of the CFONB Parser package.
+ *
+ * (c) SILARHI <dev@silarhi.fr>
+ * (c) @fezfez <demonchaux.stephane@gmail.com>
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
+
+$header = <<<'EOF'
+This file is part of the Picasso Bundle package.
+
+(c) SILARHI <dev@silarhi.fr>
+
+This source file is subject to the MIT license that is bundled
+with this source code in the file LICENSE.
+EOF;
+
 $finder = PhpCsFixer\Finder::create()
-    ->in([
-        __DIR__.'/src',
-        __DIR__.'/tests',
-    ])
-    ->append([
-        __DIR__.'/rector.php',
-        __DIR__.'/.php-cs-fixer.dist.php',
+    ->in(__DIR__)
+    ->notPath([
+        'node_modules',
+        'var',
     ])
 ;
 
-return (new PhpCsFixer\Config())
-    ->setRiskyAllowed(true)
+$config = new PhpCsFixer\Config();
+
+return $config
+    ->setParallelConfig(PhpCsFixer\Runner\Parallel\ParallelConfigFactory::detect())
     ->setRules([
-        '@PER-CS2.0' => true,
-        '@PER-CS2.0:risky' => true,
         '@Symfony' => true,
         '@Symfony:risky' => true,
-        'declare_strict_types' => true,
-        'native_function_invocation' => ['include' => ['@compiler_optimized'], 'scope' => 'namespaced'],
-        'no_unused_imports' => true,
+        '@DoctrineAnnotation' => true,
+        'array_syntax' => ['syntax' => 'short'],
+        'phpdoc_summary' => false,
+        'no_superfluous_phpdoc_tags' => true,
+        'header_comment' => ['header' => $header],
+        'concat_space' => ['spacing' => 'one'],
+        'native_constant_invocation' => true,
+        'native_function_invocation' => ['include' => ['@compiler_optimized']],
         'ordered_imports' => ['sort_algorithm' => 'alpha'],
-        'trailing_comma_in_multiline' => ['elements' => ['arguments', 'arrays', 'match', 'parameters']],
-        'nullable_type_declaration_for_default_null_value' => true,
-        'global_namespace_import' => ['import_classes' => false, 'import_functions' => false, 'import_constants' => false],
+        'global_namespace_import' => ['import_functions' => true],
+        'declare_strict_types' => true,
     ])
-    ->setFinder($finder)
-;
+    ->setRiskyAllowed(true)
+    ->setCacheFile(__DIR__ . '/var/tools/.php-cs-fixer.cache')
+    ->setFinder($finder);

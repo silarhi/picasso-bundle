@@ -2,7 +2,20 @@
 
 declare(strict_types=1);
 
+/*
+ * This file is part of the Picasso Bundle package.
+ *
+ * (c) SILARHI <dev@silarhi.fr>
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
+
 namespace Silarhi\PicassoBundle\Tests\Loader;
+
+use function assert;
+use function in_array;
+use function is_string;
 
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -13,6 +26,7 @@ use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
 use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
 use Silarhi\PicassoBundle\Service\UrlEncryption;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
+use stdClass;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Vich\UploaderBundle\Storage\StorageInterface;
 
@@ -45,7 +59,7 @@ class VichMultipleMappingsTest extends TestCase
 
     public function testTwoFieldsSameEntityDifferentDestinations(): void
     {
-        $entity = new \stdClass();
+        $entity = new stdClass();
 
         $this->mappingHelper->method('getFilePropertyName')
             ->willReturnMap([
@@ -91,7 +105,7 @@ class VichMultipleMappingsTest extends TestCase
 
     public function testEncryptedSourcesAreDistinctPerMapping(): void
     {
-        $entity = new \stdClass();
+        $entity = new stdClass();
 
         $this->mappingHelper->method('getFilePropertyName')
             ->willReturnMap([
@@ -138,7 +152,7 @@ class VichMultipleMappingsTest extends TestCase
 
     public function testGlideTransformerUrlCarriesCorrectEncryptedSource(): void
     {
-        $entity = new \stdClass();
+        $entity = new stdClass();
 
         $this->mappingHelper->method('getFilePropertyName')
             ->willReturnMap([
@@ -197,7 +211,7 @@ class VichMultipleMappingsTest extends TestCase
 
     public function testFilesystemSourceAsUploadDestination(): void
     {
-        $entity = new \stdClass();
+        $entity = new stdClass();
 
         $this->mappingHelper->method('getFilePropertyName')
             ->with($entity, 'imageFile')
@@ -229,7 +243,7 @@ class VichMultipleMappingsTest extends TestCase
 
     public function testFlysystemServiceIdAsUploadDestination(): void
     {
-        $entity = new \stdClass();
+        $entity = new stdClass();
 
         $this->mappingHelper->method('getFilePropertyName')
             ->with($entity, 'documentFile')
@@ -259,7 +273,7 @@ class VichMultipleMappingsTest extends TestCase
 
     public function testMixedStorageTypesInSameEntity(): void
     {
-        $entity = new \stdClass();
+        $entity = new stdClass();
 
         $this->mappingHelper->method('getFilePropertyName')
             ->willReturnMap([
@@ -310,7 +324,7 @@ class VichMultipleMappingsTest extends TestCase
 
     public function testAutoDetectedFieldWithMultipleMappings(): void
     {
-        $entity = new \stdClass();
+        $entity = new stdClass();
 
         $this->mappingHelper->method('getFilePropertyName')
             ->with($entity, null)
@@ -339,12 +353,12 @@ class VichMultipleMappingsTest extends TestCase
         $router = $this->createMock(UrlGeneratorInterface::class);
         $router->method('generate')
             ->willReturnCallback(static function (string $name, array $params): string {
-                \assert(\is_string($params['transformer']));
-                \assert(\is_string($params['loader']));
-                \assert(\is_string($params['path']));
+                assert(is_string($params['transformer']));
+                assert(is_string($params['loader']));
+                assert(is_string($params['path']));
 
-                return '/picasso/'.$params['transformer'].'/'.$params['loader'].'/'.$params['path'].'?'.http_build_query(
-                    array_filter($params, static fn ($k): bool => !\in_array($k, ['transformer', 'loader', 'path'], true), \ARRAY_FILTER_USE_KEY),
+                return '/picasso/' . $params['transformer'] . '/' . $params['loader'] . '/' . $params['path'] . '?' . http_build_query(
+                    array_filter($params, static fn ($k): bool => !in_array($k, ['transformer', 'loader', 'path'], true), \ARRAY_FILTER_USE_KEY),
                 );
             });
 

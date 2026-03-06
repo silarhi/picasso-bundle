@@ -1,0 +1,17 @@
+{
+  "devDependencies": {
+    "husky": ">=6",
+    "lint-staged": ">=10",
+    "markdownlint": "^0.40.0",
+    "markdownlint-cli2": "^0.21.0",
+    "prettier": "^3.8.1"
+  },
+  "lint-staged": {
+    "*.{md,yml,yaml}": "prettier --write",
+    "*.php": "vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.dist.php",
+    "*.twig": "vendor/bin/twig-cs-fixer lint --fix --config=.twig-cs-fixer.php"
+  },
+  "scripts": {
+    "prepare": "husky"
+  }
+}

@@ -2,7 +2,18 @@
 
 declare(strict_types=1);
 
+/*
+ * This file is part of the Picasso Bundle package.
+ *
+ * (c) SILARHI <dev@silarhi.fr>
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
+
 namespace Silarhi\PicassoBundle\Tests\Service;
+
+use function dirname;
 
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Service\MetadataGuesser;
@@ -42,17 +53,7 @@ class MetadataGuesserTest extends TestCase
 
     public function testGuessJpegImage(): void
     {
-        if (!\function_exists('imagecreatetruecolor')) {
-            self::markTestSkipped('GD extension not available.');
-        }
-
-        $img = imagecreatetruecolor(100, 50);
-        self::assertNotFalse($img);
-        ob_start();
-        imagejpeg($img);
-        $jpeg = ob_get_clean();
-        imagedestroy($img);
-
+        $jpeg = file_get_contents(dirname(__DIR__) . '/Fixtures/photo.jpg');
         self::assertNotFalse($jpeg);
         $stream = $this->createStream($jpeg);
 

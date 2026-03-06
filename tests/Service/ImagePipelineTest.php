@@ -2,8 +2,18 @@
 
 declare(strict_types=1);
 
+/*
+ * This file is part of the Picasso Bundle package.
+ *
+ * (c) SILARHI <dev@silarhi.fr>
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
+
 namespace Silarhi\PicassoBundle\Tests\Service;
 
+use InvalidArgumentException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
@@ -29,14 +39,14 @@ class ImagePipelineTest extends TestCase
         $loaders->method('get')
             ->willReturnCallback(fn (string $key): MockObject&ImageLoaderInterface => match ($key) {
                 'filesystem' => $this->loader,
-                default => throw new \InvalidArgumentException("Unknown loader: $key"),
+                default => throw new InvalidArgumentException("Unknown loader: $key"),
             });
 
         $transformers = $this->createMock(ContainerInterface::class);
         $transformers->method('get')
             ->willReturnCallback(fn (string $key): MockObject&ImageTransformerInterface => match ($key) {
                 'glide' => $this->transformer,
-                default => throw new \InvalidArgumentException("Unknown transformer: $key"),
+                default => throw new InvalidArgumentException("Unknown transformer: $key"),
             });
 
         $this->pipeline = new ImagePipeline($loaders, $transformers, 'filesystem', 'glide');

@@ -2,7 +2,20 @@
 
 declare(strict_types=1);
 
+/*
+ * This file is part of the Picasso Bundle package.
+ *
+ * (c) SILARHI <dev@silarhi.fr>
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
+
 namespace Silarhi\PicassoBundle\Service;
+
+use RuntimeException;
+
+use function strlen;
 
 final readonly class UrlEncryption
 {
@@ -24,10 +37,10 @@ final readonly class UrlEncryption
         $ciphertext = openssl_encrypt($plaintext, self::CIPHER, $derivedKey, \OPENSSL_RAW_DATA, $iv, $tag, '', self::TAG_LENGTH);
 
         if (false === $ciphertext) {
-            throw new \RuntimeException('Encryption failed.');
+            throw new RuntimeException('Encryption failed.');
         }
 
-        return rtrim(strtr(base64_encode($iv.$tag.$ciphertext), '+/', '-_'), '=');
+        return rtrim(strtr(base64_encode($iv . $tag . $ciphertext), '+/', '-_'), '=');
     }
 
     public function decrypt(string $encoded): string
@@ -35,8 +48,8 @@ final readonly class UrlEncryption
         $derivedKey = hash('sha256', $this->key, true);
         $data = base64_decode(strtr($encoded, '-_', '+/'), true);
 
-        if (false === $data || \strlen($data) < self::IV_LENGTH + self::TAG_LENGTH) {
-            throw new \RuntimeException('Decryption failed: invalid data.');
+        if (false === $data || strlen($data) < self::IV_LENGTH + self::TAG_LENGTH) {
+            throw new RuntimeException('Decryption failed: invalid data.');
         }
 
         $iv = substr($data, 0, self::IV_LENGTH);
@@ -46,7 +59,7 @@ final readonly class UrlEncryption
         $plaintext = openssl_decrypt($ciphertext, self::CIPHER, $derivedKey, \OPENSSL_RAW_DATA, $iv, $tag);
 
         if (false === $plaintext) {
-            throw new \RuntimeException('Decryption failed: invalid key or tampered data.');
+            throw new RuntimeException('Decryption failed: invalid key or tampered data.');
         }
 
         return $plaintext;

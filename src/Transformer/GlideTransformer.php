@@ -2,13 +2,24 @@
 
 declare(strict_types=1);
 
+/*
+ * This file is part of the Picasso Bundle package.
+ *
+ * (c) SILARHI <dev@silarhi.fr>
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
+
 namespace Silarhi\PicassoBundle\Transformer;
 
+use InvalidArgumentException;
 use League\Glide\Filesystem\FileNotFoundException;
 use League\Glide\Responses\SymfonyResponseFactory;
 use League\Glide\ServerFactory;
 use League\Glide\Signatures\SignatureException;
 use League\Glide\Signatures\SignatureFactory;
+use RuntimeException;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
@@ -73,7 +84,7 @@ class GlideTransformer implements LocalTransformerInterface
                 /** @var string $encryptedSource */
                 $encryptedSource = $params['_source'];
                 $source = $this->urlEncryption->decrypt($encryptedSource);
-            } catch (\RuntimeException $e) {
+            } catch (RuntimeException $e) {
                 throw new NotFoundHttpException('Invalid source parameter.', $e);
             }
         } else {
@@ -98,7 +109,7 @@ class GlideTransformer implements LocalTransformerInterface
             $response = $server->getImageResponse($path, $params);
 
             return $response;
-        } catch (FileNotFoundException|\InvalidArgumentException $e) {
+        } catch (FileNotFoundException|InvalidArgumentException $e) {
             throw new NotFoundHttpException('Image not found.', $e);
         }
     }

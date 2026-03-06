@@ -2,9 +2,19 @@
 
 declare(strict_types=1);
 
+/*
+ * This file is part of the Picasso Bundle package.
+ *
+ * (c) SILARHI <dev@silarhi.fr>
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
+
 namespace Silarhi\PicassoBundle\Tests\Dto;
 
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 
 class ImageTransformationTest extends TestCase
@@ -46,7 +56,7 @@ class ImageTransformationTest extends TestCase
     public function testReadonlyProperties(): void
     {
         $t = new ImageTransformation(width: 100);
-        $reflection = new \ReflectionClass($t);
+        $reflection = new ReflectionClass($t);
 
         self::assertTrue($reflection->getProperty('width')->isReadOnly());
         self::assertTrue($reflection->getProperty('quality')->isReadOnly());

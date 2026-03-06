@@ -2,14 +2,26 @@
 
 declare(strict_types=1);
 
+/*
+ * This file is part of the Picasso Bundle package.
+ *
+ * (c) SILARHI <dev@silarhi.fr>
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
+
 namespace Silarhi\PicassoBundle\Tests\Loader;
 
+use LogicException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Loader\VichMappingHelperInterface;
 use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
 use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
+use stdClass;
 use Vich\UploaderBundle\Storage\StorageInterface;
 
 class VichUploaderLoaderTest extends TestCase
@@ -42,7 +54,7 @@ class VichUploaderLoaderTest extends TestCase
 
     public function testLoadWithEntityAndFieldContext(): void
     {
-        $entity = new \stdClass();
+        $entity = new stdClass();
 
         $this->mappingHelper->method('getFilePropertyName')
             ->with($entity, 'imageFile')
@@ -70,7 +82,7 @@ class VichUploaderLoaderTest extends TestCase
 
     public function testLoadAutoDetectsFieldWhenNull(): void
     {
-        $entity = new \stdClass();
+        $entity = new stdClass();
 
         $this->mappingHelper->method('getFilePropertyName')
             ->with($entity, null)
@@ -97,7 +109,7 @@ class VichUploaderLoaderTest extends TestCase
 
     public function testLoadFallsBackWhenNoMappingFound(): void
     {
-        $entity = new \stdClass();
+        $entity = new stdClass();
 
         $this->mappingHelper->method('getFilePropertyName')
             ->with($entity, null)
@@ -112,7 +124,7 @@ class VichUploaderLoaderTest extends TestCase
 
     public function testLoadWithEntityStripsLeadingSlash(): void
     {
-        $entity = new \stdClass();
+        $entity = new stdClass();
 
         $this->mappingHelper->method('getFilePropertyName')
             ->willReturn('imageFile');
@@ -137,7 +149,7 @@ class VichUploaderLoaderTest extends TestCase
 
     public function testLoadWithEntityReturnsEmptyOnNull(): void
     {
-        $entity = new \stdClass();
+        $entity = new stdClass();
 
         $this->mappingHelper->method('getFilePropertyName')
             ->willReturn('imageFile');
@@ -161,7 +173,7 @@ class VichUploaderLoaderTest extends TestCase
 
     public function testLoadProvidesStreamWhenAvailable(): void
     {
-        $entity = new \stdClass();
+        $entity = new stdClass();
         $stream = fopen('php://memory', 'r+');
         self::assertNotFalse($stream);
 
@@ -185,7 +197,7 @@ class VichUploaderLoaderTest extends TestCase
 
     public function testLoadHandlesStreamException(): void
     {
-        $entity = new \stdClass();
+        $entity = new stdClass();
 
         $this->mappingHelper->method('getFilePropertyName')
             ->willReturn('imageFile');
@@ -195,7 +207,7 @@ class VichUploaderLoaderTest extends TestCase
 
         $this->storage->method('resolvePath')->willReturn('photo.jpg');
         $this->storage->method('resolveStream')
-            ->willThrowException(new \RuntimeException('Stream not available'));
+            ->willThrowException(new RuntimeException('Stream not available'));
 
         $image = $this->loader->load(new ImageReference('photo.jpg', [
             'entity' => $entity,
@@ -208,14 +220,14 @@ class VichUploaderLoaderTest extends TestCase
 
     public function testGetSourceAlwaysThrows(): void
     {
-        $this->expectException(\LogicException::class);
+        $this->expectException(LogicException::class);
         $this->expectExceptionMessage('encrypted URL metadata');
         $this->loader->getSource();
     }
 
     public function testLoadWithNullUploadDestinationReturnsEmptyMetadata(): void
     {
-        $entity = new \stdClass();
+        $entity = new stdClass();
 
         $this->mappingHelper->method('getFilePropertyName')
             ->willReturn('imageFile');
@@ -236,7 +248,7 @@ class VichUploaderLoaderTest extends TestCase
 
     public function testLoadWithMultipleMappingsUsesCorrectDestination(): void
     {
-        $entity = new \stdClass();
+        $entity = new stdClass();
 
         $this->mappingHelper->expects(self::once())
             ->method('getFilePropertyName')
@@ -265,7 +277,7 @@ class VichUploaderLoaderTest extends TestCase
 
     public function testLoadWithMetadataUsesGuesser(): void
     {
-        $entity = new \stdClass();
+        $entity = new stdClass();
         $stream = fopen('php://memory', 'r+');
         self::assertNotFalse($stream);
 
@@ -291,7 +303,7 @@ class VichUploaderLoaderTest extends TestCase
 
     public function testLoadWithMetadataSkipsWhenNoStream(): void
     {
-        $entity = new \stdClass();
+        $entity = new stdClass();
 
         $this->mappingHelper->method('getFilePropertyName')->willReturn('imageFile');
         $this->mappingHelper->method('getUploadDestination')->willReturn('/var/uploads');
@@ -311,7 +323,7 @@ class VichUploaderLoaderTest extends TestCase
 
     public function testLoadWithoutMetadataSkipsGuesser(): void
     {
-        $entity = new \stdClass();
+        $entity = new stdClass();
         $stream = fopen('php://memory', 'r+');
         self::assertNotFalse($stream);
 

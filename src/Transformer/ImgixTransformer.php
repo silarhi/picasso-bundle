@@ -2,6 +2,15 @@
 
 declare(strict_types=1);
 
+/*
+ * This file is part of the Picasso Bundle package.
+ *
+ * (c) SILARHI <dev@silarhi.fr>
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
+
 namespace Silarhi\PicassoBundle\Transformer;
 
 use Silarhi\PicassoBundle\Dto\Image;
@@ -23,17 +32,17 @@ class ImgixTransformer implements ImageTransformerInterface
     {
         $imgixParams = $this->mapToImgixParams($transformation);
 
-        $path = '/'.ltrim($image->path ?? '', '/');
+        $path = '/' . ltrim($image->path ?? '', '/');
         $queryString = http_build_query($imgixParams);
 
         if (null !== $this->signKey) {
             $signature = $this->generateSignature($this->signKey, $path, $queryString);
-            $queryString .= ('' !== $queryString ? '&' : '').'s='.$signature;
+            $queryString .= ('' !== $queryString ? '&' : '') . 's=' . $signature;
         }
 
         $scheme = $this->useHttps ? 'https' : 'http';
 
-        return $scheme.'://'.$this->domain.$path.('' !== $queryString ? '?'.$queryString : '');
+        return $scheme . '://' . $this->domain . $path . ('' !== $queryString ? '?' . $queryString : '');
     }
 
     /**
@@ -84,9 +93,9 @@ class ImgixTransformer implements ImageTransformerInterface
      */
     private function generateSignature(string $signKey, string $path, string $queryString): string
     {
-        $data = $signKey.$path;
+        $data = $signKey . $path;
         if ('' !== $queryString) {
-            $data .= '?'.$queryString;
+            $data .= '?' . $queryString;
         }
 
         return md5($data);

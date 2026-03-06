@@ -2,11 +2,26 @@
 
 declare(strict_types=1);
 
+/*
+ * This file is part of the Picasso Bundle package.
+ *
+ * (c) SILARHI <dev@silarhi.fr>
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
+
 namespace Silarhi\PicassoBundle\Loader;
 
+use function is_object;
+use function is_resource;
+use function is_string;
+
+use LogicException;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
+use Throwable;
 use Vich\UploaderBundle\Storage\StorageInterface;
 
 class VichUploaderLoader implements ServableLoaderInterface
@@ -22,12 +37,12 @@ class VichUploaderLoader implements ServableLoaderInterface
     {
         $entity = $reference->context['entity'] ?? null;
 
-        if (!\is_object($entity)) {
+        if (!is_object($entity)) {
             return new Image(path: ltrim($reference->path ?? '', '/'));
         }
 
         $field = $reference->context['field'] ?? null;
-        $field = \is_string($field) ? $field : null;
+        $field = is_string($field) ? $field : null;
         $fileProperty = $this->mappingHelper->getFilePropertyName($entity, $field);
 
         if (null === $fileProperty) {
@@ -42,8 +57,8 @@ class VichUploaderLoader implements ServableLoaderInterface
 
         try {
             $resolved = $this->storage->resolveStream($entity, $fileProperty);
-            $stream = \is_resource($resolved) ? $resolved : null;
-        } catch (\Throwable) {
+            $stream = is_resource($resolved) ? $resolved : null;
+        } catch (Throwable) {
             // Stream not available
         }
 
@@ -70,6 +85,6 @@ class VichUploaderLoader implements ServableLoaderInterface
 
     public function getSource(): object|string
     {
-        throw new \LogicException('VichUploaderLoader passes its source via encrypted URL metadata.');
+        throw new LogicException('VichUploaderLoader passes its source via encrypted URL metadata.');
     }
 }

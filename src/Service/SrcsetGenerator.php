@@ -2,6 +2,15 @@
 
 declare(strict_types=1);
 
+/*
+ * This file is part of the Picasso Bundle package.
+ *
+ * (c) SILARHI <dev@silarhi.fr>
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
+
 namespace Silarhi\PicassoBundle\Service;
 
 use Silarhi\PicassoBundle\Dto\Image;
@@ -86,7 +95,7 @@ class SrcsetGenerator
             );
 
             $url = $transformer->url($image, $transformation, $context);
-            $descriptor = $isFixed ? ($index + 1).'x' : $w.'w';
+            $descriptor = $isFixed ? ($index + 1) . 'x' : $w . 'w';
 
             $entries[] = new SrcsetEntry($url, $descriptor);
         }

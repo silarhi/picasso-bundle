@@ -2,8 +2,18 @@
 
 declare(strict_types=1);
 
+/*
+ * This file is part of the Picasso Bundle package.
+ *
+ * (c) SILARHI <dev@silarhi.fr>
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
+
 namespace Silarhi\PicassoBundle\Twig\Component;
 
+use LogicException;
 use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Dto\ImageSource;
@@ -111,7 +121,7 @@ class ImageComponent
             return;
         }
 
-        $loaderName = $this->loader ?? $this->defaultLoader ?? throw new \LogicException('No loader specified and no default_loader configured.');
+        $loaderName = $this->loader ?? $this->defaultLoader ?? throw new LogicException('No loader specified and no default_loader configured.');
         /** @var ImageLoaderInterface $imageLoader */
         $imageLoader = $this->loaders->get($loaderName);
 
@@ -215,7 +225,7 @@ class ImageComponent
             'jpg', 'jpeg', 'pjpg' => 'image/jpeg',
             'png' => 'image/png',
             'gif' => 'image/gif',
-            default => 'image/'.$format,
+            default => 'image/' . $format,
         };
     }
 }

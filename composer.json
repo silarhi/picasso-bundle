@@ -5,19 +5,29 @@
     "license": "MIT",
     "require": {
         "php": ">=8.2",
-        "symfony/framework-bundle": "^6.4 || ^7.0",
+        "symfony/framework-bundle": "^6.4 || ^7.0 || ^8.0",
         "symfony/ux-twig-component": "^2.13"
     },
     "require-dev": {
-        "phpunit/phpunit": "^11.0",
-        "symfony/twig-bundle": "^6.4 || ^7.0",
-        "league/glide": "^2.0",
-        "league/glide-symfony": "^2.0",
-        "vich/uploader-bundle": "^2.0",
-        "rector/rector": "^2.3",
-        "friendsofphp/php-cs-fixer": "^3.94",
-        "phpstan/phpstan": "^2.1",
-        "vincentlanglet/twig-cs-fixer": "^3.13"
+        "friendsofphp/php-cs-fixer": "^3.94.2",
+        "league/glide": "^2.3.2",
+        "league/glide-symfony": "^2.0.1",
+        "phpstan/phpstan": "^2.1.40",
+        "phpunit/phpunit": "^11.5.55",
+        "rector/rector": "^2.3.8",
+        "symfony/twig-bundle": "^6.4 || ^7.4.4 || ^8.0",
+        "vich/uploader-bundle": "^2.9.1",
+        "vincentlanglet/twig-cs-fixer": "^3.14"
+    },
+    "config": {
+        "preferred-install": {
+            "*": "dist"
+        },
+        "platform": {
+            "php": "8.2.0"
+        },
+        "bump-after-update": "dev",
+        "sort-packages": true
     },
     "suggest": {
         "league/glide": "Required for the Glide transformer (local image transformation)",

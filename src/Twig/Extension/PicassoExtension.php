@@ -2,7 +2,19 @@
 
 declare(strict_types=1);
 
+/*
+ * This file is part of the Picasso Bundle package.
+ *
+ * (c) SILARHI <dev@silarhi.fr>
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
+
 namespace Silarhi\PicassoBundle\Twig\Extension;
+
+use function is_int;
+use function is_string;
 
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
@@ -37,8 +49,8 @@ class PicassoExtension extends AbstractExtension
      */
     public function imageUrl(string $path, array $params = []): string
     {
-        $loader = isset($params['loader']) && \is_string($params['loader']) ? $params['loader'] : null;
-        $transformer = isset($params['transformer']) && \is_string($params['transformer']) ? $params['transformer'] : null;
+        $loader = isset($params['loader']) && is_string($params['loader']) ? $params['loader'] : null;
+        $transformer = isset($params['transformer']) && is_string($params['transformer']) ? $params['transformer'] : null;
         unset($params['loader'], $params['transformer']);
 
         $reference = new ImageReference($path);
@@ -52,13 +64,13 @@ class PicassoExtension extends AbstractExtension
         $dpr = $params['dpr'] ?? null;
 
         $transformation = new ImageTransformation(
-            width: \is_int($width) ? $width : null,
-            height: \is_int($height) ? $height : null,
-            format: \is_string($format) ? $format : null,
-            quality: \is_int($quality) ? $quality : $this->defaultQuality,
-            fit: \is_string($fit) ? $fit : $this->defaultFit,
-            blur: \is_int($blur) ? $blur : null,
-            dpr: \is_int($dpr) ? $dpr : null,
+            width: is_int($width) ? $width : null,
+            height: is_int($height) ? $height : null,
+            format: is_string($format) ? $format : null,
+            quality: is_int($quality) ? $quality : $this->defaultQuality,
+            fit: is_string($fit) ? $fit : $this->defaultFit,
+            blur: is_int($blur) ? $blur : null,
+            dpr: is_int($dpr) ? $dpr : null,
         );
 
         return $this->pipeline->url($reference, $transformation, $loader, $transformer);
