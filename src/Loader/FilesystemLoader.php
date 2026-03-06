@@ -14,21 +14,19 @@ declare(strict_types=1);
 namespace Silarhi\PicassoBundle\Loader;
 
 use function count;
+use function is_string;
 
+use LogicException;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 
-class FilesystemLoader implements ServableLoaderInterface
+final class FilesystemLoader implements ServableLoaderInterface
 {
-    /** @var list<string> */
-    private readonly array $paths;
-
     /**
      * @param list<string> $paths
      */
-    public function __construct(array $paths)
+    public function __construct(private readonly array $paths)
     {
-        $this->paths = $paths;
     }
 
     public function load(ImageReference $reference, bool $withMetadata = false): Image
@@ -42,34 +40,31 @@ class FilesystemLoader implements ServableLoaderInterface
                 continue;
             }
 
-            $stream = @fopen($absolutePath, 'r') ?: null;
-            $width = null;
-            $height = null;
-            $mimeType = null;
             $metadata = [];
 
             if (count($this->paths) > 1) {
-                $metadata['_source'] = $basePath;
+                $metadata['path'] = $basePath;
             }
 
-            if ($withMetadata) {
-                $info = @getimagesize($absolutePath);
+            $stream = (static fn () => @fopen($absolutePath, 'r') ?: null);
 
-                if (false !== $info) {
-                    $width = $info[0];
-                    $height = $info[1];
-                    $mimeType = $info['mime'];
-                }
-            }
-
-            return new Image(path: $path, stream: $stream, width: $width, height: $height, mimeType: $mimeType, metadata: $metadata);
+            return new Image(path: $path, stream: $stream, metadata: $metadata);
         }
 
         return new Image(path: $path);
     }
 
-    public function getSource(): string
+    /** @param array<string, mixed> $metadata */
+    public function getSource(array $metadata): string
     {
-        return $this->paths[0] ?? '';
+        if (isset($metadata['path']) && is_string($metadata['path'])) {
+            return $metadata['path'];
+        }
+
+        if (1 === count($this->paths)) {
+            return $this->paths[0];
+        }
+
+        throw new LogicException('No path found in metadata and multiple paths configured.');
     }
 }

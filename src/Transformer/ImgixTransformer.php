@@ -19,12 +19,11 @@ use Silarhi\PicassoBundle\Dto\ImageTransformation;
 /**
  * @see https://docs.imgix.com/apis/rendering
  */
-class ImgixTransformer implements ImageTransformerInterface
+final class ImgixTransformer implements ImageTransformerInterface
 {
     public function __construct(
-        private readonly string $domain,
+        private readonly string $baseUrl,
         private readonly ?string $signKey = null,
-        private readonly bool $useHttps = true,
     ) {
     }
 
@@ -40,9 +39,7 @@ class ImgixTransformer implements ImageTransformerInterface
             $queryString .= ('' !== $queryString ? '&' : '') . 's=' . $signature;
         }
 
-        $scheme = $this->useHttps ? 'https' : 'http';
-
-        return $scheme . '://' . $this->domain . $path . ('' !== $queryString ? '?' . $queryString : '');
+        return rtrim($this->baseUrl, '/') . $path . ('' !== $queryString ? '?' . $queryString : '');
     }
 
     /**

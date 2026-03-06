@@ -16,20 +16,24 @@ namespace Silarhi\PicassoBundle\Tests\Functional;
 use function dirname;
 
 use Silarhi\PicassoBundle\PicassoBundle;
+use Silarhi\PicassoBundle\Tests\Functional\Stub\StubAttributeLoader;
+use Silarhi\PicassoBundle\Tests\Functional\Stub\StubAttributeTransformer;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\TwigBundle\TwigBundle;
 use Symfony\Component\Config\Loader\LoaderInterface;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\HttpKernel\Kernel;
+use Symfony\UX\TwigComponent\TwigComponentBundle;
 
-class PicassoTestKernel extends Kernel
+class MultiConfigKernel extends Kernel
 {
     public function registerBundles(): iterable
     {
         return [
             new FrameworkBundle(),
             new TwigBundle(),
+            new TwigComponentBundle(),
             new PicassoBundle(),
         ];
     }
@@ -39,7 +43,7 @@ class PicassoTestKernel extends Kernel
         $loader->load(static function (ContainerBuilder $container): void {
             $container->loadFromExtension('framework', [
                 'test' => true,
-                'secret' => 'test-secret',
+                'secret' => 'multi-config-secret',
                 'router' => [
                     'resource' => '%kernel.project_dir%/config/routes.php',
                 ],
@@ -52,26 +56,41 @@ class PicassoTestKernel extends Kernel
                 'default_path' => '%kernel.project_dir%/templates',
             ]);
 
+            // Multiple loaders of the same type, attribute-registered stubs, etc.
             $container->loadFromExtension('picasso', [
+                'default_loader' => 'primary',
+                'default_transformer' => 'glide',
                 'loaders' => [
-                    'filesystem' => [
+                    'primary' => [
+                        'type' => 'filesystem',
                         'paths' => [dirname(__DIR__) . '/Fixtures'],
+                    ],
+                    'secondary' => [
+                        'type' => 'filesystem',
+                        'paths' => [dirname(__DIR__) . '/Fixtures'],
+                    ],
+                    'disabled_loader' => [
+                        'type' => 'filesystem',
+                        'enabled' => false,
+                        'paths' => ['/nonexistent'],
                     ],
                 ],
                 'transformers' => [
                     'glide' => [
-                        'sign_key' => 'integration-test-key',
+                        'sign_key' => 'multi-test-key',
                         'cache' => '%kernel.cache_dir%/glide',
                     ],
                 ],
             ]);
+
+            // Register attribute-based stubs as services
+            $container->register(StubAttributeLoader::class, StubAttributeLoader::class)->setAutoconfigured(true);
+            $container->register(StubAttributeTransformer::class, StubAttributeTransformer::class)->setAutoconfigured(true);
         });
     }
 
     protected function build(ContainerBuilder $container): void
     {
-        // Prevent these services from being inlined/removed during compilation
-        // so they remain accessible via test.service_container.
         $container->addCompilerPass(new class implements CompilerPassInterface {
             public function process(ContainerBuilder $container): void
             {
@@ -91,7 +110,7 @@ class PicassoTestKernel extends Kernel
 
     public function getCacheDir(): string
     {
-        return sys_get_temp_dir() . '/picasso_test/cache/' . $this->environment;
+        return sys_get_temp_dir() . '/picasso_test/cache/multi';
     }
 
     public function getLogDir(): string

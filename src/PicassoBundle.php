@@ -25,9 +25,12 @@ use Silarhi\PicassoBundle\Attribute\AsImageTransformer;
 use Silarhi\PicassoBundle\Controller\ImageController;
 use Silarhi\PicassoBundle\Loader\FilesystemLoader;
 use Silarhi\PicassoBundle\Loader\FlysystemLoader;
+use Silarhi\PicassoBundle\Loader\FlysystemRegistry;
 use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
+use Silarhi\PicassoBundle\Loader\UrlLoader;
 use Silarhi\PicassoBundle\Loader\VichMappingHelper;
 use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
+use Silarhi\PicassoBundle\Service\ImageHelper;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Service\MetadataGuesser;
@@ -110,7 +113,8 @@ final class PicassoBundle extends AbstractBundle
                 ->end()
                 ->integerNode('default_quality')
                     ->defaultValue(75)
-                    ->min(1)->max(100)
+                    ->min(1)
+                    ->max(100)
                 ->end()
                 ->scalarNode('default_fit')
                     ->defaultValue('contain')
@@ -124,8 +128,8 @@ final class PicassoBundle extends AbstractBundle
                             ->children()
                                 ->booleanNode('enabled')->defaultTrue()->end()
                                 ->integerNode('size')->defaultValue(10)->end()
-                                ->integerNode('blur')->defaultValue(50)->end()
-                                ->integerNode('quality')->defaultValue(30)->end()
+                                ->integerNode('blur')->defaultValue(5)->end()
+                                ->integerNode('quality')->defaultValue(30)->min(1)->max(100)->end()
                             ->end()
                         ->end()
                     ->end()
@@ -135,8 +139,9 @@ final class PicassoBundle extends AbstractBundle
                     ->defaultValue([])
                     ->arrayPrototype()
                         ->children()
+                            ->booleanNode('enabled')->defaultTrue()->end()
                             ->enumNode('type')
-                                ->values(['filesystem', 'flysystem', 'vich'])
+                                ->values(['filesystem', 'flysystem', 'vich', 'url'])
                                 ->defaultNull()
                                 ->info('Loader type. Inferred from name when it matches a known type.')
                             ->end()
@@ -148,6 +153,10 @@ final class PicassoBundle extends AbstractBundle
                             ->scalarNode('storage')
                                 ->defaultNull()
                                 ->info('Flysystem storage service ID.')
+                            ->end()
+                            ->scalarNode('http_client')
+                                ->defaultNull()
+                                ->info('HTTP client service ID for url loaders.')
                             ->end()
                         ->end()
                         ->validate()
@@ -161,32 +170,28 @@ final class PicassoBundle extends AbstractBundle
                     ->end()
                 ->end()
                 ->arrayNode('transformers')
-                    ->addDefaultsIfNotSet()
-                    ->children()
-                        ->arrayNode('glide')
-                            ->addDefaultsIfNotSet()
-                            ->children()
-                                ->booleanNode('enabled')->defaultFalse()->end()
-                                ->scalarNode('sign_key')->defaultNull()->end()
-                                ->scalarNode('cache')->defaultNull()->end()
-                                ->scalarNode('driver')
-                                    ->defaultValue('gd')
-                                    ->validate()
-                                        ->ifNotInArray(['gd', 'imagick'])
-                                        ->thenInvalid('Driver must be "gd" or "imagick"')
-                                    ->end()
+                    ->useAttributeAsKey('name')
+                    ->defaultValue([])
+                    ->arrayPrototype()
+                        ->children()
+                            ->booleanNode('enabled')->defaultTrue()->end()
+                            ->enumNode('type')
+                                ->values(['glide', 'imgix', 'service'])
+                                ->defaultNull()
+                                ->info('Transformer type. Inferred from name when it matches a known type.')
+                            ->end()
+                            ->scalarNode('sign_key')->defaultNull()->end()
+                            ->scalarNode('cache')->defaultNull()->info('Cache directory for glide.')->end()
+                            ->scalarNode('driver')
+                                ->defaultValue('gd')
+                                ->validate()
+                                    ->ifNotInArray(['gd', 'imagick'])
+                                    ->thenInvalid('Driver must be "gd" or "imagick"')
                                 ->end()
-                                ->integerNode('max_image_size')->defaultNull()->end()
                             ->end()
-                        ->end()
-                        ->arrayNode('imgix')
-                            ->addDefaultsIfNotSet()
-                            ->children()
-                                ->booleanNode('enabled')->defaultFalse()->end()
-                                ->scalarNode('domain')->defaultNull()->info('Your imgix source domain')->end()
-                                ->scalarNode('sign_key')->defaultNull()->info('Imgix secure URL token')->end()
-                                ->booleanNode('use_https')->defaultTrue()->end()
-                            ->end()
+                            ->integerNode('max_image_size')->defaultNull()->info('Max image size for glide.')->end()
+                            ->scalarNode('base_url')->defaultNull()->info('Base URL for imgix (e.g. https://my-source.imgix.net).')->end()
+                            ->scalarNode('service')->defaultNull()->info('Service ID for custom transformers (type: service).')->end()
                         ->end()
                     ->end()
                 ->end()
@@ -208,11 +213,8 @@ final class PicassoBundle extends AbstractBundle
          *     default_quality: int,
          *     default_fit: string,
          *     placeholders: array{blur: array{enabled: bool, size: int, blur: int, quality: int}},
-         *     loaders: array<string, array{type: string|null, paths: list<string>, storage: string|null}>,
-         *     transformers: array{
-         *         glide: array{enabled: bool, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null},
-         *         imgix: array{enabled: bool, domain: string|null, sign_key: string|null, use_https: bool}
-         *     }
+         *     loaders: array<string, array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null}>,
+         *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null}>
          * } $config
          */
         $services = $container->services();
@@ -225,10 +227,14 @@ final class PicassoBundle extends AbstractBundle
 
         // --- Loaders ---
 
-        $knownTypes = ['filesystem', 'flysystem', 'vich'];
+        $knownTypes = ['filesystem', 'flysystem', 'vich', 'url'];
         $vichHelperRegistered = false;
 
         foreach ($config['loaders'] as $name => $loaderConfig) {
+            if (!$loaderConfig['enabled']) {
+                continue;
+            }
+
             $type = $loaderConfig['type'] ?? (in_array($name, $knownTypes, true) ? $name : null);
 
             if (null === $type) {
@@ -247,8 +253,13 @@ final class PicassoBundle extends AbstractBundle
                     $services->set('picasso.loader.' . $name, FlysystemLoader::class)
                         ->args([
                             service($loaderConfig['storage']),
-                            service('picasso.metadata_guesser'),
                         ])
+                        ->tag('picasso.loader', ['key' => $name]);
+                    break;
+
+                case 'url':
+                    $services->set('picasso.loader.' . $name, UrlLoader::class)
+                        ->args([service($loaderConfig['http_client'] ?? 'http_client')])
                         ->tag('picasso.loader', ['key' => $name]);
                     break;
 
@@ -257,6 +268,8 @@ final class PicassoBundle extends AbstractBundle
                         if (!$vichHelperRegistered) {
                             $services->set('.picasso.vich_mapping_helper', VichMappingHelper::class)
                                 ->args([service(\Vich\UploaderBundle\Mapping\PropertyMappingFactory::class)]);
+                            $services->set('.picasso.flysystem_registry', FlysystemRegistry::class)
+                                ->args([tagged_locator('flysystem.storage', 'storage')]);
                             $vichHelperRegistered = true;
                         }
 
@@ -264,7 +277,7 @@ final class PicassoBundle extends AbstractBundle
                             ->args([
                                 service(VichStorageInterface::class),
                                 service('.picasso.vich_mapping_helper'),
-                                service('picasso.metadata_guesser'),
+                                service('.picasso.flysystem_registry'),
                             ])
                             ->tag('picasso.loader', ['key' => $name]);
                     }
@@ -272,12 +285,12 @@ final class PicassoBundle extends AbstractBundle
             }
         }
 
-        // Alias default loader
+        // Alias default loader (auto-detect when exactly one is enabled)
         $defaultLoader = $config['default_loader'];
         if (null === $defaultLoader) {
-            $loaderNames = array_keys($config['loaders']);
-            if (1 === count($loaderNames)) {
-                $defaultLoader = $loaderNames[0];
+            $enabledLoaders = array_keys(array_filter($config['loaders'], static fn (array $v): bool => $v['enabled']));
+            if (1 === count($enabledLoaders)) {
+                $defaultLoader = $enabledLoaders[0];
             }
         }
 
@@ -298,57 +311,74 @@ final class PicassoBundle extends AbstractBundle
 
         // --- Transformers ---
 
-        $transformerConfig = $config['transformers'];
-        $hasGlide = $transformerConfig['glide']['enabled'];
-        $hasImgix = $transformerConfig['imgix']['enabled'];
+        $knownTransformerTypes = ['glide', 'imgix', 'service'];
+        $urlEncryptionRegistered = false;
 
-        // Determine default transformer
-        $defaultTransformer = $config['default_transformer'];
-        if (null === $defaultTransformer) {
-            if ($hasGlide && !$hasImgix) {
-                $defaultTransformer = 'glide';
-            } elseif ($hasImgix && !$hasGlide) {
-                $defaultTransformer = 'imgix';
-            } elseif ($hasGlide && $hasImgix) {
-                throw new LogicException('When both "glide" and "imgix" transformers are enabled, you must set "default_transformer" explicitly.');
-            } else {
-                throw new LogicException('You must enable at least one transformer ("glide" and/or "imgix").');
+        foreach ($config['transformers'] as $name => $transformerConfig) {
+            if (!$transformerConfig['enabled']) {
+                continue;
+            }
+
+            $type = $transformerConfig['type'] ?? (in_array($name, $knownTransformerTypes, true) ? $name : null);
+
+            if (null === $type) {
+                throw new LogicException(sprintf('Transformer "%s" must specify a "type" (glide, imgix, or service).', $name));
+            }
+
+            switch ($type) {
+                case 'glide':
+                    if (!$urlEncryptionRegistered) {
+                        $services->set('picasso.url_encryption', UrlEncryption::class)
+                            ->args([$transformerConfig['sign_key']]);
+                        $services->alias(UrlEncryption::class, 'picasso.url_encryption');
+                        $urlEncryptionRegistered = true;
+                    }
+
+                    $services->set('picasso.transformer.' . $name, GlideTransformer::class)
+                        ->args([
+                            service('router'),
+                            service('picasso.url_encryption'),
+                            $transformerConfig['sign_key'],
+                            $transformerConfig['cache'] ?? '%kernel.project_dir%/var/glide-cache',
+                            $transformerConfig['driver'],
+                            $transformerConfig['max_image_size'],
+                        ])
+                        ->tag('picasso.transformer', ['key' => $name]);
+                    break;
+
+                case 'imgix':
+                    $services->set('picasso.transformer.' . $name, ImgixTransformer::class)
+                        ->args([
+                            $transformerConfig['base_url'],
+                            $transformerConfig['sign_key'],
+                        ])
+                        ->tag('picasso.transformer', ['key' => $name]);
+                    break;
+
+                case 'service':
+                    assert(is_string($transformerConfig['service']), sprintf('Transformer "%s" of type "service" must specify a "service" ID.', $name));
+                    $builder->setDefinition(
+                        'picasso.transformer.' . $name,
+                        (new ChildDefinition($transformerConfig['service']))
+                            ->addTag('picasso.transformer', ['key' => $name]),
+                    );
+                    break;
             }
         }
 
-        if ($hasGlide) {
-            $glide = $transformerConfig['glide'];
-
-            $services->set('picasso.url_encryption', UrlEncryption::class)
-                ->args([$glide['sign_key']]);
-            $services->alias(UrlEncryption::class, 'picasso.url_encryption');
-
-            $services->set('picasso.transformer.glide', GlideTransformer::class)
-                ->args([
-                    service('router'),
-                    service('picasso.url_encryption'),
-                    $glide['sign_key'],
-                    $glide['cache'] ?? '%kernel.project_dir%/var/glide-cache',
-                    $glide['driver'],
-                    $glide['max_image_size'],
-                ])
-                ->tag('picasso.transformer', ['key' => 'glide']);
+        // Alias default transformer (auto-detect when exactly one is enabled)
+        $defaultTransformer = $config['default_transformer'];
+        if (null === $defaultTransformer) {
+            $enabledTransformers = array_keys(array_filter($config['transformers'], static fn (array $v): bool => $v['enabled']));
+            if (1 === count($enabledTransformers)) {
+                $defaultTransformer = $enabledTransformers[0];
+            }
         }
 
-        if ($hasImgix) {
-            $imgix = $transformerConfig['imgix'];
-            $services->set('picasso.transformer.imgix', ImgixTransformer::class)
-                ->args([
-                    $imgix['domain'],
-                    $imgix['sign_key'],
-                    $imgix['use_https'],
-                ])
-                ->tag('picasso.transformer', ['key' => 'imgix']);
+        if (null !== $defaultTransformer) {
+            $services->alias('picasso.default_transformer', 'picasso.transformer.' . $defaultTransformer);
+            $services->alias(ImageTransformerInterface::class, 'picasso.transformer.' . $defaultTransformer);
         }
-
-        // Alias default transformer
-        $services->alias('picasso.default_transformer', 'picasso.transformer.' . $defaultTransformer);
-        $services->alias(ImageTransformerInterface::class, 'picasso.transformer.' . $defaultTransformer);
 
         // --- Controller ---
 
@@ -356,6 +386,7 @@ final class PicassoBundle extends AbstractBundle
             ->args([
                 service('picasso.transformer_registry'),
                 service('picasso.loader_registry'),
+                service('debug.stopwatch')->nullOnInvalid(),
             ])
             ->tag('controller.service_arguments')
             ->public();
@@ -364,8 +395,8 @@ final class PicassoBundle extends AbstractBundle
 
         $services->set('picasso.pipeline', ImagePipeline::class)
             ->args([
-                tagged_locator('picasso.loader', 'key'),
-                tagged_locator('picasso.transformer', 'key'),
+                service('picasso.loader_registry'),
+                service('picasso.transformer_registry'),
                 $defaultLoader,
                 $defaultTransformer,
             ]);
@@ -377,18 +408,25 @@ final class PicassoBundle extends AbstractBundle
             ->args([
                 $config['device_sizes'],
                 $config['image_sizes'],
-                $config['formats'],
                 $config['default_quality'],
             ]);
         $services->alias(SrcsetGenerator::class, 'picasso.srcset_generator');
+
+        // --- Image Helper ---
+
+        $services->set('picasso.image_helper', ImageHelper::class)
+            ->args([
+                service('picasso.pipeline'),
+                $config['default_quality'],
+                $config['default_fit'],
+            ]);
+        $services->alias(ImageHelper::class, 'picasso.image_helper');
 
         // --- Twig Extension ---
 
         $services->set('.picasso.twig_extension', PicassoExtension::class)
             ->args([
-                service('picasso.pipeline'),
-                $config['default_quality'],
-                $config['default_fit'],
+                service('picasso.image_helper'),
             ])
             ->tag('twig.extension');
 
@@ -399,11 +437,9 @@ final class PicassoBundle extends AbstractBundle
         $services->set('.picasso.image_component', ImageComponent::class)
             ->args([
                 service('picasso.srcset_generator'),
-                tagged_locator('picasso.loader', 'key'),
-                tagged_locator('picasso.transformer', 'key'),
+                service('picasso.pipeline'),
+                service('picasso.transformer_registry'),
                 service('picasso.metadata_guesser'),
-                $defaultLoader,
-                $defaultTransformer,
                 $config['formats'],
                 $config['default_quality'],
                 $config['default_fit'],
@@ -411,6 +447,7 @@ final class PicassoBundle extends AbstractBundle
                 $blurConfig['size'],
                 $blurConfig['blur'],
                 $blurConfig['quality'],
+                service('debug.stopwatch')->nullOnInvalid(),
             ])
             ->tag('twig.component', [
                 'key' => 'Picasso:Image',

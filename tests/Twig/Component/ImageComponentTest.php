@@ -20,18 +20,18 @@ use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageSource;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Dto\SrcsetEntry;
-use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
+use Silarhi\PicassoBundle\Service\ImagePipeline;
 use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
+use Silarhi\PicassoBundle\Service\TransformerRegistry;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 use Silarhi\PicassoBundle\Twig\Component\ImageComponent;
 
 class ImageComponentTest extends TestCase
 {
     private MockObject&SrcsetGenerator $srcsetGenerator;
-    private MockObject&ContainerInterface $loaders;
-    private MockObject&ContainerInterface $transformers;
-    private MockObject&ImageLoaderInterface $filesystemLoader;
+    private MockObject&ImagePipeline $pipeline;
+    private TransformerRegistry $transformerRegistry;
     private MockObject&ImageTransformerInterface $glideTransformer;
     private MockObject&MetadataGuesserInterface $metadataGuesser;
 
@@ -39,31 +39,25 @@ class ImageComponentTest extends TestCase
     {
         $this->srcsetGenerator = $this->createMock(SrcsetGenerator::class);
         $this->metadataGuesser = $this->createMock(MetadataGuesserInterface::class);
-
-        $this->filesystemLoader = $this->createMock(ImageLoaderInterface::class);
-
-        $this->loaders = $this->createMock(ContainerInterface::class);
-        $this->loaders->method('get')
-            ->with('filesystem')
-            ->willReturn($this->filesystemLoader);
-
         $this->glideTransformer = $this->createMock(ImageTransformerInterface::class);
 
-        $this->transformers = $this->createMock(ContainerInterface::class);
-        $this->transformers->method('get')
-            ->with('glide')
-            ->willReturn($this->glideTransformer);
+        $transformerLocator = $this->createMock(ContainerInterface::class);
+        $transformerLocator->method('has')->with('glide')->willReturn(true);
+        $transformerLocator->method('get')->with('glide')->willReturn($this->glideTransformer);
+        $this->transformerRegistry = new TransformerRegistry($transformerLocator);
+
+        $this->pipeline = $this->createMock(ImagePipeline::class);
+        $this->pipeline->method('resolveLoaderName')->willReturn('filesystem');
+        $this->pipeline->method('resolveTransformerName')->willReturn('glide');
     }
 
     private function createComponent(bool $blurEnabled = false): ImageComponent
     {
         return new ImageComponent(
             srcsetGenerator: $this->srcsetGenerator,
-            loaders: $this->loaders,
-            transformers: $this->transformers,
+            pipeline: $this->pipeline,
+            transformerRegistry: $this->transformerRegistry,
             metadataGuesser: $this->metadataGuesser,
-            defaultLoader: 'filesystem',
-            defaultTransformer: 'glide',
             formats: ['avif', 'webp', 'jpg'],
             defaultQuality: 75,
             defaultFit: 'contain',
@@ -78,7 +72,7 @@ class ImageComponentTest extends TestCase
     {
         $stream = fopen('php://memory', 'r+');
         self::assertNotFalse($stream);
-        $this->filesystemLoader->method('load')
+        $this->pipeline->method('load')
             ->willReturn(new Image(path: 'uploads/photo.jpg', stream: $stream));
         $this->metadataGuesser->method('guess')
             ->willReturn(['width' => 1920, 'height' => 1080, 'mimeType' => 'image/jpeg']);
@@ -89,26 +83,27 @@ class ImageComponentTest extends TestCase
         $component->sizes = '100vw';
         $component->computeImageData();
 
-        self::assertSame('uploads/photo.jpg', $component->resolvedPath);
+        self::assertNotNull($component->fallbackSrc);
+        self::assertSame(1920, $component->width);
+        self::assertSame(1080, $component->height);
     }
 
-    public function testComputeImageDataSkipsWhenSrcIsNull(): void
+    public function testComputeImageDataHandlesNullSrc(): void
     {
         $this->configureSrcsetGenerator();
+        $this->pipeline->method('load')
+            ->willReturn(new Image());
 
         $component = $this->createComponent();
         $component->computeImageData();
 
-        self::assertNull($component->resolvedPath);
-        self::assertNull($component->fallbackSrc);
-        self::assertSame([], $component->sources);
+        // Even with null src, pipeline processes the image
+        self::assertNotNull($component->fallbackSrc);
     }
 
     public function testComputeImageDataUsesSourceWidthHeight(): void
     {
-        $this->filesystemLoader->expects(self::once())
-            ->method('load')
-            ->with(self::anything(), false)
+        $this->pipeline->method('load')
             ->willReturn(new Image(path: 'photo.jpg'));
         $this->metadataGuesser->expects(self::never())->method('guess');
         $this->configureSrcsetGenerator();
@@ -126,9 +121,7 @@ class ImageComponentTest extends TestCase
 
     public function testComputeImageDataUsesLoaderMetadata(): void
     {
-        $this->filesystemLoader->expects(self::once())
-            ->method('load')
-            ->with(self::anything(), true)
+        $this->pipeline->method('load')
             ->willReturn(new Image(path: 'photo.jpg', width: 1600, height: 900));
         $this->metadataGuesser->expects(self::never())->method('guess');
         $this->configureSrcsetGenerator();
@@ -146,7 +139,7 @@ class ImageComponentTest extends TestCase
     {
         $stream = fopen('php://memory', 'r+');
         self::assertNotFalse($stream);
-        $this->filesystemLoader->method('load')
+        $this->pipeline->method('load')
             ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
         $this->metadataGuesser->expects(self::once())
             ->method('guess')
@@ -167,7 +160,7 @@ class ImageComponentTest extends TestCase
     {
         $stream = fopen('php://memory', 'r+');
         self::assertNotFalse($stream);
-        $this->filesystemLoader->method('load')
+        $this->pipeline->method('load')
             ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
         $this->metadataGuesser->method('guess')
             ->willReturn(['width' => 1920, 'height' => 1080, 'mimeType' => 'image/jpeg']);
@@ -198,7 +191,7 @@ class ImageComponentTest extends TestCase
     {
         $stream = fopen('php://memory', 'r+');
         self::assertNotFalse($stream);
-        $this->filesystemLoader->method('load')
+        $this->pipeline->method('load')
             ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
         $this->metadataGuesser->method('guess')
             ->willReturn(['width' => 1920, 'height' => 1080, 'mimeType' => 'image/jpeg']);
@@ -218,7 +211,7 @@ class ImageComponentTest extends TestCase
     {
         $stream = fopen('php://memory', 'r+');
         self::assertNotFalse($stream);
-        $this->filesystemLoader->method('load')
+        $this->pipeline->method('load')
             ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
         $this->metadataGuesser->method('guess')
             ->willReturn(['width' => 1920, 'height' => 1080, 'mimeType' => 'image/jpeg']);
@@ -235,7 +228,7 @@ class ImageComponentTest extends TestCase
 
     public function testComputeImageDataGeneratesSourcesAndFallback(): void
     {
-        $this->filesystemLoader->method('load')
+        $this->pipeline->method('load')
             ->willReturn(new Image(path: 'photo.jpg'));
 
         $this->srcsetGenerator->method('generateSrcset')
@@ -272,14 +265,14 @@ class ImageComponentTest extends TestCase
 
     public function testComputeImageDataUsesCustomLoader(): void
     {
-        $customLoader = $this->createMock(ImageLoaderInterface::class);
         $stream = fopen('php://memory', 'r+');
         self::assertNotFalse($stream);
-        $customLoader->method('load')
-            ->willReturn(new Image(path: 'custom/photo.jpg', stream: $stream));
 
-        $loaders = $this->createMock(ContainerInterface::class);
-        $loaders->method('get')->with('custom')->willReturn($customLoader);
+        $pipeline = $this->createMock(ImagePipeline::class);
+        $pipeline->method('resolveLoaderName')->with('custom')->willReturn('custom');
+        $pipeline->method('resolveTransformerName')->willReturn('glide');
+        $pipeline->method('load')
+            ->willReturn(new Image(path: 'custom/photo.jpg', stream: $stream));
 
         $metadataGuesser = $this->createMock(MetadataGuesserInterface::class);
         $metadataGuesser->method('guess')
@@ -288,11 +281,9 @@ class ImageComponentTest extends TestCase
 
         $component = new ImageComponent(
             srcsetGenerator: $this->srcsetGenerator,
-            loaders: $loaders,
-            transformers: $this->transformers,
+            pipeline: $pipeline,
+            transformerRegistry: $this->transformerRegistry,
             metadataGuesser: $metadataGuesser,
-            defaultLoader: 'filesystem',
-            defaultTransformer: 'glide',
             formats: ['avif', 'webp', 'jpg'],
             defaultQuality: 75,
             defaultFit: 'contain',
@@ -307,7 +298,6 @@ class ImageComponentTest extends TestCase
         $component->sizes = '100vw';
         $component->computeImageData();
 
-        self::assertSame('custom/photo.jpg', $component->resolvedPath);
         self::assertSame(500, $component->width);
         self::assertSame(500, $component->height);
     }
@@ -340,6 +330,9 @@ class ImageComponentTest extends TestCase
         self::assertNull($component->quality);
         self::assertNull($component->fit);
         self::assertNull($component->placeholder);
+        self::assertFalse($component->priority);
+        self::assertNull($component->loading);
+        self::assertNull($component->fetchPriority);
         self::assertFalse($component->unoptimized);
         self::assertSame([], $component->context);
     }
@@ -348,7 +341,7 @@ class ImageComponentTest extends TestCase
     {
         $stream = fopen('php://memory', 'r+');
         self::assertNotFalse($stream);
-        $this->filesystemLoader->method('load')
+        $this->pipeline->method('load')
             ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
         $this->metadataGuesser->method('guess')
             ->willReturn(['width' => 800, 'height' => 600, 'mimeType' => 'image/jpeg']);
@@ -368,7 +361,7 @@ class ImageComponentTest extends TestCase
 
     public function testSkipsMetadataGuesserWhenNoStream(): void
     {
-        $this->filesystemLoader->method('load')
+        $this->pipeline->method('load')
             ->willReturn(new Image(path: 'photo.jpg'));
         $this->metadataGuesser->expects(self::never())->method('guess');
         $this->configureSrcsetGenerator();
@@ -384,7 +377,7 @@ class ImageComponentTest extends TestCase
 
     public function testFitDefaultsToConfigValue(): void
     {
-        $this->filesystemLoader->method('load')
+        $this->pipeline->method('load')
             ->willReturn(new Image(path: 'photo.jpg'));
 
         $this->srcsetGenerator->expects(self::atLeastOnce())
@@ -399,6 +392,7 @@ class ImageComponentTest extends TestCase
                 self::anything(),
                 'cover',
                 self::anything(),
+                self::anything(),
             )
             ->willReturn([new SrcsetEntry('/img/photo.jpg?w=640', '640w')]);
         $this->srcsetGenerator->method('buildSrcsetString')->willReturn('/img/photo.jpg?w=640 640w');
@@ -406,11 +400,9 @@ class ImageComponentTest extends TestCase
 
         $component = new ImageComponent(
             srcsetGenerator: $this->srcsetGenerator,
-            loaders: $this->loaders,
-            transformers: $this->transformers,
+            pipeline: $this->pipeline,
+            transformerRegistry: $this->transformerRegistry,
             metadataGuesser: $this->metadataGuesser,
-            defaultLoader: 'filesystem',
-            defaultTransformer: 'glide',
             formats: ['jpg'],
             defaultQuality: 75,
             defaultFit: 'cover',
@@ -423,6 +415,60 @@ class ImageComponentTest extends TestCase
         $component->src = 'photo.jpg';
         $component->sizes = '100vw';
         $component->computeImageData();
+    }
+
+    public function testPriorityDisablesBlurAndSetsEagerLoading(): void
+    {
+        $stream = fopen('php://memory', 'r+');
+        self::assertNotFalse($stream);
+        $this->pipeline->method('load')
+            ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
+        $this->metadataGuesser->method('guess')
+            ->willReturn(['width' => 1920, 'height' => 1080, 'mimeType' => 'image/jpeg']);
+        $this->glideTransformer->expects(self::never())->method('url');
+        $this->configureSrcsetGenerator();
+
+        $component = $this->createComponent(blurEnabled: true);
+        $component->src = 'photo.jpg';
+        $component->priority = true;
+        $component->sizes = '100vw';
+        $component->computeImageData();
+
+        self::assertNull($component->blurDataUri);
+        self::assertSame('eager', $component->loading);
+        self::assertSame('high', $component->fetchPriority);
+    }
+
+    public function testLoadingPropOverridesPriority(): void
+    {
+        $this->pipeline->method('load')
+            ->willReturn(new Image(path: 'photo.jpg'));
+        $this->configureSrcsetGenerator();
+
+        $component = $this->createComponent();
+        $component->src = 'photo.jpg';
+        $component->priority = true;
+        $component->loading = 'lazy';
+        $component->sizes = '100vw';
+        $component->computeImageData();
+
+        self::assertSame('lazy', $component->loading);
+        self::assertSame('high', $component->fetchPriority);
+    }
+
+    public function testNonPriorityDefaultsToLazy(): void
+    {
+        $this->pipeline->method('load')
+            ->willReturn(new Image(path: 'photo.jpg'));
+        $this->configureSrcsetGenerator();
+
+        $component = $this->createComponent();
+        $component->src = 'photo.jpg';
+        $component->sizes = '100vw';
+        $component->computeImageData();
+
+        self::assertSame('lazy', $component->loading);
+        self::assertNull($component->fetchPriority);
     }
 
     private function configureSrcsetGenerator(): void

@@ -13,15 +13,14 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Twig\Component;
 
-use LogicException;
-use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Dto\ImageSource;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
-use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
+use Silarhi\PicassoBundle\Service\ImagePipeline;
 use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
-use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
+use Silarhi\PicassoBundle\Service\TransformerRegistry;
+use Symfony\Component\Stopwatch\Stopwatch;
 use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
 use Symfony\UX\TwigComponent\Attribute\PostMount;
 
@@ -64,13 +63,19 @@ class ImageComponent
     /** Enable/disable blur placeholder for this image. */
     public ?bool $placeholder = null;
 
+    /** Mark as high-priority (above the fold): disables lazy loading and blur placeholder. */
+    public bool $priority = false;
+
+    /** Loading attribute ('lazy' or 'eager'). Resolved in PostMount: defaults to 'eager' when priority, 'lazy' otherwise. */
+    public ?string $loading = null;
+
+    /** Fetch priority attribute ('high', 'low', 'auto'). Resolved in PostMount: defaults to 'high' when priority. */
+    public ?string $fetchPriority = null;
+
     /** Serve the image as-is, without optimization. */
     public bool $unoptimized = false;
 
     // --- Computed state (set in PostMount, used by template) ---
-
-    /** @internal */
-    public ?string $resolvedPath = null;
 
     /** @internal */
     public ?string $blurDataUri = null;
@@ -93,11 +98,9 @@ class ImageComponent
      */
     public function __construct(
         private readonly SrcsetGenerator $srcsetGenerator,
-        private readonly ContainerInterface $loaders,
-        private readonly ContainerInterface $transformers,
+        private readonly ImagePipeline $pipeline,
+        private readonly TransformerRegistry $transformerRegistry,
         private readonly MetadataGuesserInterface $metadataGuesser,
-        private readonly ?string $defaultLoader,
-        private readonly string $defaultTransformer,
         private readonly array $formats,
         private readonly int $defaultQuality,
         private readonly string $defaultFit,
@@ -105,15 +108,15 @@ class ImageComponent
         private readonly int $blurSize,
         private readonly int $blurAmount,
         private readonly int $blurQuality,
+        private readonly ?Stopwatch $stopwatch = null,
     ) {
     }
 
     #[PostMount]
     public function computeImageData(): void
     {
-        if (null === $this->src) {
-            return;
-        }
+        $this->loading ??= $this->priority ? 'eager' : 'lazy';
+        $this->fetchPriority ??= $this->priority ? 'high' : null;
 
         if ($this->unoptimized) {
             $this->fallbackSrc = $this->src;
@@ -121,49 +124,63 @@ class ImageComponent
             return;
         }
 
-        $loaderName = $this->loader ?? $this->defaultLoader ?? throw new LogicException('No loader specified and no default_loader configured.');
-        /** @var ImageLoaderInterface $imageLoader */
-        $imageLoader = $this->loaders->get($loaderName);
+        $loaderName = $this->pipeline->resolveLoaderName($this->loader);
 
         $reference = new ImageReference($this->src, $this->context);
         $needsMetadata = null === $this->sourceWidth || null === $this->sourceHeight;
-        $image = $imageLoader->load($reference, $needsMetadata);
-
-        $this->resolvedPath = $image->path ?? '';
+        $image = $this->pipeline->load($reference, $this->loader, $needsMetadata);
 
         // Resolve dimensions: explicit props > loader metadata > stream detection > display dims
         $w = $this->sourceWidth ?? $image->width;
         $h = $this->sourceHeight ?? $image->height;
 
         if ((null === $w || null === $h) && null !== $image->stream) {
-            $guessed = $this->metadataGuesser->guess($image->stream);
-            $w ??= $guessed['width'];
-            $h ??= $guessed['height'];
+            $this->stopwatch?->start('picasso.metadata_guess', 'picasso');
+            $stream = $image->resolveStream();
+            if (null !== $stream) {
+                $guessed = $this->metadataGuesser->guess($stream);
+                $w ??= $guessed['width'];
+                $h ??= $guessed['height'];
+            }
+            $this->stopwatch?->stop('picasso.metadata_guess');
         }
 
-        $resolvedWidth = $w ?? $this->width;
-        $resolvedHeight = $h ?? $this->height;
+        // Preserve aspect ratio when only one display dimension is provided
+        $ratio = (null !== $w && null !== $h && $w > 0) ? $h / $w : null;
+        $this->width ??= null !== $ratio && null !== $this->height ? (int) round($this->height / $ratio) : $w;
+        $this->height ??= null !== $ratio && null !== $this->width ? (int) round($this->width * $ratio) : $h;
 
-        $this->width ??= $resolvedWidth;
-        $this->height ??= $resolvedHeight;
+        // Prevent upscaling beyond source dimensions
+        if (null !== $w && null !== $this->width && $this->width > $w) {
+            $this->width = $w;
+        }
+        if (null !== $h && null !== $this->height && $this->height > $h) {
+            $this->height = $h;
+        }
+
+        // URL-based images bypass transformation (no local serving)
+        if (null !== $image->url) {
+            $this->fallbackSrc = $image->url;
+
+            return;
+        }
 
         // Resolve transformer
-        $transformerName = $this->transformer ?? $this->defaultTransformer;
-        /** @var ImageTransformerInterface $imageTransformer */
-        $imageTransformer = $this->transformers->get($transformerName);
+        $transformerName = $this->pipeline->resolveTransformerName($this->transformer);
+        $imageTransformer = $this->transformerRegistry->get($transformerName);
         $transformerContext = ['loader' => $loaderName];
 
         // Resolve fit from prop or config default
         $fit = $this->fit ?? $this->defaultFit;
 
-        // Generate blur placeholder URL via the transformer
-        $shouldBlur = $this->placeholder ?? $this->blurEnabled;
+        // Generate blur placeholder URL via the transformer (priority disables blur)
+        $shouldBlur = !$this->priority && ($this->placeholder ?? $this->blurEnabled);
         if ($shouldBlur) {
             $tinyWidth = $this->blurSize;
             $tinyHeight = $this->blurSize;
 
-            if (null !== $resolvedWidth && null !== $resolvedHeight && $resolvedWidth > 0) {
-                $tinyHeight = max(1, (int) round($tinyWidth * $resolvedHeight / $resolvedWidth));
+            if (null !== $this->width && null !== $this->height && $this->width > 0) {
+                $tinyHeight = max(1, (int) round($tinyWidth * $this->height / $this->width));
             }
 
             $this->blurDataUri = $imageTransformer->url($image, new ImageTransformation(
@@ -192,6 +209,7 @@ class ImageComponent
                 quality: $quality,
                 fit: $fit,
                 context: $transformerContext,
+                sourceWidth: $w,
             );
 
             $srcsetString = $this->srcsetGenerator->buildSrcsetString($entries);

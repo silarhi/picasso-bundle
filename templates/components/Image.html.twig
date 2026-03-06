@@ -1,9 +1,11 @@
 {% if this.fallbackSrc %}
-    {% if this.unoptimized %}
+    {% if this.unoptimized or (this.sources is empty and not this.fallbackSrcset) %}
         <img
             src="{{ this.fallbackSrc }}"
             {% if this.width %}width="{{ this.width }}"{% endif %}
             {% if this.height %}height="{{ this.height }}"{% endif %}
+            loading="{{ this.loading }}"
+            {% if this.fetchPriority %}fetchpriority="{{ this.fetchPriority }}"{% endif %}
             {{ attributes }}
         />
     {% else %}
@@ -26,11 +28,12 @@
                 {% if this.sizes %}sizes="{{ this.sizes }}"{% endif %}
                 {% if this.width %}width="{{ this.width }}"{% endif %}
                 {% if this.height %}height="{{ this.height }}"{% endif %}
+                loading="{{ this.loading }}"
+                {% if this.fetchPriority %}fetchpriority="{{ this.fetchPriority }}"{% endif %}
                 {% if fullStyle %}style="{{ fullStyle }}"{% endif %}
+                {% if this.blurDataUri %}onload="this.style.backgroundImage=''"{% endif %}
                 {{ attributes.without('style') }}
             />
         </picture>
     {% endif %}
-{% else %}
-    {{ dump(this) }}
 {% endif %}

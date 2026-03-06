@@ -22,7 +22,7 @@ class ImgixTransformerTest extends TestCase
 {
     public function testUrlGeneratesBasicUrl(): void
     {
-        $transformer = new ImgixTransformer('my-source.imgix.net');
+        $transformer = new ImgixTransformer('https://my-source.imgix.net');
         $image = new Image(path: 'photos/photo.jpg');
         $transformation = new ImageTransformation(width: 300, format: 'webp');
 
@@ -35,7 +35,7 @@ class ImgixTransformerTest extends TestCase
 
     public function testUrlGeneratesSignedUrl(): void
     {
-        $transformer = new ImgixTransformer('my-source.imgix.net', 'my-sign-key');
+        $transformer = new ImgixTransformer('https://my-source.imgix.net', 'my-sign-key');
         $image = new Image(path: 'photo.jpg');
         $transformation = new ImageTransformation(width: 300);
 
@@ -44,20 +44,20 @@ class ImgixTransformerTest extends TestCase
         self::assertStringContainsString('s=', $url);
     }
 
-    public function testUrlUsesHttpWhenConfigured(): void
+    public function testUrlSupportsHttpBaseUrl(): void
     {
-        $transformer = new ImgixTransformer('my-source.imgix.net', null, false);
+        $transformer = new ImgixTransformer('http://my-source.imgix.net');
         $image = new Image(path: 'photo.jpg');
         $transformation = new ImageTransformation();
 
         $url = $transformer->url($image, $transformation);
 
-        self::assertStringStartsWith('http://', $url);
+        self::assertStringStartsWith('http://my-source.imgix.net/', $url);
     }
 
     public function testUrlMapsContainFitToClip(): void
     {
-        $transformer = new ImgixTransformer('cdn.imgix.net');
+        $transformer = new ImgixTransformer('https://cdn.imgix.net');
         $image = new Image(path: 'photo.jpg');
         $transformation = new ImageTransformation(fit: 'contain');
 
@@ -68,7 +68,7 @@ class ImgixTransformerTest extends TestCase
 
     public function testUrlMapsCoverFitToCrop(): void
     {
-        $transformer = new ImgixTransformer('cdn.imgix.net');
+        $transformer = new ImgixTransformer('https://cdn.imgix.net');
         $image = new Image(path: 'photo.jpg');
         $transformation = new ImageTransformation(fit: 'cover');
 
@@ -79,7 +79,7 @@ class ImgixTransformerTest extends TestCase
 
     public function testUrlMapsAllParams(): void
     {
-        $transformer = new ImgixTransformer('cdn.imgix.net');
+        $transformer = new ImgixTransformer('https://cdn.imgix.net');
         $image = new Image(path: 'photo.jpg');
         $transformation = new ImageTransformation(
             width: 300,
@@ -102,9 +102,9 @@ class ImgixTransformerTest extends TestCase
         self::assertStringContainsString('dpr=2', $url);
     }
 
-    public function testUrlStripsLeadingSlash(): void
+    public function testUrlStripsTrailingSlashFromBaseUrl(): void
     {
-        $transformer = new ImgixTransformer('cdn.imgix.net');
+        $transformer = new ImgixTransformer('https://cdn.imgix.net/');
         $image = new Image(path: 'photo.jpg');
         $transformation = new ImageTransformation();
 

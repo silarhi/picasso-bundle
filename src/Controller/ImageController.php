@@ -23,35 +23,41 @@ use function sprintf;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\Stopwatch\Stopwatch;
 
 final readonly class ImageController
 {
     public function __construct(
-        private TransformerRegistry $transformers,
-        private LoaderRegistry $loaders,
+        private TransformerRegistry $transformerRegistry,
+        private LoaderRegistry $loaderRegistry,
+        private ?Stopwatch $stopwatch = null,
     ) {
     }
 
     public function __invoke(string $transformer, string $loader, string $path, Request $request): Response
     {
-        if (!$this->transformers->has($transformer)) {
+        if (!$this->transformerRegistry->has($transformer)) {
             throw new NotFoundHttpException(sprintf('Transformer "%s" not found.', $transformer));
         }
 
-        $imageTransformer = $this->transformers->get($transformer);
+        $imageTransformer = $this->transformerRegistry->get($transformer);
         if (!$imageTransformer instanceof LocalTransformerInterface) {
             throw new NotFoundHttpException(sprintf('Transformer "%s" does not support serving.', $transformer));
         }
 
-        if (!$this->loaders->has($loader)) {
+        if (!$this->loaderRegistry->has($loader)) {
             throw new NotFoundHttpException(sprintf('Loader "%s" not found.', $loader));
         }
 
-        $imageLoader = $this->loaders->get($loader);
+        $imageLoader = $this->loaderRegistry->get($loader);
         if (!$imageLoader instanceof ServableLoaderInterface) {
             throw new NotFoundHttpException(sprintf('Loader "%s" does not support serving.', $loader));
         }
 
-        return $imageTransformer->serve($imageLoader, $path, $request);
+        $this->stopwatch?->start('picasso.image_response', 'picasso');
+        $response = $imageTransformer->serve($imageLoader, $path, $request);
+        $this->stopwatch?->stop('picasso.image_response');
+
+        return $response;
     }
 }

@@ -13,29 +13,29 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Tests\Loader;
 
+use Closure;
 use League\Flysystem\FilesystemOperator;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Loader\FlysystemLoader;
-use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
 
 class FlysystemLoaderTest extends TestCase
 {
-    public function testLoadReturnsPathOnly(): void
+    public function testLoadReturnsPathWithLazyStream(): void
     {
         $storage = $this->createMock(FilesystemOperator::class);
-        $metadataGuesser = $this->createMock(MetadataGuesserInterface::class);
-        $loader = new FlysystemLoader($storage, $metadataGuesser);
+        $loader = new FlysystemLoader($storage);
 
         $image = $loader->load(new ImageReference('/uploads/photo.jpg'));
 
         self::assertSame('uploads/photo.jpg', $image->path);
+        self::assertInstanceOf(Closure::class, $image->stream);
         self::assertNull($image->width);
         self::assertNull($image->height);
     }
 
-    public function testLoadWithMetadataReadsStream(): void
+    public function testLazyStreamResolvesToResource(): void
     {
         $stream = fopen('php://memory', 'r+');
         self::assertNotFalse($stream);
@@ -45,41 +45,42 @@ class FlysystemLoaderTest extends TestCase
             ->with('photo.jpg')
             ->willReturn($stream);
 
-        $metadataGuesser = $this->createMock(MetadataGuesserInterface::class);
-        $metadataGuesser->expects(self::once())
-            ->method('guess')
-            ->with($stream)
-            ->willReturn(['width' => 640, 'height' => 480, 'mimeType' => 'image/jpeg']);
+        $loader = new FlysystemLoader($storage);
+        $image = $loader->load(new ImageReference('photo.jpg'));
 
-        $loader = new FlysystemLoader($storage, $metadataGuesser);
-        $image = $loader->load(new ImageReference('photo.jpg'), withMetadata: true);
-
-        self::assertSame(640, $image->width);
-        self::assertSame(480, $image->height);
-        self::assertSame('image/jpeg', $image->mimeType);
+        self::assertInstanceOf(Closure::class, $image->stream);
+        self::assertSame($stream, ($image->stream)());
     }
 
-    public function testLoadWithMetadataHandlesStreamException(): void
+    public function testLazyStreamReturnsNullOnException(): void
     {
         $storage = $this->createMock(FilesystemOperator::class);
         $storage->method('readStream')
             ->willThrowException(new RuntimeException('File not found'));
 
-        $metadataGuesser = $this->createMock(MetadataGuesserInterface::class);
-        $loader = new FlysystemLoader($storage, $metadataGuesser);
+        $loader = new FlysystemLoader($storage);
+        $image = $loader->load(new ImageReference('missing.jpg'));
 
-        $image = $loader->load(new ImageReference('missing.jpg'), withMetadata: true);
+        self::assertInstanceOf(Closure::class, $image->stream);
+        self::assertNull($image->resolveStream());
+    }
 
-        self::assertSame('missing.jpg', $image->path);
-        self::assertNull($image->width);
+    public function testLoadEmptyPathHasNullStream(): void
+    {
+        $storage = $this->createMock(FilesystemOperator::class);
+        $loader = new FlysystemLoader($storage);
+
+        $image = $loader->load(new ImageReference());
+
+        self::assertNull($image->path);
+        self::assertNull($image->stream);
     }
 
     public function testGetSourceReturnsFilesystemOperator(): void
     {
         $storage = $this->createMock(FilesystemOperator::class);
-        $metadataGuesser = $this->createMock(MetadataGuesserInterface::class);
-        $loader = new FlysystemLoader($storage, $metadataGuesser);
-        $source = $loader->getSource();
+        $loader = new FlysystemLoader($storage);
+        $source = $loader->getSource([]);
 
         self::assertSame($storage, $source);
         self::assertInstanceOf(FilesystemOperator::class, $source);

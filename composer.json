@@ -15,6 +15,7 @@
         "phpstan/phpstan": "^2.1.40",
         "phpunit/phpunit": "^11.5.55",
         "rector/rector": "^2.3.8",
+        "symfony/http-client": "^6.4 || ^7.4.4 || ^8.0.6",
         "symfony/twig-bundle": "^6.4 || ^7.4.4 || ^8.0",
         "vich/uploader-bundle": "^2.9.1",
         "vincentlanglet/twig-cs-fixer": "^3.14"
@@ -22,9 +23,6 @@
     "config": {
         "preferred-install": {
             "*": "dist"
-        },
-        "platform": {
-            "php": "8.2.0"
         },
         "bump-after-update": "dev",
         "sort-packages": true
