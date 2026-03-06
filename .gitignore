@@ -2,6 +2,7 @@
 /vendor/
 /composer.lock
 /.phpunit.cache/
+/coverage/
 .phpunit.result.cache
 .php-cs-fixer.cache
 .twig-cs-fixer.cache
