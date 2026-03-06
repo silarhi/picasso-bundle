@@ -35,11 +35,7 @@
     },
     "scripts": {
         "test": "phpunit",
-        "test:coverage": "phpunit",
-        "test:coverage:check": [
-            "@test:coverage",
-            "php bin/check-coverage.php coverage/clover.xml 50"
-        ]
+        "test:coverage": "phpunit"
     },
     "autoload": {
         "psr-4": {

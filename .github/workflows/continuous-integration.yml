@@ -12,3 +12,5 @@ on:
 jobs:
   ci:
     uses: laminas/workflow-continuous-integration/.github/workflows/continuous-integration.yml@1.x
+    with:
+      minimum_code_coverage: 50
