@@ -65,7 +65,7 @@ final class PicassoBundle extends AbstractBundle
         $definition->rootNode()
             ->children()
                 ->scalarNode('default_loader')
-                    ->defaultValue('filesystem')
+                    ->defaultNull()
                     ->info('Default loader name.')
                 ->end()
                 ->scalarNode('default_transformer')
@@ -112,27 +112,32 @@ final class PicassoBundle extends AbstractBundle
                     ->end()
                 ->end()
                 ->arrayNode('loaders')
-                    ->addDefaultsIfNotSet()
-                    ->children()
-                        ->arrayNode('filesystem')
-                            ->addDefaultsIfNotSet()
-                            ->children()
-                                ->booleanNode('enabled')->defaultTrue()->end()
-                                ->scalarNode('base_directory')->defaultNull()->end()
+                    ->useAttributeAsKey('name')
+                    ->defaultValue([])
+                    ->arrayPrototype()
+                        ->children()
+                            ->enumNode('type')
+                                ->values(['filesystem', 'flysystem', 'vich'])
+                                ->defaultNull()
+                                ->info('Loader type. Inferred from name when it matches a known type.')
+                            ->end()
+                            ->arrayNode('paths')
+                                ->scalarPrototype()->end()
+                                ->defaultValue([])
+                                ->info('Base directories for filesystem loaders.')
+                            ->end()
+                            ->scalarNode('storage')
+                                ->defaultNull()
+                                ->info('Flysystem storage service ID.')
                             ->end()
                         ->end()
-                        ->arrayNode('flysystem')
-                            ->addDefaultsIfNotSet()
-                            ->children()
-                                ->booleanNode('enabled')->defaultFalse()->end()
-                                ->scalarNode('service')->defaultNull()->info('Flysystem storage service ID')->end()
-                            ->end()
+                        ->validate()
+                            ->ifTrue(static fn (array $v): bool => 'flysystem' === $v['type'] && (null === $v['storage'] || '' === $v['storage']))
+                            ->thenInvalid('A flysystem loader requires a "storage" service ID.')
                         ->end()
-                        ->arrayNode('vich')
-                            ->addDefaultsIfNotSet()
-                            ->children()
-                                ->booleanNode('enabled')->defaultFalse()->end()
-                            ->end()
+                        ->validate()
+                            ->ifTrue(static fn (array $v): bool => 'filesystem' === $v['type'] && null !== $v['storage'])
+                            ->thenInvalid('The "storage" option is not supported for filesystem loaders. Use "paths" instead.')
                         ->end()
                     ->end()
                 ->end()
@@ -176,7 +181,7 @@ final class PicassoBundle extends AbstractBundle
     public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
     {
         /** @var array{
-         *     default_loader: string,
+         *     default_loader: string|null,
          *     default_transformer: string|null,
          *     device_sizes: list<int>,
          *     image_sizes: list<int>,
@@ -184,11 +189,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_quality: int,
          *     default_fit: string,
          *     placeholders: array{blur: array{enabled: bool, size: int, blur: int, quality: int}},
-         *     loaders: array{
-         *         filesystem: array{enabled: bool, base_directory: string|null},
-         *         flysystem: array{enabled: bool, service: string|null},
-         *         vich: array{enabled: bool}
-         *     },
+         *     loaders: array<string, array{type: string|null, paths: list<string>, storage: string|null}>,
          *     transformers: array{
          *         glide: array{enabled: bool, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null},
          *         imgix: array{enabled: bool, domain: string|null, sign_key: string|null, use_https: bool}
@@ -205,39 +206,66 @@ final class PicassoBundle extends AbstractBundle
 
         // --- Loaders ---
 
-        $loaderConfig = $config['loaders'];
+        $knownTypes = ['filesystem', 'flysystem', 'vich'];
+        $vichHelperRegistered = false;
 
-        if ($loaderConfig['filesystem']['enabled']) {
-            $services->set('picasso.loader.filesystem', FilesystemLoader::class)
-                ->args([$loaderConfig['filesystem']['base_directory'] ?? '%kernel.project_dir%/public/uploads'])
-                ->tag('picasso.loader', ['key' => 'filesystem']);
-        }
+        foreach ($config['loaders'] as $name => $loaderConfig) {
+            $type = $loaderConfig['type'] ?? (\in_array($name, $knownTypes, true) ? $name : null);
 
-        if ($loaderConfig['flysystem']['enabled'] && null !== $loaderConfig['flysystem']['service']) {
-            $services->set('picasso.loader.flysystem', FlysystemLoader::class)
-                ->args([
-                    service($loaderConfig['flysystem']['service']),
-                    service('picasso.metadata_guesser'),
-                ])
-                ->tag('picasso.loader', ['key' => 'flysystem']);
-        }
+            if (null === $type) {
+                throw new \LogicException(\sprintf('Loader "%s" must specify a "type" (filesystem, flysystem, or vich).', $name));
+            }
 
-        if ($loaderConfig['vich']['enabled'] && interface_exists(VichStorageInterface::class)) {
-            $services->set('.picasso.vich_mapping_helper', VichMappingHelper::class)
-                ->args([service(\Vich\UploaderBundle\Mapping\PropertyMappingFactory::class)]);
+            switch ($type) {
+                case 'filesystem':
+                    $services->set('picasso.loader.'.$name, FilesystemLoader::class)
+                        ->args([$loaderConfig['paths']])
+                        ->tag('picasso.loader', ['key' => $name]);
+                    break;
 
-            $services->set('picasso.loader.vich', VichUploaderLoader::class)
-                ->args([
-                    service(VichStorageInterface::class),
-                    service('.picasso.vich_mapping_helper'),
-                    service('picasso.metadata_guesser'),
-                ])
-                ->tag('picasso.loader', ['key' => 'vich']);
+                case 'flysystem':
+                    \assert(\is_string($loaderConfig['storage']));
+                    $services->set('picasso.loader.'.$name, FlysystemLoader::class)
+                        ->args([
+                            service($loaderConfig['storage']),
+                            service('picasso.metadata_guesser'),
+                        ])
+                        ->tag('picasso.loader', ['key' => $name]);
+                    break;
+
+                case 'vich':
+                    if (interface_exists(VichStorageInterface::class)) {
+                        if (!$vichHelperRegistered) {
+                            $services->set('.picasso.vich_mapping_helper', VichMappingHelper::class)
+                                ->args([service(\Vich\UploaderBundle\Mapping\PropertyMappingFactory::class)]);
+                            $vichHelperRegistered = true;
+                        }
+
+                        $services->set('picasso.loader.'.$name, VichUploaderLoader::class)
+                            ->args([
+                                service(VichStorageInterface::class),
+                                service('.picasso.vich_mapping_helper'),
+                                service('picasso.metadata_guesser'),
+                            ])
+                            ->tag('picasso.loader', ['key' => $name]);
+                    }
+                    break;
+            }
         }
 
         // Alias default loader
-        $services->alias('picasso.default_loader', 'picasso.loader.'.$config['default_loader']);
-        $services->alias(ImageLoaderInterface::class, 'picasso.loader.'.$config['default_loader']);
+        $defaultLoader = $config['default_loader'];
+        if (null === $defaultLoader) {
+            $loaderNames = array_keys($config['loaders']);
+            if (1 === \count($loaderNames)) {
+                $defaultLoader = $loaderNames[0];
+            }
+        }
+
+        if (null !== $defaultLoader) {
+            $services->alias('picasso.default_loader', 'picasso.loader.'.$defaultLoader);
+            $services->alias(ImageLoaderInterface::class, 'picasso.loader.'.$defaultLoader);
+        }
 
         // --- Registries ---
 
@@ -319,7 +347,7 @@ final class PicassoBundle extends AbstractBundle
             ->args([
                 tagged_locator('picasso.loader', 'key'),
                 tagged_locator('picasso.transformer', 'key'),
-                $config['default_loader'],
+                $defaultLoader,
                 $defaultTransformer,
             ]);
         $services->alias(ImagePipeline::class, 'picasso.pipeline');
@@ -355,7 +383,7 @@ final class PicassoBundle extends AbstractBundle
                 tagged_locator('picasso.loader', 'key'),
                 tagged_locator('picasso.transformer', 'key'),
                 service('picasso.metadata_guesser'),
-                $config['default_loader'],
+                $defaultLoader,
                 $defaultTransformer,
                 $config['formats'],
                 $config['default_quality'],
