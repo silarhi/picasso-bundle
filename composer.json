@@ -33,6 +33,10 @@
         "league/flysystem": "Required for the Flysystem loader",
         "vich/uploader-bundle": "Required for the VichUploader loader"
     },
+    "scripts": {
+        "test": "phpunit",
+        "test:coverage": "phpunit"
+    },
     "autoload": {
         "psr-4": {
             "Silarhi\\PicassoBundle\\": "src/"

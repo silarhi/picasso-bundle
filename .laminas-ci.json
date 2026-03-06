@@ -1,6 +1,7 @@
 {
     "extensions": [
-        "gd"
+        "gd",
+        "pcov"
     ],
     "ignore_php_platform_requirements": {
         "8.4": true,
