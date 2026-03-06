@@ -4,10 +4,3 @@ parameters:
         - src
         - tests
     tmpDir: var/phpstan
-    ignoreErrors:
-        -
-            identifier: offsetAccess.nonOffsetAccessible
-            path: tests/Functional/ConfigurationTest.php
-        -
-            identifier: argument.type
-            path: tests/Functional/ConfigurationTest.php

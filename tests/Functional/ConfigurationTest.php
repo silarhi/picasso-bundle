@@ -21,12 +21,29 @@ use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\Config\Definition\Loader\DefinitionFileLoader;
 use Symfony\Component\Config\FileLocator;
 
+/**
+ * @phpstan-type BlurConfig array{enabled: bool, size: int, blur: int, quality: int}
+ * @phpstan-type LoaderConfig array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null}
+ * @phpstan-type TransformerConfig array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null}
+ * @phpstan-type PicassoConfig array{
+ *     default_loader: string|null,
+ *     default_transformer: string|null,
+ *     device_sizes: list<int>,
+ *     image_sizes: list<int>,
+ *     formats: list<string>,
+ *     default_quality: int,
+ *     default_fit: string,
+ *     placeholders: array{blur: BlurConfig},
+ *     loaders: array<string, LoaderConfig>,
+ *     transformers: array<string, TransformerConfig>,
+ * }
+ */
 class ConfigurationTest extends TestCase
 {
     /**
      * @param array<string, mixed> $config
      *
-     * @return array<string, mixed>
+     * @return PicassoConfig
      */
     private function processConfig(array $config): array
     {
@@ -40,7 +57,7 @@ class ConfigurationTest extends TestCase
 
         $tree = $treeBuilder->buildTree();
 
-        /** @var array<string, mixed> */
+        /** @var PicassoConfig */
         return $tree->finalize($tree->normalize($config));
     }
 
