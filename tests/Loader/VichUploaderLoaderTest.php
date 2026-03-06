@@ -15,12 +15,12 @@ namespace Silarhi\PicassoBundle\Tests\Loader;
 
 use Closure;
 use League\Flysystem\FilesystemOperator;
-use LogicException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use RuntimeException;
 use Silarhi\PicassoBundle\Dto\ImageReference;
+use Silarhi\PicassoBundle\Exception\InvalidMetadataException;
 use Silarhi\PicassoBundle\Loader\FlysystemRegistry;
 use Silarhi\PicassoBundle\Loader\VichMappingHelperInterface;
 use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
@@ -215,7 +215,7 @@ class VichUploaderLoaderTest extends TestCase
 
     public function testGetSourceThrowsWithoutUploadDestination(): void
     {
-        $this->expectException(LogicException::class);
+        $this->expectException(InvalidMetadataException::class);
         $this->expectExceptionMessage('Upload destination is required');
         $this->loader->getSource([]);
     }

@@ -15,8 +15,8 @@ namespace Silarhi\PicassoBundle\Service;
 
 use function assert;
 
-use InvalidArgumentException;
 use Psr\Container\ContainerInterface;
+use Silarhi\PicassoBundle\Exception\TransformerNotFoundException;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 
 use function sprintf;
@@ -31,7 +31,7 @@ final readonly class TransformerRegistry
     public function get(string $name): ImageTransformerInterface
     {
         if (!$this->has($name)) {
-            throw new InvalidArgumentException(sprintf('Transformer "%s" not found.', $name));
+            throw new TransformerNotFoundException(sprintf('Transformer "%s" not found.', $name));
         }
 
         $transformer = $this->transformers->get($name);

@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Controller;
 
+use Silarhi\PicassoBundle\Exception\LoaderNotFoundException;
+use Silarhi\PicassoBundle\Exception\TransformerNotFoundException;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
@@ -37,7 +39,7 @@ final readonly class ImageController
     public function __invoke(string $transformer, string $loader, string $path, Request $request): Response
     {
         if (!$this->transformerRegistry->has($transformer)) {
-            throw new NotFoundHttpException(sprintf('Transformer "%s" not found.', $transformer));
+            throw new NotFoundHttpException(sprintf('Transformer "%s" not found.', $transformer), new TransformerNotFoundException(sprintf('Transformer "%s" not found.', $transformer)));
         }
 
         $imageTransformer = $this->transformerRegistry->get($transformer);
@@ -46,7 +48,7 @@ final readonly class ImageController
         }
 
         if (!$this->loaderRegistry->has($loader)) {
-            throw new NotFoundHttpException(sprintf('Loader "%s" not found.', $loader));
+            throw new NotFoundHttpException(sprintf('Loader "%s" not found.', $loader), new LoaderNotFoundException(sprintf('Loader "%s" not found.', $loader)));
         }
 
         $imageLoader = $this->loaderRegistry->get($loader);

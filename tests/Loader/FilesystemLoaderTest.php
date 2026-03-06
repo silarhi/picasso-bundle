@@ -17,9 +17,9 @@ use Closure;
 
 use function dirname;
 
-use LogicException;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\ImageReference;
+use Silarhi\PicassoBundle\Exception\InvalidMetadataException;
 use Silarhi\PicassoBundle\Loader\FilesystemLoader;
 
 class FilesystemLoaderTest extends TestCase
@@ -68,7 +68,7 @@ class FilesystemLoaderTest extends TestCase
     {
         $loader = new FilesystemLoader(['/var/www/uploads', '/var/www/images']);
 
-        $this->expectException(LogicException::class);
+        $this->expectException(InvalidMetadataException::class);
         $loader->getSource([]);
     }
 
