@@ -2,9 +2,19 @@
 
 declare(strict_types=1);
 
+/*
+ * This file is part of the Picasso Bundle package.
+ *
+ * (c) SILARHI <dev@silarhi.fr>
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
+
 namespace Silarhi\PicassoBundle\Tests\Dto;
 
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 use Silarhi\PicassoBundle\Dto\Image;
 
 class ImageTest extends TestCase
@@ -56,7 +66,7 @@ class ImageTest extends TestCase
     public function testReadonlyProperties(): void
     {
         $image = new Image(path: 'photo.jpg');
-        $reflection = new \ReflectionClass($image);
+        $reflection = new ReflectionClass($image);
 
         self::assertTrue($reflection->isReadOnly());
     }

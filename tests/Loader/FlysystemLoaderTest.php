@@ -2,10 +2,20 @@
 
 declare(strict_types=1);
 
+/*
+ * This file is part of the Picasso Bundle package.
+ *
+ * (c) SILARHI <dev@silarhi.fr>
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
+
 namespace Silarhi\PicassoBundle\Tests\Loader;
 
 use League\Flysystem\FilesystemOperator;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Loader\FlysystemLoader;
 use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
@@ -53,7 +63,7 @@ class FlysystemLoaderTest extends TestCase
     {
         $storage = $this->createMock(FilesystemOperator::class);
         $storage->method('readStream')
-            ->willThrowException(new \RuntimeException('File not found'));
+            ->willThrowException(new RuntimeException('File not found'));
 
         $metadataGuesser = $this->createMock(MetadataGuesserInterface::class);
         $loader = new FlysystemLoader($storage, $metadataGuesser);

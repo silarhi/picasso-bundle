@@ -2,8 +2,24 @@
 
 declare(strict_types=1);
 
+/*
+ * This file is part of the Picasso Bundle package.
+ *
+ * (c) SILARHI <dev@silarhi.fr>
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
+
 namespace Silarhi\PicassoBundle;
 
+use function assert;
+use function count;
+use function dirname;
+use function in_array;
+use function is_string;
+
+use LogicException;
 use Silarhi\PicassoBundle\Attribute\AsImageLoader;
 use Silarhi\PicassoBundle\Attribute\AsImageTransformer;
 use Silarhi\PicassoBundle\Controller\ImageController;
@@ -24,6 +40,9 @@ use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 use Silarhi\PicassoBundle\Transformer\ImgixTransformer;
 use Silarhi\PicassoBundle\Twig\Component\ImageComponent;
 use Silarhi\PicassoBundle\Twig\Extension\PicassoExtension;
+
+use function sprintf;
+
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -85,7 +104,7 @@ final class PicassoBundle extends AbstractBundle
                     ->scalarPrototype()
                         ->validate()
                             ->ifNotInArray($allowedFormats)
-                            ->thenInvalid('Invalid format "%s". Allowed: '.implode(', ', $allowedFormats))
+                            ->thenInvalid('Invalid format "%s". Allowed: ' . implode(', ', $allowedFormats))
                         ->end()
                     ->end()
                 ->end()
@@ -210,22 +229,22 @@ final class PicassoBundle extends AbstractBundle
         $vichHelperRegistered = false;
 
         foreach ($config['loaders'] as $name => $loaderConfig) {
-            $type = $loaderConfig['type'] ?? (\in_array($name, $knownTypes, true) ? $name : null);
+            $type = $loaderConfig['type'] ?? (in_array($name, $knownTypes, true) ? $name : null);
 
             if (null === $type) {
-                throw new \LogicException(\sprintf('Loader "%s" must specify a "type" (filesystem, flysystem, or vich).', $name));
+                throw new LogicException(sprintf('Loader "%s" must specify a "type" (filesystem, flysystem, or vich).', $name));
             }
 
             switch ($type) {
                 case 'filesystem':
-                    $services->set('picasso.loader.'.$name, FilesystemLoader::class)
+                    $services->set('picasso.loader.' . $name, FilesystemLoader::class)
                         ->args([$loaderConfig['paths']])
                         ->tag('picasso.loader', ['key' => $name]);
                     break;
 
                 case 'flysystem':
-                    \assert(\is_string($loaderConfig['storage']));
-                    $services->set('picasso.loader.'.$name, FlysystemLoader::class)
+                    assert(is_string($loaderConfig['storage']));
+                    $services->set('picasso.loader.' . $name, FlysystemLoader::class)
                         ->args([
                             service($loaderConfig['storage']),
                             service('picasso.metadata_guesser'),
@@ -241,7 +260,7 @@ final class PicassoBundle extends AbstractBundle
                             $vichHelperRegistered = true;
                         }
 
-                        $services->set('picasso.loader.'.$name, VichUploaderLoader::class)
+                        $services->set('picasso.loader.' . $name, VichUploaderLoader::class)
                             ->args([
                                 service(VichStorageInterface::class),
                                 service('.picasso.vich_mapping_helper'),
@@ -257,14 +276,14 @@ final class PicassoBundle extends AbstractBundle
         $defaultLoader = $config['default_loader'];
         if (null === $defaultLoader) {
             $loaderNames = array_keys($config['loaders']);
-            if (1 === \count($loaderNames)) {
+            if (1 === count($loaderNames)) {
                 $defaultLoader = $loaderNames[0];
             }
         }
 
         if (null !== $defaultLoader) {
-            $services->alias('picasso.default_loader', 'picasso.loader.'.$defaultLoader);
-            $services->alias(ImageLoaderInterface::class, 'picasso.loader.'.$defaultLoader);
+            $services->alias('picasso.default_loader', 'picasso.loader.' . $defaultLoader);
+            $services->alias(ImageLoaderInterface::class, 'picasso.loader.' . $defaultLoader);
         }
 
         // --- Registries ---
@@ -291,9 +310,9 @@ final class PicassoBundle extends AbstractBundle
             } elseif ($hasImgix && !$hasGlide) {
                 $defaultTransformer = 'imgix';
             } elseif ($hasGlide && $hasImgix) {
-                throw new \LogicException('When both "glide" and "imgix" transformers are enabled, you must set "default_transformer" explicitly.');
+                throw new LogicException('When both "glide" and "imgix" transformers are enabled, you must set "default_transformer" explicitly.');
             } else {
-                throw new \LogicException('You must enable at least one transformer ("glide" and/or "imgix").');
+                throw new LogicException('You must enable at least one transformer ("glide" and/or "imgix").');
             }
         }
 
@@ -328,8 +347,8 @@ final class PicassoBundle extends AbstractBundle
         }
 
         // Alias default transformer
-        $services->alias('picasso.default_transformer', 'picasso.transformer.'.$defaultTransformer);
-        $services->alias(ImageTransformerInterface::class, 'picasso.transformer.'.$defaultTransformer);
+        $services->alias('picasso.default_transformer', 'picasso.transformer.' . $defaultTransformer);
+        $services->alias(ImageTransformerInterface::class, 'picasso.transformer.' . $defaultTransformer);
 
         // --- Controller ---
 
@@ -404,7 +423,7 @@ final class PicassoBundle extends AbstractBundle
         if ($builder->hasExtension('twig')) {
             $builder->prependExtensionConfig('twig', [
                 'paths' => [
-                    \dirname(__DIR__).'/templates' => 'Picasso',
+                    dirname(__DIR__) . '/templates' => 'Picasso',
                 ],
             ]);
         }

@@ -2,7 +2,18 @@
 
 declare(strict_types=1);
 
+/*
+ * This file is part of the Picasso Bundle package.
+ *
+ * (c) SILARHI <dev@silarhi.fr>
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
+
 namespace Silarhi\PicassoBundle\Tests\Loader;
+
+use function dirname;
 
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\ImageReference;
@@ -14,7 +25,7 @@ class FilesystemLoaderTest extends TestCase
 
     public static function setUpBeforeClass(): void
     {
-        self::$fixturesDir = \dirname(__DIR__).'/Fixtures';
+        self::$fixturesDir = dirname(__DIR__) . '/Fixtures';
     }
 
     public function testLoadStripsLeadingSlash(): void
@@ -83,11 +94,11 @@ class FilesystemLoaderTest extends TestCase
 
     public function testLoadSearchesMultiplePaths(): void
     {
-        $tmpDir1 = sys_get_temp_dir().'/picasso_test_'.uniqid();
-        $tmpDir2 = sys_get_temp_dir().'/picasso_test_'.uniqid();
+        $tmpDir1 = sys_get_temp_dir() . '/picasso_test_' . uniqid();
+        $tmpDir2 = sys_get_temp_dir() . '/picasso_test_' . uniqid();
         mkdir($tmpDir1, 0o777, true);
         mkdir($tmpDir2, 0o777, true);
-        file_put_contents($tmpDir2.'/photo.jpg', 'image-data');
+        file_put_contents($tmpDir2 . '/photo.jpg', 'image-data');
 
         try {
             $loader = new FilesystemLoader([$tmpDir1, $tmpDir2]);
@@ -97,7 +108,7 @@ class FilesystemLoaderTest extends TestCase
             self::assertNotNull($image->stream);
             self::assertSame($tmpDir2, $image->metadata['_source']);
         } finally {
-            @unlink($tmpDir2.'/photo.jpg');
+            @unlink($tmpDir2 . '/photo.jpg');
             @rmdir($tmpDir1);
             @rmdir($tmpDir2);
         }
@@ -105,9 +116,9 @@ class FilesystemLoaderTest extends TestCase
 
     public function testSinglePathDoesNotSetSourceMetadata(): void
     {
-        $tmpDir = sys_get_temp_dir().'/picasso_test_'.uniqid();
+        $tmpDir = sys_get_temp_dir() . '/picasso_test_' . uniqid();
         mkdir($tmpDir, 0o777, true);
-        file_put_contents($tmpDir.'/test.txt', 'hello');
+        file_put_contents($tmpDir . '/test.txt', 'hello');
 
         try {
             $loader = new FilesystemLoader([$tmpDir]);
@@ -115,19 +126,19 @@ class FilesystemLoaderTest extends TestCase
 
             self::assertArrayNotHasKey('_source', $image->metadata);
         } finally {
-            @unlink($tmpDir.'/test.txt');
+            @unlink($tmpDir . '/test.txt');
             @rmdir($tmpDir);
         }
     }
 
     public function testLoadFirstPathTakesPriority(): void
     {
-        $tmpDir1 = sys_get_temp_dir().'/picasso_test_'.uniqid();
-        $tmpDir2 = sys_get_temp_dir().'/picasso_test_'.uniqid();
+        $tmpDir1 = sys_get_temp_dir() . '/picasso_test_' . uniqid();
+        $tmpDir2 = sys_get_temp_dir() . '/picasso_test_' . uniqid();
         mkdir($tmpDir1, 0o777, true);
         mkdir($tmpDir2, 0o777, true);
-        file_put_contents($tmpDir1.'/photo.jpg', 'first');
-        file_put_contents($tmpDir2.'/photo.jpg', 'second');
+        file_put_contents($tmpDir1 . '/photo.jpg', 'first');
+        file_put_contents($tmpDir2 . '/photo.jpg', 'second');
 
         try {
             $loader = new FilesystemLoader([$tmpDir1, $tmpDir2]);
@@ -136,8 +147,8 @@ class FilesystemLoaderTest extends TestCase
             self::assertNotNull($image->stream);
             self::assertSame($tmpDir1, $image->metadata['_source']);
         } finally {
-            @unlink($tmpDir1.'/photo.jpg');
-            @unlink($tmpDir2.'/photo.jpg');
+            @unlink($tmpDir1 . '/photo.jpg');
+            @unlink($tmpDir2 . '/photo.jpg');
             @rmdir($tmpDir1);
             @rmdir($tmpDir2);
         }

@@ -2,7 +2,18 @@
 
 declare(strict_types=1);
 
+/*
+ * This file is part of the Picasso Bundle package.
+ *
+ * (c) SILARHI <dev@silarhi.fr>
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
+
 namespace Silarhi\PicassoBundle\Loader;
+
+use function count;
 
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
@@ -25,7 +36,7 @@ class FilesystemLoader implements ServableLoaderInterface
         $path = ltrim($reference->path ?? '', '/');
 
         foreach ($this->paths as $basePath) {
-            $absolutePath = rtrim($basePath, '/').'/'.$path;
+            $absolutePath = rtrim($basePath, '/') . '/' . $path;
 
             if (!is_file($absolutePath)) {
                 continue;
@@ -37,7 +48,7 @@ class FilesystemLoader implements ServableLoaderInterface
             $mimeType = null;
             $metadata = [];
 
-            if (\count($this->paths) > 1) {
+            if (count($this->paths) > 1) {
                 $metadata['_source'] = $basePath;
             }
 

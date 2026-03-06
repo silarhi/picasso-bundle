@@ -2,6 +2,15 @@
 
 declare(strict_types=1);
 
+/*
+ * This file is part of the Picasso Bundle package.
+ *
+ * (c) SILARHI <dev@silarhi.fr>
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
+
 namespace Silarhi\PicassoBundle\Tests\Service;
 
 use PHPUnit\Framework\TestCase;
@@ -34,7 +43,7 @@ class SrcsetGeneratorTest extends TestCase
                 $query['q'] = $t->quality;
                 $query['fit'] = $t->fit;
 
-                return '/picasso/glide/filesystem/'.$image->path.'?'.http_build_query($query);
+                return '/picasso/glide/filesystem/' . $image->path . '?' . http_build_query($query);
             });
 
         $this->generator = new SrcsetGenerator(

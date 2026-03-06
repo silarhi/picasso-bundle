@@ -2,8 +2,18 @@
 
 declare(strict_types=1);
 
+/*
+ * This file is part of the Picasso Bundle package.
+ *
+ * (c) SILARHI <dev@silarhi.fr>
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
+
 namespace Silarhi\PicassoBundle\Service;
 
+use LogicException;
 use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
@@ -30,7 +40,7 @@ class ImagePipeline
         ?string $loader = null,
         ?string $transformer = null,
     ): string {
-        $loaderName = $loader ?? $this->defaultLoader ?? throw new \LogicException('No loader specified and no default_loader configured.');
+        $loaderName = $loader ?? $this->defaultLoader ?? throw new LogicException('No loader specified and no default_loader configured.');
         $transformerName = $transformer ?? $this->defaultTransformer;
 
         /** @var ImageLoaderInterface $imageLoader */
@@ -51,7 +61,7 @@ class ImagePipeline
         ?string $loader = null,
         bool $withMetadata = false,
     ): Image {
-        $loaderName = $loader ?? $this->defaultLoader ?? throw new \LogicException('No loader specified and no default_loader configured.');
+        $loaderName = $loader ?? $this->defaultLoader ?? throw new LogicException('No loader specified and no default_loader configured.');
 
         /** @var ImageLoaderInterface $imageLoader */
         $imageLoader = $this->loaders->get($loaderName);

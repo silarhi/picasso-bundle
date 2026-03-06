@@ -2,7 +2,18 @@
 
 declare(strict_types=1);
 
+/*
+ * This file is part of the Picasso Bundle package.
+ *
+ * (c) SILARHI <dev@silarhi.fr>
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
+
 namespace Silarhi\PicassoBundle\Tests\Functional;
+
+use function assert;
 
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
@@ -30,7 +41,7 @@ class PicassoBundleTest extends TestCase
         self::$kernel->boot();
 
         // Ensure the Glide cache directory exists before image processing tests
-        $glideCache = self::$kernel->getCacheDir().'/glide';
+        $glideCache = self::$kernel->getCacheDir() . '/glide';
         if (!is_dir($glideCache)) {
             mkdir($glideCache, 0777, true);
         }
@@ -48,7 +59,7 @@ class PicassoBundleTest extends TestCase
     private static function getTestContainer(): ContainerInterface
     {
         $container = self::$kernel->getContainer()->get('test.service_container');
-        \assert($container instanceof ContainerInterface);
+        assert($container instanceof ContainerInterface);
 
         return $container;
     }
@@ -176,7 +187,7 @@ class PicassoBundleTest extends TestCase
         $request = Request::create($url);
         $response = self::$kernel->handle($request);
 
-        self::assertSame(200, $response->getStatusCode(), 'Serve failed: '.$response->getContent());
+        self::assertSame(200, $response->getStatusCode(), 'Serve failed: ' . $response->getContent());
         self::assertStringContainsString('image/', (string) $response->headers->get('Content-Type'));
     }
 

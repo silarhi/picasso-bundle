@@ -2,7 +2,20 @@
 
 declare(strict_types=1);
 
+/*
+ * This file is part of the Picasso Bundle package.
+ *
+ * (c) SILARHI <dev@silarhi.fr>
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
+
 namespace Silarhi\PicassoBundle\Tests\Transformer;
+
+use function assert;
+use function in_array;
+use function is_string;
 
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\Image;
@@ -23,12 +36,12 @@ class GlideTransformerTest extends TestCase
         $this->router = $this->createMock(UrlGeneratorInterface::class);
         $this->router->method('generate')
             ->willReturnCallback(static function (string $name, array $params): string {
-                \assert(\is_string($params['transformer']));
-                \assert(\is_string($params['loader']));
-                \assert(\is_string($params['path']));
+                assert(is_string($params['transformer']));
+                assert(is_string($params['loader']));
+                assert(is_string($params['path']));
 
-                return '/picasso/'.$params['transformer'].'/'.$params['loader'].'/'.$params['path'].'?'.http_build_query(
-                    array_filter($params, static fn ($k): bool => !\in_array($k, ['transformer', 'loader', 'path'], true), \ARRAY_FILTER_USE_KEY),
+                return '/picasso/' . $params['transformer'] . '/' . $params['loader'] . '/' . $params['path'] . '?' . http_build_query(
+                    array_filter($params, static fn ($k): bool => !in_array($k, ['transformer', 'loader', 'path'], true), \ARRAY_FILTER_USE_KEY),
                 );
             });
 

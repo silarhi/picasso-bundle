@@ -2,7 +2,18 @@
 
 declare(strict_types=1);
 
+/*
+ * This file is part of the Picasso Bundle package.
+ *
+ * (c) SILARHI <dev@silarhi.fr>
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
+
 namespace Silarhi\PicassoBundle\Tests\Functional;
+
+use function dirname;
 
 use Silarhi\PicassoBundle\PicassoBundle;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
@@ -44,7 +55,7 @@ class PicassoTestKernel extends Kernel
             $container->loadFromExtension('picasso', [
                 'loaders' => [
                     'filesystem' => [
-                        'paths' => [\dirname(__DIR__).'/Fixtures'],
+                        'paths' => [dirname(__DIR__) . '/Fixtures'],
                     ],
                 ],
                 'transformers' => [
@@ -76,16 +87,16 @@ class PicassoTestKernel extends Kernel
 
     public function getProjectDir(): string
     {
-        return \dirname(__DIR__, 2);
+        return dirname(__DIR__, 2);
     }
 
     public function getCacheDir(): string
     {
-        return sys_get_temp_dir().'/picasso_test/cache/'.$this->environment;
+        return sys_get_temp_dir() . '/picasso_test/cache/' . $this->environment;
     }
 
     public function getLogDir(): string
     {
-        return sys_get_temp_dir().'/picasso_test/log';
+        return sys_get_temp_dir() . '/picasso_test/log';
     }
 }
