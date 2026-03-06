@@ -55,7 +55,8 @@ class EndToEndImageServingTest extends KernelTestCase
         $html = $rendered->toString();
 
         $srcUrl = $this->parseSrcFromImg($html);
-        self::assertStringContainsString('/image/', $srcUrl);
+        // FullConfigKernel: default transformer='local_glide', default loader='main'
+        self::assertStringContainsString('/image/local_glide/main/', $srcUrl);
 
         $response = self::handleRequest($srcUrl);
 
@@ -72,7 +73,7 @@ class EndToEndImageServingTest extends KernelTestCase
         $html = $rendered->toString();
 
         $url = $this->parseFirstSrcsetUrl('/<img[^>]+srcset="([^"]+)"/', $html);
-        self::assertStringContainsString('/image/', $url);
+        self::assertStringContainsString('/image/local_glide/main/', $url);
 
         $response = self::handleRequest($url);
 
@@ -89,7 +90,7 @@ class EndToEndImageServingTest extends KernelTestCase
         $html = $rendered->toString();
 
         $url = $this->parseFirstSrcsetUrl('/<source[^>]+srcset="([^"]+)"/', $html);
-        self::assertStringContainsString('/image/', $url);
+        self::assertStringContainsString('/image/local_glide/main/', $url);
 
         $response = self::handleRequest($url);
 
@@ -141,16 +142,16 @@ class EndToEndImageServingTest extends KernelTestCase
         $html = $rendered->toString();
 
         $srcUrl = $this->parseSrcFromImg($html);
-        self::assertStringContainsString('secondary_fs', $srcUrl);
+        self::assertStringContainsString('/image/local_glide/secondary_fs/', $srcUrl);
 
         $response = self::handleRequest($srcUrl);
         self::assertSame(200, $response->getStatusCode(), 'Secondary loader image serving failed');
         self::assertStringContainsString('image/', (string) $response->headers->get('Content-Type'));
     }
 
-    public function testGeneratedUrlUsesRegisteredTransformerName(): void
+    public function testGeneratedUrlUsesRegisteredTransformerAndLoaderNames(): void
     {
-        // FullConfigKernel registers the Glide transformer as 'local_glide', not 'glide'
+        // FullConfigKernel: transformer='local_glide', default loader='main'
         $rendered = $this->renderTwigComponent('Picasso:Image', [
             'src' => 'photo.jpg',
             'sizes' => '100vw',
@@ -158,7 +159,24 @@ class EndToEndImageServingTest extends KernelTestCase
         $html = $rendered->toString();
 
         $srcUrl = $this->parseSrcFromImg($html);
-        self::assertStringContainsString('/image/local_glide/', $srcUrl);
+        self::assertStringContainsString('/image/local_glide/main/photo.jpg', $srcUrl);
+
+        $response = self::handleRequest($srcUrl);
+        self::assertSame(200, $response->getStatusCode());
+    }
+
+    public function testGeneratedUrlUsesOverriddenLoaderName(): void
+    {
+        // Explicitly use third_fs loader — URL must reflect it
+        $rendered = $this->renderTwigComponent('Picasso:Image', [
+            'src' => 'pixel.gif',
+            'loader' => 'third_fs',
+            'sizes' => '100vw',
+        ]);
+        $html = $rendered->toString();
+
+        $srcUrl = $this->parseSrcFromImg($html);
+        self::assertStringContainsString('/image/local_glide/third_fs/pixel.gif', $srcUrl);
 
         $response = self::handleRequest($srcUrl);
         self::assertSame(200, $response->getStatusCode());
