@@ -13,9 +13,9 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Tests\Service;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
+use Silarhi\PicassoBundle\Exception\LoaderNotFoundException;
 use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
 
@@ -60,7 +60,7 @@ class LoaderRegistryTest extends TestCase
 
         $registry = new LoaderRegistry($container);
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(LoaderNotFoundException::class);
         $this->expectExceptionMessage('Loader "unknown" not found.');
         $registry->get('unknown');
     }

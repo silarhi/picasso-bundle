@@ -13,10 +13,11 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Service;
 
-use LogicException;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
+use Silarhi\PicassoBundle\Exception\LoaderNotFoundException;
+use Silarhi\PicassoBundle\Exception\TransformerNotFoundException;
 
 readonly class ImagePipeline
 {
@@ -59,11 +60,11 @@ readonly class ImagePipeline
 
     public function resolveLoaderName(?string $loader = null): string
     {
-        return $loader ?? $this->defaultLoader ?? throw new LogicException('No loader specified and no default_loader configured.');
+        return $loader ?? $this->defaultLoader ?? throw new LoaderNotFoundException('No loader specified and no default_loader configured.');
     }
 
     public function resolveTransformerName(?string $transformer = null): string
     {
-        return $transformer ?? $this->defaultTransformer ?? throw new LogicException('No transformer specified and no default_transformer configured.');
+        return $transformer ?? $this->defaultTransformer ?? throw new TransformerNotFoundException('No transformer specified and no default_transformer configured.');
     }
 }

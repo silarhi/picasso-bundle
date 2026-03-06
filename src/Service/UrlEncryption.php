@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Service;
 
-use RuntimeException;
+use Silarhi\PicassoBundle\Exception\EncryptionException;
 
 use function strlen;
 
@@ -37,7 +37,7 @@ final readonly class UrlEncryption
         $ciphertext = openssl_encrypt($plaintext, self::CIPHER, $derivedKey, \OPENSSL_RAW_DATA, $iv, $tag, '', self::TAG_LENGTH);
 
         if (false === $ciphertext) {
-            throw new RuntimeException('Encryption failed.');
+            throw new EncryptionException('Encryption failed.');
         }
 
         return rtrim(strtr(base64_encode($iv . $tag . $ciphertext), '+/', '-_'), '=');
@@ -49,7 +49,7 @@ final readonly class UrlEncryption
         $data = base64_decode(strtr($encoded, '-_', '+/'), true);
 
         if (false === $data || strlen($data) < self::IV_LENGTH + self::TAG_LENGTH) {
-            throw new RuntimeException('Decryption failed: invalid data.');
+            throw new EncryptionException('Decryption failed: invalid data.');
         }
 
         $iv = substr($data, 0, self::IV_LENGTH);
@@ -59,7 +59,7 @@ final readonly class UrlEncryption
         $plaintext = openssl_decrypt($ciphertext, self::CIPHER, $derivedKey, \OPENSSL_RAW_DATA, $iv, $tag);
 
         if (false === $plaintext) {
-            throw new RuntimeException('Decryption failed: invalid key or tampered data.');
+            throw new EncryptionException('Decryption failed: invalid key or tampered data.');
         }
 
         return $plaintext;

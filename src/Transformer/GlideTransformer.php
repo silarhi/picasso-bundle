@@ -21,9 +21,9 @@ use League\Glide\ServerFactory;
 use League\Glide\Signatures\SignatureException;
 use League\Glide\Signatures\SignatureFactory;
 use LogicException;
-use RuntimeException;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
+use Silarhi\PicassoBundle\Exception\EncryptionException;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
 use Silarhi\PicassoBundle\Service\UrlEncryption;
 use Symfony\Component\HttpFoundation\Request;
@@ -83,7 +83,7 @@ final class GlideTransformer implements LocalTransformerInterface
                 $encryptedMetadata = $params['_metadata'];
                 unset($params['_metadata']);
                 $metadata = json_decode($this->urlEncryption->decrypt($encryptedMetadata), true, flags: \JSON_THROW_ON_ERROR);
-            } catch (RuntimeException|JsonException $e) {
+            } catch (EncryptionException|JsonException $e) {
                 throw new NotFoundHttpException('Invalid metadata parameter.', $e);
             }
         } else {

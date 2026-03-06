@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace Silarhi\PicassoBundle\Tests\Service;
 
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
+use Silarhi\PicassoBundle\Exception\EncryptionException;
 use Silarhi\PicassoBundle\Service\UrlEncryption;
 
 class UrlEncryptionTest extends TestCase
@@ -60,7 +60,7 @@ class UrlEncryptionTest extends TestCase
         $encrypted = $this->encryption->encrypt('/var/uploads');
         $wrongKey = new UrlEncryption('wrong-key');
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(EncryptionException::class);
         $wrongKey->decrypt($encrypted);
     }
 
@@ -69,13 +69,13 @@ class UrlEncryptionTest extends TestCase
         $encrypted = $this->encryption->encrypt('/var/uploads');
         $tampered = $encrypted . 'x';
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(EncryptionException::class);
         $this->encryption->decrypt($tampered);
     }
 
     public function testDecryptWithTooShortDataThrows(): void
     {
-        $this->expectException(RuntimeException::class);
+        $this->expectException(EncryptionException::class);
         $this->encryption->decrypt('abc');
     }
 }

@@ -14,8 +14,8 @@ declare(strict_types=1);
 namespace Silarhi\PicassoBundle\Loader;
 
 use League\Flysystem\FilesystemOperator;
-use LogicException;
 use Psr\Container\ContainerInterface;
+use Silarhi\PicassoBundle\Exception\InvalidMetadataException;
 
 use function sprintf;
 
@@ -29,7 +29,7 @@ final readonly class FlysystemRegistry
     public function get(string $storageName): FilesystemOperator
     {
         if (!$this->storages->has($storageName)) {
-            throw new LogicException(sprintf('Flysystem storage "%s" is not registered. Available storages are collected from services tagged with "flysystem.storage".', $storageName));
+            throw new InvalidMetadataException(sprintf('Flysystem storage "%s" is not registered. Available storages are collected from services tagged with "flysystem.storage".', $storageName));
         }
 
         /** @var FilesystemOperator $storage */

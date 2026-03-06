@@ -13,9 +13,9 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Tests\Service;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
+use Silarhi\PicassoBundle\Exception\TransformerNotFoundException;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 
@@ -60,7 +60,7 @@ class TransformerRegistryTest extends TestCase
 
         $registry = new TransformerRegistry($container);
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(TransformerNotFoundException::class);
         $this->expectExceptionMessage('Transformer "unknown" not found.');
         $registry->get('unknown');
     }

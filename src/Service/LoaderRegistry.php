@@ -15,8 +15,8 @@ namespace Silarhi\PicassoBundle\Service;
 
 use function assert;
 
-use InvalidArgumentException;
 use Psr\Container\ContainerInterface;
+use Silarhi\PicassoBundle\Exception\LoaderNotFoundException;
 use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
 
 use function sprintf;
@@ -31,7 +31,7 @@ final readonly class LoaderRegistry
     public function get(string $name): ImageLoaderInterface
     {
         if (!$this->has($name)) {
-            throw new InvalidArgumentException(sprintf('Loader "%s" not found.', $name));
+            throw new LoaderNotFoundException(sprintf('Loader "%s" not found.', $name));
         }
 
         $loader = $this->loaders->get($name);

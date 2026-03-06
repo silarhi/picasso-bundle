@@ -14,9 +14,9 @@ declare(strict_types=1);
 namespace Silarhi\PicassoBundle\Tests\Loader;
 
 use League\Flysystem\FilesystemOperator;
-use LogicException;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
+use Silarhi\PicassoBundle\Exception\InvalidMetadataException;
 use Silarhi\PicassoBundle\Loader\FlysystemRegistry;
 
 class FlysystemRegistryTest extends TestCase
@@ -40,7 +40,7 @@ class FlysystemRegistryTest extends TestCase
 
         $registry = new FlysystemRegistry($container);
 
-        $this->expectException(LogicException::class);
+        $this->expectException(InvalidMetadataException::class);
         $this->expectExceptionMessage('Flysystem storage "unknown" is not registered.');
         $registry->get('unknown');
     }

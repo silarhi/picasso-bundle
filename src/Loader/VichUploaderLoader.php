@@ -17,9 +17,9 @@ use function is_object;
 use function is_string;
 
 use League\Flysystem\FilesystemOperator;
-use LogicException;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
+use Silarhi\PicassoBundle\Exception\InvalidMetadataException;
 use Vich\UploaderBundle\Storage\StorageInterface;
 
 final class VichUploaderLoader implements ServableLoaderInterface
@@ -78,7 +78,7 @@ final class VichUploaderLoader implements ServableLoaderInterface
     {
         $uploadDestination = $metadata['upload_destination'] ?? null;
         if (!is_string($uploadDestination)) {
-            throw new LogicException('Upload destination is required to get the source.');
+            throw new InvalidMetadataException('Upload destination is required to get the source.');
         }
 
         if ($this->flysystemRegistry->has($uploadDestination)) {

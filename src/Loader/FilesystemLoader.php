@@ -16,9 +16,9 @@ namespace Silarhi\PicassoBundle\Loader;
 use function count;
 use function is_string;
 
-use LogicException;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
+use Silarhi\PicassoBundle\Exception\InvalidMetadataException;
 
 final class FilesystemLoader implements ServableLoaderInterface
 {
@@ -65,6 +65,6 @@ final class FilesystemLoader implements ServableLoaderInterface
             return $this->paths[0];
         }
 
-        throw new LogicException('No path found in metadata and multiple paths configured.');
+        throw new InvalidMetadataException('No path found in metadata and multiple paths configured.');
     }
 }
