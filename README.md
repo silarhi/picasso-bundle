@@ -9,7 +9,9 @@ srcset generation, and blur placeholders — all from a single Twig component.
 
 - **Responsive `<picture>` output** with automatic srcset and multiple format generation
 - **Blur placeholders** (LQIP) for smooth loading transitions
-- **Pluggable loaders** — Filesystem, [Flysystem](https://flysystem.thephpleague.com/), [VichUploaderBundle](https://github.com/dustin10/VichUploaderBundle), URL
+- **Pluggable loaders** — Filesystem,
+  [Flysystem](https://flysystem.thephpleague.com/),
+  [VichUploaderBundle](https://github.com/dustin10/VichUploaderBundle), URL
 - **Pluggable transformers** — [Glide](https://glide.thephpleague.com/) (local), [Imgix](https://imgix.com/) (CDN), or custom service
 - **Twig component** (`<Picasso:Image>`) and **Twig function** (`picasso_image_url()`)
 - **Automatic image dimension detection** from streams
@@ -132,13 +134,17 @@ picasso:
 
 </details>
 
-> **Note:** The loader/transformer `type` is automatically inferred from the key name when it matches a known type (`filesystem`, `flysystem`, `vich`, `url`, `glide`, `imgix`). Use `type` explicitly when your key name differs from the type.
+> **Note:** The loader/transformer `type` is automatically inferred from the key name
+> when it matches a known type (`filesystem`, `flysystem`, `vich`, `url`, `glide`, `imgix`).
+> Use `type` explicitly when your key name differs from the type.
 
 ## Usage
 
 ### Twig Component (recommended)
 
-The `<Picasso:Image>` component renders a responsive `<picture>` element with `<source>` tags for each configured format and a fallback `<img>` with a full srcset.
+The `<Picasso:Image>` component renders a responsive `<picture>` element
+with `<source>` tags for each configured format and a fallback `<img>`
+with a full srcset.
 
 ```twig
 <Picasso:Image
@@ -152,28 +158,31 @@ The `<Picasso:Image>` component renders a responsive `<picture>` element with `<
 
 #### Component Properties
 
-| Property       | Type     | Default | Description                                                              |
-| -------------- | -------- | ------- | ------------------------------------------------------------------------ |
-| `src`          | `string` | —       | Image path relative to the loader's base (or a URL for URL loaders)      |
-| `width`        | `int`    | auto    | Display width in pixels (auto-detected from source if omitted)           |
-| `height`       | `int`    | auto    | Display height in pixels (auto-detected from source if omitted)          |
-| `sizes`        | `string` | —       | Responsive `sizes` attribute                                             |
-| `sourceWidth`  | `int`    | auto    | Explicit source image width (skips metadata detection)                   |
-| `sourceHeight` | `int`    | auto    | Explicit source image height (skips metadata detection)                  |
-| `loader`       | `string` | —       | Override the default loader (e.g. `filesystem`, `vich`, `flysystem`)     |
-| `transformer`  | `string` | —       | Override the default transformer (e.g. `glide`, `imgix`)                 |
-| `quality`      | `int`    | 75      | Override quality (1–100)                                                 |
-| `fit`          | `string` | contain | Fit mode: `contain`, `cover`, `crop`, `fill`                             |
-| `placeholder`  | `bool`   | —       | Override blur placeholder for this image (overrides global config)        |
-| `priority`     | `bool`   | false   | Mark as high-priority: eager loading, `fetchpriority="high"`, no blur    |
-| `loading`      | `string` | lazy    | Loading attribute (`lazy` or `eager`). Auto-set to `eager` when priority |
-| `fetchPriority`| `string` | —       | Fetch priority (`high`, `low`, `auto`). Auto-set to `high` when priority |
-| `unoptimized`  | `bool`   | false   | Serve the original image without any transformation                      |
-| `context`      | `array`  | `[]`    | Extra context for the loader (e.g. Vich entity/field)                    |
+| Property        | Type     | Default | Description                                         |
+| --------------- | -------- | ------- | --------------------------------------------------- |
+| `src`           | `string` | —       | Image path relative to the loader's base            |
+| `width`         | `int`    | auto    | Display width (auto-detected from source)           |
+| `height`        | `int`    | auto    | Display height (auto-detected from source)          |
+| `sizes`         | `string` | —       | Responsive `sizes` attribute                        |
+| `sourceWidth`   | `int`    | auto    | Explicit source width (skips detection)             |
+| `sourceHeight`  | `int`    | auto    | Explicit source height (skips detection)            |
+| `loader`        | `string` | —       | Override default loader                             |
+| `transformer`   | `string` | —       | Override default transformer                        |
+| `quality`       | `int`    | 75      | Override quality (1–100)                            |
+| `fit`           | `string` | contain | Fit mode: `contain`, `cover`, `crop`, `fill`        |
+| `placeholder`   | `bool`   | —       | Override blur placeholder (overrides global config) |
+| `priority`      | `bool`   | false   | Eager loading, `fetchpriority="high"`, no blur      |
+| `loading`       | `string` | lazy    | `lazy` or `eager`. Auto-set when priority           |
+| `fetchPriority` | `string` | —       | `high`, `low`, `auto`. Auto-set when priority       |
+| `unoptimized`   | `bool`   | false   | Serve original image without transformation         |
+| `context`       | `array`  | `[]`    | Extra context for the loader (e.g. Vich)            |
 
 #### Blur Placeholder
 
-When enabled (default), the component generates a tiny blurred version of the image and inlines it as a CSS `background-image` on the `<img>` tag. Once the full image loads, the blur background is removed via an `onload` handler, creating a smooth transition.
+When enabled (default), the component generates a tiny blurred version of the image
+and inlines it as a CSS `background-image` on the `<img>` tag. Once the full image
+loads, the blur background is removed via an `onload` handler, creating a smooth
+transition.
 
 You can control blur globally via configuration or per-image via the `placeholder` prop:
 
@@ -189,7 +198,9 @@ You can control blur globally via configuration or per-image via the `placeholde
 
 #### Priority Images
 
-For above-the-fold images (hero banners, LCP images), use the `priority` prop. This sets `loading="eager"`, `fetchpriority="high"`, and disables the blur placeholder:
+For above-the-fold images (hero banners, LCP images), use the `priority` prop.
+This sets `loading="eager"`, `fetchpriority="high"`, and disables the blur
+placeholder:
 
 ```twig
 <Picasso:Image
@@ -219,7 +230,8 @@ The component forwards any extra attributes to the inner `<img>` tag:
 
 ### Twig Function
 
-The `picasso_image_url()` function generates a single transformed image URL. Useful for backgrounds, meta tags, or anywhere you need a plain URL.
+The `picasso_image_url()` function generates a single transformed image URL.
+Useful for backgrounds, meta tags, or anywhere you need a plain URL.
 
 ```twig
 <img src="{{ picasso_image_url('photo.jpg', width: 300, format: 'webp') }}" alt="Thumbnail">
@@ -400,7 +412,7 @@ Then use them by name:
 
 The bundle registers a route for on-demand image transformation (used by Glide):
 
-```
+```text
 GET /image/{transformer}/{loader}/{path}
 ```
 
