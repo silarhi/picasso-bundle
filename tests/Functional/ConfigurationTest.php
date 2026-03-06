@@ -23,6 +23,11 @@ use Symfony\Component\Config\FileLocator;
 
 class ConfigurationTest extends TestCase
 {
+    /**
+     * @param array<string, mixed> $config
+     *
+     * @return array<string, mixed>
+     */
     private function processConfig(array $config): array
     {
         $bundle = new PicassoBundle();
@@ -35,6 +40,7 @@ class ConfigurationTest extends TestCase
 
         $tree = $treeBuilder->buildTree();
 
+        /** @var array<string, mixed> */
         return $tree->finalize($tree->normalize($config));
     }
 
