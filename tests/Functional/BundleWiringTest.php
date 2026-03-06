@@ -16,19 +16,23 @@ namespace Silarhi\PicassoBundle\Tests\Functional;
 use function assert;
 use function dirname;
 
+use League\FlysystemBundle\FlysystemBundle;
 use LogicException;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
 use Silarhi\PicassoBundle\Loader\UrlLoader;
+use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
 use Silarhi\PicassoBundle\PicassoBundle;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 use Silarhi\PicassoBundle\Transformer\ImgixTransformer;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\TwigBundle\TwigBundle;
+use Symfony\Component\Config\Loader\LoaderInterface;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\HttpKernel\Kernel;
+use Vich\UploaderBundle\VichUploaderBundle;
 
 class BundleWiringTest extends TestCase
 {
@@ -220,6 +224,28 @@ class BundleWiringTest extends TestCase
         self::assertInstanceOf(ImgixTransformer::class, $container->get('picasso.transformer.imgix'));
     }
 
+    public function testVichLoaderWithFlysystemStorageIsRegistered(): void
+    {
+        $kernel = $this->bootVichKernel();
+
+        $container = $kernel->getContainer()->get('test.service_container');
+        assert($container instanceof ContainerInterface);
+
+        self::assertTrue($container->has('picasso.loader.vich'));
+        self::assertInstanceOf(VichUploaderLoader::class, $container->get('picasso.loader.vich'));
+    }
+
+    public function testVichHelperAndFlysystemRegistryAreRegistered(): void
+    {
+        $kernel = $this->bootVichKernel();
+
+        $container = $kernel->getContainer()->get('test.service_container');
+        assert($container instanceof ContainerInterface);
+
+        self::assertTrue($container->has('.picasso.vich_mapping_helper'));
+        self::assertTrue($container->has('.picasso.flysystem_registry'));
+    }
+
     /**
      * @param array<string, mixed> $picassoConfig
      */
@@ -238,6 +264,15 @@ class BundleWiringTest extends TestCase
         assert($container instanceof ContainerInterface);
 
         return $container;
+    }
+
+    private function bootVichKernel(): Kernel
+    {
+        $kernel = new VichWiringTestKernel('test_vich_' . bin2hex(random_bytes(4)), false);
+        $kernel->boot();
+        $this->kernels[] = $kernel;
+
+        return $kernel;
     }
 }
 
@@ -267,7 +302,7 @@ class BundleWiringTestKernel extends Kernel
         ];
     }
 
-    public function registerContainerConfiguration(\Symfony\Component\Config\Loader\LoaderInterface $loader): void
+    public function registerContainerConfiguration(LoaderInterface $loader): void
     {
         $picassoConfig = $this->picassoConfig;
         $withHttpClient = $this->withHttpClient;
@@ -325,5 +360,114 @@ class BundleWiringTestKernel extends Kernel
     public function getLogDir(): string
     {
         return sys_get_temp_dir() . '/picasso_wiring_test/log';
+    }
+}
+
+/**
+ * Kernel that configures VichUploaderBundle with Flysystem storage
+ * and Picasso's vich loader, using a Flysystem storage service name as upload_destination.
+ *
+ * @internal
+ */
+class VichWiringTestKernel extends Kernel
+{
+    public function registerBundles(): iterable
+    {
+        return [
+            new FrameworkBundle(),
+            new TwigBundle(),
+            new FlysystemBundle(),
+            new VichUploaderBundle(),
+            new PicassoBundle(),
+        ];
+    }
+
+    public function registerContainerConfiguration(LoaderInterface $loader): void
+    {
+        $fixturesDir = dirname(__DIR__) . '/Fixtures';
+
+        $loader->load(static function (ContainerBuilder $container) use ($fixturesDir): void {
+            $container->loadFromExtension('framework', [
+                'test' => true,
+                'secret' => 'test-secret',
+                'router' => [
+                    'resource' => '%kernel.project_dir%/config/routes.php',
+                ],
+                'http_method_override' => false,
+                'handle_all_throwables' => true,
+                'php_errors' => ['log' => true],
+            ]);
+
+            $container->loadFromExtension('twig', [
+                'default_path' => '%kernel.project_dir%/templates',
+            ]);
+
+            // Configure FlysystemBundle with a local adapter
+            $container->loadFromExtension('flysystem', [
+                'storages' => [
+                    'products.storage' => [
+                        'adapter' => 'local',
+                        'options' => [
+                            'directory' => $fixturesDir,
+                        ],
+                    ],
+                ],
+            ]);
+
+            // Configure VichUploaderBundle with flysystem storage,
+            // using the Flysystem storage service name as upload_destination
+            $container->loadFromExtension('vich_uploader', [
+                'db_driver' => 'orm',
+                'storage' => 'flysystem',
+                'mappings' => [
+                    'product_image' => [
+                        'upload_destination' => 'products.storage',
+                        'uri_prefix' => '/uploads/products',
+                    ],
+                ],
+            ]);
+
+            // Configure Picasso with a vich loader
+            $container->loadFromExtension('picasso', [
+                'loaders' => [
+                    'vich' => [],
+                ],
+                'transformers' => [
+                    'glide' => [
+                        'sign_key' => 'test-key',
+                        'cache' => '%kernel.cache_dir%/glide',
+                    ],
+                ],
+            ]);
+        });
+    }
+
+    protected function build(ContainerBuilder $container): void
+    {
+        $container->addCompilerPass(new class implements CompilerPassInterface {
+            public function process(ContainerBuilder $container): void
+            {
+                foreach ($container->getDefinitions() as $id => $definition) {
+                    if (str_starts_with($id, 'picasso.') || str_starts_with($id, '.picasso.')) {
+                        $definition->setPublic(true);
+                    }
+                }
+            }
+        });
+    }
+
+    public function getProjectDir(): string
+    {
+        return dirname(__DIR__, 2);
+    }
+
+    public function getCacheDir(): string
+    {
+        return sys_get_temp_dir() . '/picasso_vich_test/cache/' . $this->environment;
+    }
+
+    public function getLogDir(): string
+    {
+        return sys_get_temp_dir() . '/picasso_vich_test/log';
     }
 }

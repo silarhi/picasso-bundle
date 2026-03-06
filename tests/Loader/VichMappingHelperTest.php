@@ -17,9 +17,9 @@ use Metadata\Driver\DriverChain;
 use Metadata\MetadataFactory;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Loader\VichMappingHelper;
-use Symfony\Component\HttpFoundation\File\File;
-use Vich\UploaderBundle\Mapping\Attribute\Uploadable;
-use Vich\UploaderBundle\Mapping\Attribute\UploadableField;
+use Silarhi\PicassoBundle\Tests\Fixtures\Entity\MinimalEntity;
+use Silarhi\PicassoBundle\Tests\Fixtures\Entity\MultiFieldEntity;
+use Silarhi\PicassoBundle\Tests\Fixtures\Entity\ProductEntity;
 use Vich\UploaderBundle\Mapping\PropertyMappingFactory;
 use Vich\UploaderBundle\Mapping\PropertyMappingResolver;
 use Vich\UploaderBundle\Metadata\Driver\AttributeDriver;
@@ -47,13 +47,13 @@ class VichMappingHelperTest extends TestCase
             [],
             [
                 'product_image' => [
-                    'upload_destination' => '/var/uploads/products',
+                    'upload_destination' => 'products.storage',
                     'uri_prefix' => '/uploads/products',
                     'namer' => null,
                     'directory_namer' => null,
                 ],
                 'avatar_image' => [
-                    'upload_destination' => '/var/uploads/avatars',
+                    'upload_destination' => 'avatars.storage',
                     'uri_prefix' => '/uploads/avatars',
                     'namer' => null,
                     'directory_namer' => null,
@@ -83,14 +83,14 @@ class VichMappingHelperTest extends TestCase
     {
         $entity = new ProductEntity();
 
-        self::assertSame('/var/uploads/products', $this->helper->getUploadDestination($entity, 'imageFile'));
+        self::assertSame('products.storage', $this->helper->getUploadDestination($entity, 'imageFile'));
     }
 
     public function testGetUploadDestinationWithNullFieldAutoDetects(): void
     {
         $entity = new ProductEntity();
 
-        self::assertSame('/var/uploads/products', $this->helper->getUploadDestination($entity, null));
+        self::assertSame('products.storage', $this->helper->getUploadDestination($entity, null));
     }
 
     public function testReadMimeTypeReturnsStringValue(): void
@@ -184,7 +184,7 @@ class VichMappingHelperTest extends TestCase
         $entity = new MultiFieldEntity();
 
         self::assertSame('avatarFile', $this->helper->getFilePropertyName($entity, 'avatarFile'));
-        self::assertSame('/var/uploads/avatars', $this->helper->getUploadDestination($entity, 'avatarFile'));
+        self::assertSame('avatars.storage', $this->helper->getUploadDestination($entity, 'avatarFile'));
     }
 
     public function testMultiFieldEntityAutoDetectsFirstMapping(): void
@@ -209,60 +209,4 @@ class VichMappingHelperTest extends TestCase
 
         self::assertNull($this->helper->readDimensions($entity, 'imageFile'));
     }
-}
-
-#[Uploadable]
-class ProductEntity
-{
-    #[UploadableField(
-        mapping: 'product_image',
-        fileNameProperty: 'imageName',
-        mimeType: 'mimeType',
-        dimensions: 'dimensions',
-    )]
-    public ?File $imageFile = null;
-
-    public ?string $imageName = null;
-
-    public mixed $mimeType = null;
-
-    public mixed $dimensions = null;
-}
-
-#[Uploadable]
-class MultiFieldEntity
-{
-    #[UploadableField(
-        mapping: 'product_image',
-        fileNameProperty: 'imageName',
-        mimeType: 'mimeType',
-        dimensions: 'dimensions',
-    )]
-    public ?File $imageFile = null;
-
-    public ?string $imageName = null;
-
-    #[UploadableField(
-        mapping: 'avatar_image',
-        fileNameProperty: 'avatarName',
-    )]
-    public ?File $avatarFile = null;
-
-    public ?string $avatarName = null;
-
-    public mixed $mimeType = null;
-
-    public mixed $dimensions = null;
-}
-
-#[Uploadable]
-class MinimalEntity
-{
-    #[UploadableField(
-        mapping: 'product_image',
-        fileNameProperty: 'imageName',
-    )]
-    public ?File $imageFile = null;
-
-    public ?string $imageName = null;
 }
