@@ -240,9 +240,10 @@ class SrcsetGeneratorTest extends TestCase
             image: $image,
             format: 'webp',
             width: 300,
-            context: ['loader' => 'vich'],
+            context: ['loader' => 'vich', 'transformer' => 'glide'],
         );
 
         self::assertSame('vich', $contextReceived['loader']);
+        self::assertSame('glide', $contextReceived['transformer']);
     }
 }

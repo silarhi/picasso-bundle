@@ -175,7 +175,7 @@ class ImageComponentTest extends TestCase
                     && 30 === $t->quality
                     && 'crop' === $t->fit
                     && 50 === $t->blur),
-                ['loader' => 'filesystem'],
+                ['loader' => 'filesystem', 'transformer' => 'glide'],
             )
             ->willReturn('/picasso/glide/filesystem/photo.jpg?w=10&h=6&fm=jpg&q=30&blur=50');
 
