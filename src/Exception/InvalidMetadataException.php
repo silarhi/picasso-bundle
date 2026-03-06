@@ -15,6 +15,6 @@ namespace Silarhi\PicassoBundle\Exception;
 
 use LogicException;
 
-class InvalidMetadataException extends LogicException implements PicassoExceptionInterface
+final class InvalidMetadataException extends LogicException implements PicassoExceptionInterface
 {
 }

@@ -15,6 +15,6 @@ namespace Silarhi\PicassoBundle\Exception;
 
 use InvalidArgumentException;
 
-class LoaderNotFoundException extends InvalidArgumentException implements PicassoExceptionInterface
+final class LoaderNotFoundException extends InvalidArgumentException implements PicassoExceptionInterface
 {
 }

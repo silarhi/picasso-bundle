@@ -15,6 +15,6 @@ namespace Silarhi\PicassoBundle\Exception;
 
 use RuntimeException;
 
-class EncryptionException extends RuntimeException implements PicassoExceptionInterface
+final class EncryptionException extends RuntimeException implements PicassoExceptionInterface
 {
 }

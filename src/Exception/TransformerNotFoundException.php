@@ -15,6 +15,6 @@ namespace Silarhi\PicassoBundle\Exception;
 
 use InvalidArgumentException;
 
-class TransformerNotFoundException extends InvalidArgumentException implements PicassoExceptionInterface
+final class TransformerNotFoundException extends InvalidArgumentException implements PicassoExceptionInterface
 {
 }
