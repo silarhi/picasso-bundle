@@ -22,6 +22,8 @@ use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
+use Silarhi\PicassoBundle\Service\LoaderRegistry;
+use Silarhi\PicassoBundle\Service\TransformerRegistry;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 
 class ImagePipelineTest extends TestCase
@@ -35,21 +37,26 @@ class ImagePipelineTest extends TestCase
         $this->loader = $this->createMock(ImageLoaderInterface::class);
         $this->transformer = $this->createMock(ImageTransformerInterface::class);
 
-        $loaders = $this->createMock(ContainerInterface::class);
-        $loaders->method('get')
-            ->willReturnCallback(fn (string $key): MockObject&ImageLoaderInterface => match ($key) {
-                'filesystem' => $this->loader,
-                default => throw new InvalidArgumentException("Unknown loader: $key"),
-            });
+        $loaderLocator = $this->createMock(ContainerInterface::class);
+        $loaderLocator->method('has')->willReturnCallback(static fn (string $key): bool => 'filesystem' === $key);
+        $loaderLocator->method('get')->willReturnCallback(fn (string $key) => match ($key) {
+            'filesystem' => $this->loader,
+            default => throw new InvalidArgumentException("Unknown loader: $key"),
+        });
 
-        $transformers = $this->createMock(ContainerInterface::class);
-        $transformers->method('get')
-            ->willReturnCallback(fn (string $key): MockObject&ImageTransformerInterface => match ($key) {
-                'glide' => $this->transformer,
-                default => throw new InvalidArgumentException("Unknown transformer: $key"),
-            });
+        $transformerLocator = $this->createMock(ContainerInterface::class);
+        $transformerLocator->method('has')->willReturnCallback(static fn (string $key): bool => 'glide' === $key);
+        $transformerLocator->method('get')->willReturnCallback(fn (string $key) => match ($key) {
+            'glide' => $this->transformer,
+            default => throw new InvalidArgumentException("Unknown transformer: $key"),
+        });
 
-        $this->pipeline = new ImagePipeline($loaders, $transformers, 'filesystem', 'glide');
+        $this->pipeline = new ImagePipeline(
+            new LoaderRegistry($loaderLocator),
+            new TransformerRegistry($transformerLocator),
+            'filesystem',
+            'glide',
+        );
     }
 
     public function testUrlLoadsImageAndTransforms(): void

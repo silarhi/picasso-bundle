@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Silarhi\PicassoBundle\Transformer;
 
 use InvalidArgumentException;
+use JsonException;
 use League\Glide\Filesystem\FileNotFoundException;
 use League\Glide\Responses\SymfonyResponseFactory;
 use League\Glide\ServerFactory;
@@ -29,7 +30,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
-class GlideTransformer implements LocalTransformerInterface
+final class GlideTransformer implements LocalTransformerInterface
 {
     public function __construct(
         private readonly UrlGeneratorInterface $router,
@@ -47,24 +48,20 @@ class GlideTransformer implements LocalTransformerInterface
         $glideParams = $this->mapToGlideParams($transformation);
         $loaderName = $context['loader'] ?? 'filesystem';
 
-        if (isset($image->metadata['_source'])) {
-            /** @var string $source */
-            $source = $image->metadata['_source'];
-            $glideParams['_source'] = $this->urlEncryption->encrypt($source);
+        if ([] !== $image->metadata) {
+            $glideParams['_metadata'] = $this->urlEncryption->encrypt(json_encode($image->metadata, \JSON_THROW_ON_ERROR));
         }
 
         $signature = SignatureFactory::create($this->signKey)
             ->generateSignature($path, $glideParams);
 
-        return $this->router->generate('picasso_image', array_merge(
-            [
-                'transformer' => 'glide',
-                'loader' => $loaderName,
-                'path' => $path,
-            ],
-            $glideParams,
-            ['s' => $signature],
-        ), UrlGeneratorInterface::ABSOLUTE_PATH);
+        return $this->router->generate('picasso_image', [
+            'transformer' => 'glide',
+            'loader' => $loaderName,
+            'path' => $path,
+            ...$glideParams,
+            's' => $signature,
+        ], UrlGeneratorInterface::ABSOLUTE_PATH);
     }
 
     public function serve(ServableLoaderInterface $loader, string $path, Request $request): Response
@@ -72,25 +69,27 @@ class GlideTransformer implements LocalTransformerInterface
         $params = $request->query->all();
 
         try {
-            SignatureFactory::create($this->signKey)
-                ->validateRequest($path, $params);
+            SignatureFactory::create($this->signKey)->validateRequest($path, $params);
         } catch (SignatureException $e) {
             throw new NotFoundHttpException('Invalid image signature.', $e);
         }
 
         // Decrypt source from URL metadata if present, otherwise fall back to loader
-        if (isset($params['_source'])) {
+        if (isset($params['_metadata'])) {
             try {
-                /** @var string $encryptedSource */
-                $encryptedSource = $params['_source'];
-                $source = $this->urlEncryption->decrypt($encryptedSource);
-            } catch (RuntimeException $e) {
-                throw new NotFoundHttpException('Invalid source parameter.', $e);
+                /** @var string $encryptedMetadata */
+                $encryptedMetadata = $params['_metadata'];
+                unset($params['_metadata']);
+                $metadata = json_decode($this->urlEncryption->decrypt($encryptedMetadata), true, flags: \JSON_THROW_ON_ERROR);
+            } catch (RuntimeException|JsonException $e) {
+                throw new NotFoundHttpException('Invalid metadata parameter.', $e);
             }
         } else {
-            $source = $loader->getSource();
+            $metadata = [];
         }
 
+        /** @var array<string, mixed> $metadata */
+        $source = $loader->getSource($metadata);
         $serverConfig = [
             'source' => $source,
             'cache' => $this->cache,

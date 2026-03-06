@@ -15,11 +15,13 @@ namespace Silarhi\PicassoBundle\Tests\Functional;
 
 use function assert;
 
+use Closure;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Loader\FilesystemLoader;
+use Silarhi\PicassoBundle\Service\ImageHelper;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Service\MetadataGuesser;
@@ -56,7 +58,7 @@ class PicassoBundleTest extends TestCase
      * Returns the test service container which can access both public and
      * non-inlined private services via Symfony's TestContainer.
      */
-    private static function getTestContainer(): ContainerInterface
+    private function getTestContainer(): ContainerInterface
     {
         $container = self::$kernel->getContainer()->get('test.service_container');
         assert($container instanceof ContainerInterface);
@@ -66,7 +68,7 @@ class PicassoBundleTest extends TestCase
 
     public function testContainerHasLoaderRegistry(): void
     {
-        $container = self::getTestContainer();
+        $container = $this->getTestContainer();
 
         self::assertTrue($container->has('picasso.loader_registry'));
         $registry = $container->get('picasso.loader_registry');
@@ -75,7 +77,7 @@ class PicassoBundleTest extends TestCase
 
     public function testContainerHasTransformerRegistry(): void
     {
-        $container = self::getTestContainer();
+        $container = $this->getTestContainer();
 
         self::assertTrue($container->has('picasso.transformer_registry'));
         $registry = $container->get('picasso.transformer_registry');
@@ -84,7 +86,7 @@ class PicassoBundleTest extends TestCase
 
     public function testFilesystemLoaderIsRegistered(): void
     {
-        $container = self::getTestContainer();
+        $container = $this->getTestContainer();
         $registry = $container->get('picasso.loader_registry');
         self::assertInstanceOf(LoaderRegistry::class, $registry);
 
@@ -94,7 +96,7 @@ class PicassoBundleTest extends TestCase
 
     public function testGlideTransformerIsRegistered(): void
     {
-        $container = self::getTestContainer();
+        $container = $this->getTestContainer();
         $registry = $container->get('picasso.transformer_registry');
         self::assertInstanceOf(TransformerRegistry::class, $registry);
 
@@ -104,7 +106,7 @@ class PicassoBundleTest extends TestCase
 
     public function testMetadataGuesserIsRegistered(): void
     {
-        $container = self::getTestContainer();
+        $container = $this->getTestContainer();
 
         self::assertTrue($container->has('picasso.metadata_guesser'));
         self::assertInstanceOf(MetadataGuesser::class, $container->get('picasso.metadata_guesser'));
@@ -112,7 +114,7 @@ class PicassoBundleTest extends TestCase
 
     public function testUrlEncryptionIsRegistered(): void
     {
-        $container = self::getTestContainer();
+        $container = $this->getTestContainer();
 
         self::assertTrue($container->has('picasso.url_encryption'));
         self::assertInstanceOf(UrlEncryption::class, $container->get('picasso.url_encryption'));
@@ -120,7 +122,7 @@ class PicassoBundleTest extends TestCase
 
     public function testSrcsetGeneratorIsRegistered(): void
     {
-        $container = self::getTestContainer();
+        $container = $this->getTestContainer();
 
         self::assertTrue($container->has('picasso.srcset_generator'));
         self::assertInstanceOf(SrcsetGenerator::class, $container->get('picasso.srcset_generator'));
@@ -128,7 +130,7 @@ class PicassoBundleTest extends TestCase
 
     public function testPipelineIsRegistered(): void
     {
-        $container = self::getTestContainer();
+        $container = $this->getTestContainer();
 
         self::assertTrue($container->has('picasso.pipeline'));
         self::assertInstanceOf(ImagePipeline::class, $container->get('picasso.pipeline'));
@@ -136,7 +138,7 @@ class PicassoBundleTest extends TestCase
 
     public function testTwigExtensionIsRegistered(): void
     {
-        $container = self::getTestContainer();
+        $container = $this->getTestContainer();
 
         self::assertTrue($container->has('.picasso.twig_extension'));
         self::assertInstanceOf(PicassoExtension::class, $container->get('.picasso.twig_extension'));
@@ -144,7 +146,7 @@ class PicassoBundleTest extends TestCase
 
     public function testPipelineGeneratesUrl(): void
     {
-        $container = self::getTestContainer();
+        $container = $this->getTestContainer();
         $pipeline = $container->get('picasso.pipeline');
         self::assertInstanceOf(ImagePipeline::class, $pipeline);
 
@@ -153,29 +155,29 @@ class PicassoBundleTest extends TestCase
             new ImageTransformation(width: 100, format: 'jpg'),
         );
 
-        self::assertStringContainsString('/picasso/glide/filesystem/pixel.gif', $url);
+        self::assertStringContainsString('/image/glide/filesystem/pixel.gif', $url);
         self::assertStringContainsString('w=100', $url);
         self::assertStringContainsString('fm=jpg', $url);
         self::assertStringContainsString('s=', $url);
     }
 
-    public function testPipelineLoadsImageWithMetadata(): void
+    public function testPipelineLoadsImageWithLazyStream(): void
     {
-        $container = self::getTestContainer();
+        $container = $this->getTestContainer();
         $pipeline = $container->get('picasso.pipeline');
         self::assertInstanceOf(ImagePipeline::class, $pipeline);
 
         $image = $pipeline->load(new ImageReference('pixel.gif'), withMetadata: true);
 
         self::assertSame('pixel.gif', $image->path);
-        self::assertSame(1, $image->width);
-        self::assertSame(1, $image->height);
-        self::assertSame('image/gif', $image->mimeType);
+        // Loaders provide lazy streams; dimensions are resolved by ImageComponent via MetadataGuesser
+        self::assertInstanceOf(Closure::class, $image->stream);
+        self::assertNull($image->width);
     }
 
     public function testControllerServesTransformedImage(): void
     {
-        $container = self::getTestContainer();
+        $container = $this->getTestContainer();
         $pipeline = $container->get('picasso.pipeline');
         self::assertInstanceOf(ImagePipeline::class, $pipeline);
 
@@ -191,22 +193,22 @@ class PicassoBundleTest extends TestCase
         self::assertStringContainsString('image/', (string) $response->headers->get('Content-Type'));
     }
 
-    public function testTwigExtensionGeneratesUrl(): void
+    public function testImageHelperGeneratesUrl(): void
     {
-        $container = self::getTestContainer();
-        $extension = $container->get('.picasso.twig_extension');
-        self::assertInstanceOf(PicassoExtension::class, $extension);
+        $container = $this->getTestContainer();
+        $helper = $container->get('picasso.image_helper');
+        self::assertInstanceOf(ImageHelper::class, $helper);
 
-        $url = $extension->imageUrl('pixel.gif', ['width' => 50, 'format' => 'gif']);
+        $url = $helper->imageUrl('pixel.gif', width: 50, format: 'gif');
 
-        self::assertStringContainsString('/picasso/glide/filesystem/pixel.gif', $url);
+        self::assertStringContainsString('/image/glide/filesystem/pixel.gif', $url);
         self::assertStringContainsString('w=50', $url);
         self::assertStringContainsString('fm=gif', $url);
     }
 
     public function testControllerReturns404ForInvalidSignature(): void
     {
-        $request = Request::create('/picasso/glide/filesystem/pixel.gif?w=100&s=invalid');
+        $request = Request::create('/image/glide/filesystem/pixel.gif?w=100&s=invalid');
         $response = self::$kernel->handle($request);
 
         self::assertSame(404, $response->getStatusCode());
@@ -214,7 +216,7 @@ class PicassoBundleTest extends TestCase
 
     public function testSrcsetGeneratorProducesWidths(): void
     {
-        $container = self::getTestContainer();
+        $container = $this->getTestContainer();
         $generator = $container->get('picasso.srcset_generator');
         self::assertInstanceOf(SrcsetGenerator::class, $generator);
 
@@ -227,7 +229,7 @@ class PicassoBundleTest extends TestCase
 
     public function testUrlEncryptionRoundTrip(): void
     {
-        $container = self::getTestContainer();
+        $container = $this->getTestContainer();
         $encryption = $container->get('picasso.url_encryption');
         self::assertInstanceOf(UrlEncryption::class, $encryption);
 

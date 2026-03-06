@@ -21,14 +21,12 @@ use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 class SrcsetGenerator
 {
     /**
-     * @param int[]    $deviceSizes Breakpoint widths for responsive images
-     * @param int[]    $imageSizes  Smaller widths for fixed/icon images
-     * @param string[] $formats     Ordered list of output formats (last = fallback)
+     * @param int[] $deviceSizes Breakpoint widths for responsive images
+     * @param int[] $imageSizes  Smaller widths for fixed/icon images
      */
     public function __construct(
         private readonly array $deviceSizes,
         private readonly array $imageSizes,
-        private readonly array $formats,
         private readonly int $defaultQuality,
     ) {
     }
@@ -74,10 +72,19 @@ class SrcsetGenerator
         ?int $quality = null,
         string $fit = 'contain',
         array $context = [],
+        ?int $sourceWidth = null,
     ): array {
         $quality ??= $this->defaultQuality;
         $widths = $this->getWidths($sizes, $width);
         $isFixed = null === $sizes && null !== $width;
+
+        // Prevent upscaling: cap widths to source width
+        if (null !== $sourceWidth && $sourceWidth > 0) {
+            $widths = array_values(array_unique(array_map(
+                static fn (int $w): int => min($w, $sourceWidth),
+                $widths,
+            )));
+        }
         $entries = [];
 
         foreach ($widths as $index => $w) {
@@ -140,13 +147,5 @@ class SrcsetGenerator
             quality: $quality,
             fit: $fit,
         ), $context);
-    }
-
-    /**
-     * @return string[]
-     */
-    public function getFormats(): array
-    {
-        return $this->formats;
     }
 }

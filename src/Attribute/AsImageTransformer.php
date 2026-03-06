@@ -16,10 +16,10 @@ namespace Silarhi\PicassoBundle\Attribute;
 use Attribute;
 
 #[Attribute(Attribute::TARGET_CLASS)]
-class AsImageTransformer
+final readonly class AsImageTransformer
 {
     public function __construct(
-        public readonly string $name,
+        public string $name,
     ) {
     }
 }

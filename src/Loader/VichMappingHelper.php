@@ -13,6 +13,10 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Loader;
 
+use function is_array;
+use function is_string;
+
+use Vich\UploaderBundle\Mapping\PropertyMapping;
 use Vich\UploaderBundle\Mapping\PropertyMappingFactory;
 
 final readonly class VichMappingHelper implements VichMappingHelperInterface
@@ -53,5 +57,44 @@ final readonly class VichMappingHelper implements VichMappingHelperInterface
         $mappings = $this->factory->fromObject($entity);
 
         return isset($mappings[0]) ? $mappings[0]->getUploadDestination() : null;
+    }
+
+    public function readMimeType(object $entity, ?string $field): ?string
+    {
+        $mapping = $this->getMapping($entity, $field);
+        if (!$mapping instanceof PropertyMapping) {
+            return null;
+        }
+
+        $value = $mapping->readProperty($entity, 'mimeType');
+
+        return is_string($value) ? $value : null;
+    }
+
+    public function readDimensions(object $entity, ?string $field): ?array
+    {
+        $mapping = $this->getMapping($entity, $field);
+        if (!$mapping instanceof PropertyMapping) {
+            return null;
+        }
+
+        $value = $mapping->readProperty($entity, 'dimensions');
+
+        if (!is_array($value) || !isset($value[0], $value[1]) || !is_numeric($value[0]) || !is_numeric($value[1])) {
+            return null;
+        }
+
+        return [(int) $value[0], (int) $value[1]];
+    }
+
+    private function getMapping(object $entity, ?string $field): ?PropertyMapping
+    {
+        if (null !== $field) {
+            return $this->factory->fromField($entity, $field);
+        }
+
+        $mappings = $this->factory->fromObject($entity);
+
+        return $mappings[0] ?? null;
     }
 }

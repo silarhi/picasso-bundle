@@ -49,7 +49,6 @@ class SrcsetGeneratorTest extends TestCase
         $this->generator = new SrcsetGenerator(
             deviceSizes: [640, 750, 1080, 1920],
             imageSizes: [32, 64, 128, 256],
-            formats: ['avif', 'webp', 'jpg'],
             defaultQuality: 75,
         );
     }
@@ -80,7 +79,6 @@ class SrcsetGeneratorTest extends TestCase
         $generator = new SrcsetGenerator(
             deviceSizes: [640, 1080],
             imageSizes: [640, 128],
-            formats: ['jpg'],
             defaultQuality: 75,
         );
 
@@ -205,11 +203,6 @@ class SrcsetGeneratorTest extends TestCase
         self::assertStringContainsString('w=800', $url);
         self::assertStringContainsString('h=600', $url);
         self::assertStringContainsString('q=80', $url);
-    }
-
-    public function testGetFormats(): void
-    {
-        self::assertSame(['avif', 'webp', 'jpg'], $this->generator->getFormats());
     }
 
     public function testGenerateSrcsetIncludesFitParam(): void

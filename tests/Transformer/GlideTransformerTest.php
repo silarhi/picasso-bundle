@@ -120,33 +120,34 @@ class GlideTransformerTest extends TestCase
         self::assertStringContainsString('dpr=2', $url);
     }
 
-    public function testUrlIncludesEncryptedSourceFromMetadata(): void
+    public function testUrlIncludesEncryptedMetadata(): void
     {
-        $image = new Image(path: 'photo.jpg', metadata: ['_source' => '/var/uploads/images']);
+        $image = new Image(path: 'photo.jpg', metadata: ['upload_destination' => '/var/uploads/images']);
         $transformation = new ImageTransformation(width: 300);
 
         $url = $this->transformer->url($image, $transformation, ['loader' => 'vich']);
 
-        self::assertStringContainsString('_source=', $url);
+        self::assertStringContainsString('_metadata=', $url);
         self::assertStringContainsString('/picasso/glide/vich/photo.jpg', $url);
 
-        // Extract the _source param and verify it decrypts correctly
+        // Extract the _metadata param and verify it decrypts to the original metadata
         $queryString = parse_url($url, \PHP_URL_QUERY);
         self::assertIsString($queryString);
         parse_str($queryString, $query);
-        self::assertArrayHasKey('_source', $query);
+        self::assertArrayHasKey('_metadata', $query);
         $encryption = new UrlEncryption(self::SIGN_KEY);
-        self::assertIsString($query['_source']);
-        self::assertSame('/var/uploads/images', $encryption->decrypt($query['_source']));
+        self::assertIsString($query['_metadata']);
+        $decrypted = json_decode($encryption->decrypt($query['_metadata']), true, flags: \JSON_THROW_ON_ERROR);
+        self::assertSame(['upload_destination' => '/var/uploads/images'], $decrypted);
     }
 
-    public function testUrlOmitsSourceWhenNoMetadata(): void
+    public function testUrlOmitsMetadataWhenEmpty(): void
     {
         $image = new Image(path: 'photo.jpg');
         $transformation = new ImageTransformation(width: 300);
 
         $url = $this->transformer->url($image, $transformation);
 
-        self::assertStringNotContainsString('_source=', $url);
+        self::assertStringNotContainsString('_metadata=', $url);
     }
 }

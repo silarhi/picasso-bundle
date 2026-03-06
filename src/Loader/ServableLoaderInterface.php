@@ -21,7 +21,9 @@ interface ServableLoaderInterface extends ImageLoaderInterface
     /**
      * Get the filesystem source for serving images.
      *
+     * @param array<string, mixed> $metadata
+     *
      * @return object|string Local path (string) or FilesystemOperator
      */
-    public function getSource(): object|string;
+    public function getSource(array $metadata): object|string;
 }

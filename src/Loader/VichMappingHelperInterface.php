@@ -25,4 +25,16 @@ interface VichMappingHelperInterface
      * Returns the upload destination directory for an entity's mapping.
      */
     public function getUploadDestination(object $entity, ?string $field): ?string;
+
+    /**
+     * Reads the mime type from the entity's mapped property.
+     */
+    public function readMimeType(object $entity, ?string $field): ?string;
+
+    /**
+     * Reads the dimensions from the entity's mapped property.
+     *
+     * @return array{0: int, 1: int}|null [width, height] or null
+     */
+    public function readDimensions(object $entity, ?string $field): ?array;
 }

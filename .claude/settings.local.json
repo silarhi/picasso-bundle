@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(vendor/bin/phpunit:*)",
+      "Bash(./vendor/bin/phpunit:*)",
+      "Bash(./vendor/bin/phpstan analyse:*)",
+      "Bash(composer show:*)",
+      "Bash(php:*)",
+      "Bash(vendor/bin/phpstan analyse:*)",
+      "Bash(composer require:*)",
+      "Bash(composer update:*)"
+    ]
+  }
+}

@@ -58,9 +58,9 @@ class ImageTest extends TestCase
 
     public function testWithMetadata(): void
     {
-        $image = new Image(path: 'photo.jpg', metadata: ['_source' => '/var/uploads']);
+        $image = new Image(path: 'photo.jpg', metadata: ['upload_destination' => '/var/uploads']);
 
-        self::assertSame('/var/uploads', $image->metadata['_source']);
+        self::assertSame('/var/uploads', $image->metadata['upload_destination']);
     }
 
     public function testReadonlyProperties(): void

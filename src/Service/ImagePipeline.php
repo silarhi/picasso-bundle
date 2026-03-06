@@ -14,20 +14,17 @@ declare(strict_types=1);
 namespace Silarhi\PicassoBundle\Service;
 
 use LogicException;
-use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
-use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
-use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 
-class ImagePipeline
+readonly class ImagePipeline
 {
     public function __construct(
-        private readonly ContainerInterface $loaders,
-        private readonly ContainerInterface $transformers,
-        private readonly ?string $defaultLoader,
-        private readonly string $defaultTransformer,
+        private LoaderRegistry $loaderRegistry,
+        private TransformerRegistry $transformerRegistry,
+        private ?string $defaultLoader,
+        private ?string $defaultTransformer,
     ) {
     }
 
@@ -40,15 +37,11 @@ class ImagePipeline
         ?string $loader = null,
         ?string $transformer = null,
     ): string {
-        $loaderName = $loader ?? $this->defaultLoader ?? throw new LogicException('No loader specified and no default_loader configured.');
-        $transformerName = $transformer ?? $this->defaultTransformer;
+        $loaderName = $this->resolveLoaderName($loader);
+        $transformerName = $this->resolveTransformerName($transformer);
 
-        /** @var ImageLoaderInterface $imageLoader */
-        $imageLoader = $this->loaders->get($loaderName);
-        $image = $imageLoader->load($reference);
-
-        /** @var ImageTransformerInterface $imageTransformer */
-        $imageTransformer = $this->transformers->get($transformerName);
+        $image = $this->loaderRegistry->get($loaderName)->load($reference);
+        $imageTransformer = $this->transformerRegistry->get($transformerName);
 
         return $imageTransformer->url($image, $transformation, ['loader' => $loaderName]);
     }
@@ -61,11 +54,16 @@ class ImagePipeline
         ?string $loader = null,
         bool $withMetadata = false,
     ): Image {
-        $loaderName = $loader ?? $this->defaultLoader ?? throw new LogicException('No loader specified and no default_loader configured.');
+        return $this->loaderRegistry->get($this->resolveLoaderName($loader))->load($reference, $withMetadata);
+    }
 
-        /** @var ImageLoaderInterface $imageLoader */
-        $imageLoader = $this->loaders->get($loaderName);
+    public function resolveLoaderName(?string $loader = null): string
+    {
+        return $loader ?? $this->defaultLoader ?? throw new LogicException('No loader specified and no default_loader configured.');
+    }
 
-        return $imageLoader->load($reference, $withMetadata);
+    public function resolveTransformerName(?string $transformer = null): string
+    {
+        return $transformer ?? $this->defaultTransformer ?? throw new LogicException('No transformer specified and no default_transformer configured.');
     }
 }

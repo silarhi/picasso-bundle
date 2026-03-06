@@ -14,22 +14,20 @@ declare(strict_types=1);
 namespace Silarhi\PicassoBundle\Loader;
 
 use function is_object;
-use function is_resource;
 use function is_string;
 
+use League\Flysystem\FilesystemOperator;
 use LogicException;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
-use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
-use Throwable;
 use Vich\UploaderBundle\Storage\StorageInterface;
 
-class VichUploaderLoader implements ServableLoaderInterface
+final class VichUploaderLoader implements ServableLoaderInterface
 {
     public function __construct(
         private readonly StorageInterface $storage,
         private readonly VichMappingHelperInterface $mappingHelper,
-        private readonly MetadataGuesserInterface $metadataGuesser,
+        private readonly FlysystemRegistry $flysystemRegistry,
     ) {
     }
 
@@ -51,31 +49,23 @@ class VichUploaderLoader implements ServableLoaderInterface
 
         $path = $this->storage->resolvePath($entity, $fileProperty, null, true);
         $uploadDestination = $this->mappingHelper->getUploadDestination($entity, $field);
-        $metadata = null !== $uploadDestination ? ['_source' => $uploadDestination] : [];
-
-        $stream = null;
-
-        try {
-            $resolved = $this->storage->resolveStream($entity, $fileProperty);
-            $stream = is_resource($resolved) ? $resolved : null;
-        } catch (Throwable) {
-            // Stream not available
-        }
+        $metadata = null !== $uploadDestination ? ['upload_destination' => $uploadDestination] : [];
 
         $width = null;
         $height = null;
         $mimeType = null;
 
-        if ($withMetadata && null !== $stream) {
-            $guessed = $this->metadataGuesser->guess($stream);
-            $width = $guessed['width'];
-            $height = $guessed['height'];
-            $mimeType = $guessed['mimeType'];
+        if ($withMetadata) {
+            $dimensions = $this->mappingHelper->readDimensions($entity, $field);
+            if (null !== $dimensions) {
+                [$width, $height] = $dimensions;
+            }
+            $mimeType = $this->mappingHelper->readMimeType($entity, $field);
         }
 
         return new Image(
             path: ltrim($path ?? '', '/'),
-            stream: $stream,
+            stream: fn () => $this->storage->resolveStream($entity, $fileProperty),
             width: $width,
             height: $height,
             mimeType: $mimeType,
@@ -83,8 +73,18 @@ class VichUploaderLoader implements ServableLoaderInterface
         );
     }
 
-    public function getSource(): object|string
+    /** @param array<string, mixed> $metadata */
+    public function getSource(array $metadata): FilesystemOperator|string
     {
-        throw new LogicException('VichUploaderLoader passes its source via encrypted URL metadata.');
+        $uploadDestination = $metadata['upload_destination'] ?? null;
+        if (!is_string($uploadDestination)) {
+            throw new LogicException('Upload destination is required to get the source.');
+        }
+
+        if ($this->flysystemRegistry->has($uploadDestination)) {
+            return $this->flysystemRegistry->get($uploadDestination);
+        }
+
+        return $uploadDestination;
     }
 }

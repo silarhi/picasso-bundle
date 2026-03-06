@@ -13,30 +13,28 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Loader;
 
-use League\Flysystem\FilesystemOperator;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
+use Symfony\Component\HttpClient\Response\StreamWrapper;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
-final class FlysystemLoader implements ServableLoaderInterface
+final class UrlLoader implements ImageLoaderInterface
 {
     public function __construct(
-        private readonly FilesystemOperator $storage,
+        private readonly HttpClientInterface $httpClient,
     ) {
     }
 
     public function load(ImageReference $reference, bool $withMetadata = false): Image
     {
-        $path = ltrim($reference->path ?? '', '/');
-        if ('' === $path) {
+        $url = $reference->path ?? '';
+        if ('' === $url) {
             return new Image();
         }
 
-        return new Image(path: $path, stream: fn () => $this->storage->readStream($path));
-    }
-
-    /** @param array<string, mixed> $metadata */
-    public function getSource(array $metadata): FilesystemOperator
-    {
-        return $this->storage;
+        return new Image(
+            url: $url,
+            stream: fn () => StreamWrapper::createResource($this->httpClient->request('GET', $url), $this->httpClient),
+        );
     }
 }
