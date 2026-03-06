@@ -57,8 +57,10 @@ class ConfigurationTest extends TestCase
 
         $tree = $treeBuilder->buildTree();
 
-        /** @var PicassoConfig */
-        return $tree->finalize($tree->normalize($config));
+        /** @var PicassoConfig $config */
+        $config = $tree->finalize($tree->normalize($config));
+
+        return $config;
     }
 
     // --- Default values ---
