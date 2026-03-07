@@ -36,7 +36,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
     private const HMAC_LENGTH = 10;
 
     /**
-     * @param array{enabled: bool, path: string, url_prefix: string}|null $publicCache
+     * @param array{enabled: bool, path: string}|null $publicCache
      */
     public function __construct(
         private UrlGeneratorInterface $router,
@@ -114,7 +114,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
     }
 
     /**
-     * @return array{enabled: bool, path: string, url_prefix: string}|null
+     * @return array{enabled: bool, path: string}|null
      */
     public function getPublicCache(): ?array
     {
@@ -217,10 +217,13 @@ final readonly class GlideTransformer implements LocalTransformerInterface
 
         $format = isset($glideParams['fm']) ? (string) $glideParams['fm'] : pathinfo($path, \PATHINFO_EXTENSION);
 
-        /** @var array{enabled: bool, path: string, url_prefix: string} $publicCache */
-        $publicCache = $this->publicCache;
+        $cachedPath = $path . '/' . $paramsSegment . ',s_' . $hmac . '.' . $format;
 
-        return rtrim($publicCache['url_prefix'], '/') . '/' . $transformerName . '/' . $loaderName . '/' . $path . '/' . $paramsSegment . ',s_' . $hmac . '.' . $format;
+        return $this->router->generate('picasso_image_cached', [
+            'transformer' => $transformerName,
+            'loader' => $loaderName,
+            'path' => $cachedPath,
+        ], UrlGeneratorInterface::ABSOLUTE_PATH);
     }
 
     private function validateHmac(string $paramsSegment, string $hmac): void
@@ -282,7 +285,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
             return;
         }
 
-        /** @var array{enabled: bool, path: string, url_prefix: string} $publicCache */
+        /** @var array{enabled: bool, path: string} $publicCache */
         $publicCache = $this->publicCache;
         $cacheDir = rtrim($publicCache['path'], '/') . '/' . $imagePath;
 

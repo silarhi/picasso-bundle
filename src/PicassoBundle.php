@@ -199,10 +199,6 @@ final class PicassoBundle extends AbstractBundle
                                         ->defaultValue('%kernel.project_dir%/public/cache/picasso')
                                         ->info('Filesystem path to write cached images for direct web server serving.')
                                     ->end()
-                                    ->scalarNode('url_prefix')
-                                        ->defaultValue('/cache/picasso')
-                                        ->info('URL prefix for cached images (must match the route prefix).')
-                                    ->end()
                                 ->end()
                             ->end()
                         ->end()
@@ -227,7 +223,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_fit: string,
          *     placeholders: array{blur: array{enabled: bool, size: int, blur: int, quality: int}},
          *     loaders: array<string, array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null}>,
-         *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, public_cache: array{enabled: bool, path: string, url_prefix: string}}>
+         *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, public_cache: array{enabled: bool, path: string}}>
          * } $config
          */
         $services = $container->services();

@@ -144,7 +144,7 @@ class ImageControllerTest extends TestCase
             '/tmp/cache',
             'gd',
             null,
-            ['enabled' => true, 'path' => '/tmp/public-cache', 'url_prefix' => '/cache/picasso'],
+            ['enabled' => true, 'path' => '/tmp/public-cache'],
         );
 
         $transformerRegistry = $this->createRegistry(TransformerRegistry::class, 'glide', $transformer);

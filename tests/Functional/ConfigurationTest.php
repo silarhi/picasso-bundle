@@ -24,7 +24,7 @@ use Symfony\Component\Config\FileLocator;
 /**
  * @phpstan-type BlurConfig array{enabled: bool, size: int, blur: int, quality: int}
  * @phpstan-type LoaderConfig array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null}
- * @phpstan-type PublicCacheConfig array{enabled: bool, path: string, url_prefix: string}
+ * @phpstan-type PublicCacheConfig array{enabled: bool, path: string}
  * @phpstan-type TransformerConfig array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, public_cache: PublicCacheConfig}
  * @phpstan-type PicassoConfig array{
  *     default_loader: string|null,
@@ -519,7 +519,6 @@ class ConfigurationTest extends TestCase
                     'public_cache' => [
                         'enabled' => true,
                         'path' => '/var/www/public/cache/images',
-                        'url_prefix' => '/cache/images',
                     ],
                 ],
             ],
@@ -527,7 +526,6 @@ class ConfigurationTest extends TestCase
 
         self::assertTrue($config['transformers']['my_glide']['public_cache']['enabled']);
         self::assertSame('/var/www/public/cache/images', $config['transformers']['my_glide']['public_cache']['path']);
-        self::assertSame('/cache/images', $config['transformers']['my_glide']['public_cache']['url_prefix']);
     }
 
     public function testGlideTransformerPublicCacheDefaults(): void
@@ -545,7 +543,6 @@ class ConfigurationTest extends TestCase
 
         self::assertTrue($config['transformers']['my_glide']['public_cache']['enabled']);
         self::assertStringEndsWith('/public/cache/picasso', $config['transformers']['my_glide']['public_cache']['path']);
-        self::assertSame('/cache/picasso', $config['transformers']['my_glide']['public_cache']['url_prefix']);
     }
 
     public function testGlideTransformerWithImagickDriver(): void

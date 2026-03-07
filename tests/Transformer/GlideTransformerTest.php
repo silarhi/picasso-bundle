@@ -44,9 +44,17 @@ class GlideTransformerTest extends TestCase
                 assert(is_string($params['loader']));
                 assert(is_string($params['path']));
 
-                return '/picasso/' . $params['transformer'] . '/' . $params['loader'] . '/' . $params['path'] . '?' . http_build_query(
+                $base = '/picasso/' . $params['transformer'] . '/' . $params['loader'] . '/' . $params['path'];
+
+                if ('picasso_image_cached' === $name) {
+                    return $base;
+                }
+
+                $query = http_build_query(
                     array_filter($params, static fn ($k): bool => !in_array($k, ['transformer', 'loader', 'path'], true), \ARRAY_FILTER_USE_KEY),
                 );
+
+                return $base . '?' . $query;
             });
 
         $this->transformer = new GlideTransformer(
@@ -205,7 +213,7 @@ class GlideTransformerTest extends TestCase
             '/tmp/cache',
             'gd',
             null,
-            ['enabled' => true, 'path' => '/public/cache/picasso', 'url_prefix' => '/cache/picasso'],
+            ['enabled' => true, 'path' => '/public/cache/picasso'],
         );
 
         $image = new Image(path: 'uploads/photo.jpg');
@@ -213,7 +221,7 @@ class GlideTransformerTest extends TestCase
 
         $url = $transformer->url($image, $transformation, ['loader' => 'filesystem', 'transformer' => 'glide']);
 
-        self::assertStringStartsWith('/cache/picasso/glide/filesystem/uploads/photo.jpg/', $url);
+        self::assertStringStartsWith('/picasso/glide/filesystem/uploads/photo.jpg/', $url);
         self::assertStringContainsString('w_300', $url);
         self::assertStringContainsString('fm_webp', $url);
         self::assertStringContainsString(',s_', $url);
@@ -231,7 +239,7 @@ class GlideTransformerTest extends TestCase
             '/tmp/cache',
             'gd',
             null,
-            ['enabled' => true, 'path' => '/public/cache/picasso', 'url_prefix' => '/cache/picasso'],
+            ['enabled' => true, 'path' => '/public/cache/picasso'],
         );
 
         $image = new Image(path: 'photo.jpg', metadata: ['upload_destination' => '/var/uploads']);
@@ -252,7 +260,7 @@ class GlideTransformerTest extends TestCase
             '/tmp/cache',
             'gd',
             null,
-            ['enabled' => true, 'path' => '/public/cache/picasso', 'url_prefix' => '/cache/picasso'],
+            ['enabled' => true, 'path' => '/public/cache/picasso'],
         );
 
         $image = new Image(path: 'photo.jpg');
@@ -291,7 +299,7 @@ class GlideTransformerTest extends TestCase
             '/tmp/cache',
             'gd',
             null,
-            ['enabled' => true, 'path' => '/public/cache/picasso', 'url_prefix' => '/cache/picasso'],
+            ['enabled' => true, 'path' => '/public/cache/picasso'],
         );
 
         self::assertTrue($transformer->isPublicCacheEnabled());
@@ -363,7 +371,7 @@ class GlideTransformerTest extends TestCase
             '/tmp/cache',
             'gd',
             null,
-            ['enabled' => true, 'path' => '/public/cache/picasso', 'url_prefix' => '/cache/picasso'],
+            ['enabled' => true, 'path' => '/public/cache/picasso'],
         );
 
         $image = new Image(path: 'photos/hero.jpg');
