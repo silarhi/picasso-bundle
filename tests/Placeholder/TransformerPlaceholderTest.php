@@ -49,8 +49,7 @@ class TransformerPlaceholderTest extends TestCase
         $placeholder = new TransformerPlaceholder($registry);
         $result = $placeholder->generate(
             new Image(path: 'photo.jpg'),
-            1920,
-            1080,
+            new ImageTransformation(width: 1920, height: 1080),
             ['loader' => 'filesystem', 'transformer' => 'glide'],
         );
 
@@ -80,8 +79,7 @@ class TransformerPlaceholderTest extends TestCase
         $placeholder = new TransformerPlaceholder($registry, size: 20, blur: 15, quality: 50);
         $result = $placeholder->generate(
             new Image(path: 'photo.jpg'),
-            800,
-            400,
+            new ImageTransformation(width: 800, height: 400),
             ['loader' => 'filesystem', 'transformer' => 'glide'],
         );
 
@@ -96,6 +94,6 @@ class TransformerPlaceholderTest extends TestCase
         $placeholder = new TransformerPlaceholder($registry);
 
         $this->expectException(InvalidArgumentException::class);
-        $placeholder->generate(new Image(path: 'photo.jpg'), 100, 100);
+        $placeholder->generate(new Image(path: 'photo.jpg'), new ImageTransformation(width: 100, height: 100));
     }
 }

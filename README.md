@@ -427,12 +427,14 @@ class CloudinaryTransformer implements ImageTransformerInterface
 use Silarhi\PicassoBundle\Attribute\AsPlaceholder;
 use Silarhi\PicassoBundle\Placeholder\PlaceholderInterface;
 use Silarhi\PicassoBundle\Dto\Image;
+use Silarhi\PicassoBundle\Dto\ImageTransformation;
 
 #[AsPlaceholder('blurhash')]
 class BlurHashPlaceholder implements PlaceholderInterface
 {
-    public function generate(Image $image, int $width, int $height, array $context = []): string
+    public function generate(Image $image, ImageTransformation $transformation, array $context = []): string
     {
+        // Use $transformation->width, $transformation->height, etc.
         // Generate and return a data URI (e.g. blurhash, thumbhash, etc.)
         return 'data:image/png;base64,...';
     }

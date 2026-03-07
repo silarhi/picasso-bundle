@@ -31,7 +31,7 @@ final readonly class TransformerPlaceholder implements PlaceholderInterface
     ) {
     }
 
-    public function generate(Image $image, int $width, int $height, array $context = []): string
+    public function generate(Image $image, ImageTransformation $transformation, array $context = []): string
     {
         if (!is_string($context['transformer'] ?? null)) {
             throw new InvalidArgumentException('The "transformer" key is required in context for TransformerPlaceholder.');
@@ -41,6 +41,9 @@ final readonly class TransformerPlaceholder implements PlaceholderInterface
 
         $tinyWidth = $this->size;
         $tinyHeight = $this->size;
+
+        $width = $transformation->width ?? 0;
+        $height = $transformation->height ?? 0;
 
         if ($width > 0) {
             $tinyHeight = max(1, (int) round($tinyWidth * $height / $width));

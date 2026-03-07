@@ -14,11 +14,12 @@ declare(strict_types=1);
 namespace Silarhi\PicassoBundle\Tests\Functional\Stub;
 
 use Silarhi\PicassoBundle\Dto\Image;
+use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Placeholder\PlaceholderInterface;
 
 final class StubServicePlaceholder implements PlaceholderInterface
 {
-    public function generate(Image $image, int $width, int $height, array $context = []): string
+    public function generate(Image $image, ImageTransformation $transformation, array $context = []): string
     {
         return 'data:image/png;base64,service-placeholder';
     }

@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Silarhi\PicassoBundle\Placeholder;
 
 use Silarhi\PicassoBundle\Dto\Image;
+use Silarhi\PicassoBundle\Dto\ImageTransformation;
 
 interface PlaceholderInterface
 {
@@ -22,5 +23,5 @@ interface PlaceholderInterface
      *
      * @param array<string, mixed> $context Extra context (loader name, transformer name, etc.)
      */
-    public function generate(Image $image, int $width, int $height, array $context = []): string;
+    public function generate(Image $image, ImageTransformation $transformation, array $context = []): string;
 }

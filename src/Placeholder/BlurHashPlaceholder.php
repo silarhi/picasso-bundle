@@ -17,6 +17,7 @@ use kornrunner\Blurhash\Blurhash;
 use LogicException;
 use RuntimeException;
 use Silarhi\PicassoBundle\Dto\Image;
+use Silarhi\PicassoBundle\Dto\ImageTransformation;
 
 final readonly class BlurHashPlaceholder implements PlaceholderInterface
 {
@@ -32,7 +33,7 @@ final readonly class BlurHashPlaceholder implements PlaceholderInterface
     ) {
     }
 
-    public function generate(Image $image, int $width, int $height, array $context = []): string
+    public function generate(Image $image, ImageTransformation $transformation, array $context = []): string
     {
         if (!class_exists(Blurhash::class)) {
             throw new LogicException('The "kornrunner/blurhash" package is required for the BlurHash placeholder. Install it with: composer require kornrunner/blurhash');
@@ -47,7 +48,7 @@ final readonly class BlurHashPlaceholder implements PlaceholderInterface
 
         $hash = Blurhash::encode($pixels, $this->componentsX, $this->componentsY);
 
-        return $this->decodeToDataUri($hash, $width, $height);
+        return $this->decodeToDataUri($hash, $transformation->width ?? 0, $transformation->height ?? 0);
     }
 
     /**

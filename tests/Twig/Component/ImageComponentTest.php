@@ -18,6 +18,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageSource;
+use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Dto\SrcsetEntry;
 use Silarhi\PicassoBundle\Placeholder\PlaceholderInterface;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
@@ -177,8 +178,10 @@ class ImageComponentTest extends TestCase
             ->method('generate')
             ->with(
                 self::isInstanceOf(Image::class),
-                1920,
-                1080,
+                self::callback(static fn (ImageTransformation $t): bool => 1920 === $t->width
+                    && 1080 === $t->height
+                    && 75 === $t->quality
+                    && 'contain' === $t->fit),
                 ['loader' => 'filesystem', 'transformer' => 'glide'],
             )
             ->willReturn('/picasso/glide/filesystem/photo.jpg?w=10&h=6&fm=jpg&q=30&blur=50');

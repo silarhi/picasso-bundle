@@ -17,6 +17,7 @@ use function is_string;
 
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Dto\ImageSource;
+use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
 use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
 use Silarhi\PicassoBundle\Service\PlaceholderRegistry;
@@ -188,7 +189,12 @@ class ImageComponent
                 ) {
                     $this->placeholderUri = $this->placeholderRegistry
                         ->get($placeholderName)
-                        ->generate($image, $this->width, $this->height, $transformerContext);
+                        ->generate($image, new ImageTransformation(
+                            width: $this->width,
+                            height: $this->height,
+                            quality: $this->quality ?? $this->defaultQuality,
+                            fit: $this->fit ?? $this->defaultFit,
+                        ), $transformerContext);
                 }
             }
         }

@@ -16,6 +16,7 @@ namespace Silarhi\PicassoBundle\Tests\Placeholder;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Silarhi\PicassoBundle\Dto\Image;
+use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Placeholder\BlurHashPlaceholder;
 
 use function strlen;
@@ -29,7 +30,7 @@ class BlurHashPlaceholderTest extends TestCase
         $stream = $this->createTestImageStream(100, 75);
         $image = new Image(path: 'photo.jpg', stream: $stream);
 
-        $result = $placeholder->generate($image, 100, 75);
+        $result = $placeholder->generate($image, new ImageTransformation(width: 100, height: 75));
 
         self::assertStringStartsWith('data:image/png;base64,', $result);
         self::assertNotSame('data:image/png;base64,', $result);
@@ -42,7 +43,7 @@ class BlurHashPlaceholderTest extends TestCase
         $stream = $this->createTestImageStream(50, 50);
         $image = new Image(path: 'photo.jpg', stream: $stream);
 
-        $result = $placeholder->generate($image, 50, 50);
+        $result = $placeholder->generate($image, new ImageTransformation(width: 50, height: 50));
 
         self::assertStringStartsWith('data:image/png;base64,', $result);
     }
@@ -54,7 +55,7 @@ class BlurHashPlaceholderTest extends TestCase
         $stream = $this->createTestImageStream(80, 60);
         $image = new Image(path: 'photo.jpg', stream: static fn () => $stream);
 
-        $result = $placeholder->generate($image, 80, 60);
+        $result = $placeholder->generate($image, new ImageTransformation(width: 80, height: 60));
 
         self::assertStringStartsWith('data:image/png;base64,', $result);
     }
@@ -66,7 +67,7 @@ class BlurHashPlaceholderTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('image stream is not available');
-        $placeholder->generate($image, 100, 100);
+        $placeholder->generate($image, new ImageTransformation(width: 100, height: 100));
     }
 
     public function testGenerateProducesValidPng(): void
@@ -76,7 +77,7 @@ class BlurHashPlaceholderTest extends TestCase
         $stream = $this->createTestImageStream(200, 100);
         $image = new Image(path: 'photo.jpg', stream: $stream);
 
-        $result = $placeholder->generate($image, 200, 100);
+        $result = $placeholder->generate($image, new ImageTransformation(width: 200, height: 100));
 
         $base64 = substr($result, strlen('data:image/png;base64,'));
         $binary = base64_decode($base64, true);
@@ -98,7 +99,7 @@ class BlurHashPlaceholderTest extends TestCase
         $stream = $this->createTestImageStream(200, 150);
         $image = new Image(path: 'photo.jpg', stream: $stream);
 
-        $result = $placeholder->generate($image, 200, 150);
+        $result = $placeholder->generate($image, new ImageTransformation(width: 200, height: 150));
 
         self::assertStringStartsWith('data:image/png;base64,', $result);
     }

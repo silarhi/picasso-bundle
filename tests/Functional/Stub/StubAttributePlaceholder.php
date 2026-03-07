@@ -15,12 +15,13 @@ namespace Silarhi\PicassoBundle\Tests\Functional\Stub;
 
 use Silarhi\PicassoBundle\Attribute\AsPlaceholder;
 use Silarhi\PicassoBundle\Dto\Image;
+use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Placeholder\PlaceholderInterface;
 
 #[AsPlaceholder('stub')]
 final class StubAttributePlaceholder implements PlaceholderInterface
 {
-    public function generate(Image $image, int $width, int $height, array $context = []): string
+    public function generate(Image $image, ImageTransformation $transformation, array $context = []): string
     {
         return 'data:image/gif;base64,stub-placeholder';
     }
