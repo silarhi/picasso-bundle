@@ -5,8 +5,6 @@
     "license": "MIT",
     "require": {
         "php": ">=8.2",
-        "psr/http-client": "^1.0",
-        "psr/http-factory": "^1.0",
         "symfony/framework-bundle": "^6.4 || ^7.0 || ^8.0",
         "symfony/ux-twig-component": "^2.13"
     },
@@ -20,6 +18,8 @@
         "nyholm/psr7": "^1.8",
         "phpstan/phpstan": "^2.1.40",
         "phpunit/phpunit": "^11.5.55",
+        "psr/http-client": "^1.0.3",
+        "psr/http-factory": "^1.1",
         "rector/rector": "^2.3.8",
         "symfony/http-client": "^6.4 || ^7.4.4 || ^8.0.6",
         "symfony/twig-bundle": "^6.4 || ^7.4.4 || ^8.0",
@@ -40,7 +40,9 @@
         "league/flysystem": "Required for the Flysystem loader",
         "kornrunner/blurhash": "Required for the BlurHash placeholder",
         "vich/uploader-bundle": "Required for the VichUploader loader",
-        "symfony/http-client": "Provides a PSR-18 HTTP client implementation",
+        "psr/http-client": "Required for the URL loader (PSR-18 HTTP client interface)",
+        "psr/http-factory": "Required for the URL loader (PSR-17 HTTP factory interface)",
+        "symfony/http-client": "Provides a PSR-18 HTTP client implementation for the URL loader",
         "nyholm/psr7": "Provides a PSR-7/PSR-17 implementation for the URL loader"
     },
     "scripts": {
