@@ -31,7 +31,7 @@
         "sort-packages": true
     },
     "suggest": {
-        "imagine/imagine": "Required for the Imagine transformer (local image transformation with GD or Imagick)",
+        "imagine/imagine": "Required for the Imagine transformer and BlurHash placeholder (supports GD and Imagick)",
         "league/glide": "Required for the Glide transformer (local image transformation)",
         "league/glide-symfony": "Required for the Glide transformer",
         "league/flysystem": "Required for the Flysystem loader",
