@@ -8,7 +8,7 @@ srcset generation, and blur placeholders — all from a single Twig component.
 ## Features
 
 - **Responsive `<picture>` output** with automatic srcset and multiple format generation
-- **Blur placeholders** (LQIP) for smooth loading transitions
+- **Pluggable placeholders** — blur (LQIP), blurhash, or custom placeholder services for smooth loading transitions
 - **Pluggable loaders** — Filesystem,
   [Flysystem](https://flysystem.thephpleague.com/),
   [VichUploaderBundle](https://github.com/dustin10/VichUploaderBundle), URL
@@ -17,7 +17,7 @@ srcset generation, and blur placeholders — all from a single Twig component.
 - **Automatic image dimension detection** from streams
 - **URL signing** for secure on-demand transformation
 - **Priority images** — eager loading + `fetchpriority="high"` for above-the-fold content
-- **Extensible** via `#[AsImageLoader]` and `#[AsImageTransformer]` attributes
+- **Extensible** via `#[AsImageLoader]`, `#[AsImageTransformer]`, and `#[AsPlaceholder]` attributes
 
 ## Requirements
 
@@ -76,6 +76,7 @@ When only one loader and one transformer are configured, they are automatically 
 picasso:
     default_loader: ~          # auto-detected when only one is enabled
     default_transformer: ~     # auto-detected when only one is enabled
+    default_placeholder: ~     # auto-detected when only one is enabled
 
     device_sizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840]
     image_sizes: [16, 32, 48, 64, 96, 128, 256, 384]
@@ -84,11 +85,24 @@ picasso:
     default_fit: contain       # contain | cover | crop | fill
 
     placeholders:
+        # Transformer placeholder — generates a tiny blurred image via the transformer
         blur:
-            enabled: true      # enable blur placeholders globally
+            type: transformer  # inferred from the key name
             size: 10           # tiny image width/height in px
             blur: 5            # blur radius
             quality: 30        # JPEG quality for blur image (1–100)
+
+        # BlurHash placeholder — generates a BlurHash-based placeholder (requires kornrunner/blurhash)
+        # blurhash:
+        #     type: blurhash      # inferred from the key name
+        #     components_x: 4    # horizontal components (1–9)
+        #     components_y: 3    # vertical components (1–9)
+        #     size: 32           # decoded placeholder image size in px
+
+        # Custom placeholder — delegate to your own service
+        # my_placeholder:
+        #     type: service
+        #     service: 'App\Image\MyPlaceholder'  # must implement PlaceholderInterface
 
     loaders:
         # Filesystem loader — reads images from local directories
@@ -170,31 +184,38 @@ with a full srcset.
 | `transformer`   | `string` | —       | Override default transformer                        |
 | `quality`       | `int`    | 75      | Override quality (1–100)                            |
 | `fit`           | `string` | contain | Fit mode: `contain`, `cover`, `crop`, `fill`        |
-| `placeholder`   | `bool`   | —       | Override blur placeholder (overrides global config) |
-| `priority`      | `bool`   | false   | Eager loading, `fetchpriority="high"`, no blur      |
+| `placeholder`   | `string\|bool` | —  | `true`/`false` to enable/disable, or a placeholder name |
+| `placeholderData` | `string` | —     | Literal data URI, bypasses placeholder services     |
+| `priority`      | `bool`   | false   | Eager loading, `fetchpriority="high"`, no placeholder |
 | `loading`       | `string` | lazy    | `lazy` or `eager`. Auto-set when priority           |
 | `fetchPriority` | `string` | —       | `high`, `low`, `auto`. Auto-set when priority       |
 | `unoptimized`   | `bool`   | false   | Serve original image without transformation         |
 | `context`       | `array`  | `[]`    | Extra context for the loader (e.g. Vich)            |
 
-#### Blur Placeholder
+#### Placeholders
 
-When enabled (default), the component generates a tiny blurred version of the image
-and inlines it as a CSS `background-image` on the `<img>` tag. Once the full image
-loads, the blur background is removed via an `onload` handler, creating a smooth
-transition.
+Placeholders generate a low-quality preview displayed while the full image loads.
+The built-in `transformer` placeholder creates a tiny blurred version of the image
+and inlines it as a CSS `background-image`. Once the full image loads, the placeholder
+is removed via an `onload` handler.
 
-You can control blur globally via configuration or per-image via the `placeholder` prop:
+Configure placeholders in your bundle config, then control them per-image via props:
 
 ```twig
-{# Disable blur for this specific image #}
+{# Uses the default placeholder from config #}
+<Picasso:Image src="photo.jpg" width="800" height="600" sizes="100vw" alt="Photo" />
+
+{# Disable placeholder for this image #}
 <Picasso:Image src="icon.png" width="64" height="64" :placeholder="false" />
 
-{# Enable blur even if globally disabled #}
-<Picasso:Image src="hero.jpg" width="1200" height="800" :placeholder="true" />
+{# Select a specific named placeholder #}
+<Picasso:Image src="hero.jpg" width="1200" height="800" placeholder="my_blurhash" />
+
+{# Pass a literal data URI directly #}
+<Picasso:Image src="photo.jpg" width="800" height="600" placeholderData="data:image/png;base64,..." />
 ```
 
-> **Note:** Blur is automatically disabled when `priority` is `true`, since priority images should load eagerly without placeholders.
+> **Note:** Placeholders are automatically disabled when `priority` is `true`, since priority images should load eagerly without placeholders.
 
 #### Priority Images
 
@@ -366,7 +387,7 @@ picasso:
             service: 'App\Image\CloudinaryTransformer'
 ```
 
-## Custom Loaders and Transformers
+## Custom Loaders, Transformers, and Placeholders
 
 Register custom implementations using PHP attributes — they are auto-discovered by the bundle:
 
@@ -402,10 +423,40 @@ class CloudinaryTransformer implements ImageTransformerInterface
 }
 ```
 
+```php
+use Silarhi\PicassoBundle\Attribute\AsPlaceholder;
+use Silarhi\PicassoBundle\Placeholder\PlaceholderInterface;
+use Silarhi\PicassoBundle\Dto\Image;
+use Silarhi\PicassoBundle\Dto\ImageTransformation;
+
+#[AsPlaceholder('blurhash')]
+class BlurHashPlaceholder implements PlaceholderInterface
+{
+    public function generate(Image $image, ImageTransformation $transformation, array $context = []): string
+    {
+        // Use $transformation->width, $transformation->height, etc.
+        // Generate and return a data URI (e.g. blurhash, thumbhash, etc.)
+        return 'data:image/png;base64,...';
+    }
+}
+```
+
 Then use them by name:
 
 ```twig
 <Picasso:Image src="photo.jpg" loader="s3" transformer="cloudinary" width="800" alt="Photo" />
+<Picasso:Image src="photo.jpg" placeholder="blurhash" width="800" alt="Photo with blurhash" />
+```
+
+Placeholders can also be configured via the bundle config with `type: service`:
+
+```yaml
+picasso:
+    default_placeholder: blurhash
+    placeholders:
+        blurhash:
+            type: service
+            service: 'App\Image\BlurHashPlaceholder'
 ```
 
 ## Routes

@@ -39,7 +39,7 @@ class VichMappingHelperTest extends TestCase
         $attributeReader = new AttributeReader();
         $attributeDriver = new AttributeDriver($attributeReader, []);
         $driverChain = new DriverChain([$attributeDriver]);
-        $metadataFactory = new MetadataFactory($driverChain, 'Metadata\ClassHierarchyMetadata', false);
+        $metadataFactory = new MetadataFactory($driverChain, \Metadata\ClassHierarchyMetadata::class, false);
         $metadataReader = new MetadataReader($metadataFactory);
 
         $resolver = new PropertyMappingResolver(

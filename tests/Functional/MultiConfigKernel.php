@@ -17,6 +17,7 @@ use function dirname;
 
 use Silarhi\PicassoBundle\PicassoBundle;
 use Silarhi\PicassoBundle\Tests\Functional\Stub\StubAttributeLoader;
+use Silarhi\PicassoBundle\Tests\Functional\Stub\StubAttributePlaceholder;
 use Silarhi\PicassoBundle\Tests\Functional\Stub\StubAttributeTransformer;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\TwigBundle\TwigBundle;
@@ -60,6 +61,12 @@ class MultiConfigKernel extends Kernel
             $container->loadFromExtension('picasso', [
                 'default_loader' => 'primary',
                 'default_transformer' => 'glide',
+                'default_placeholder' => 'blur',
+                'placeholders' => [
+                    'blur' => [
+                        'type' => 'transformer',
+                    ],
+                ],
                 'loaders' => [
                     'primary' => [
                         'type' => 'filesystem',
@@ -86,6 +93,7 @@ class MultiConfigKernel extends Kernel
             // Register attribute-based stubs as services
             $container->register(StubAttributeLoader::class, StubAttributeLoader::class)->setAutoconfigured(true);
             $container->register(StubAttributeTransformer::class, StubAttributeTransformer::class)->setAutoconfigured(true);
+            $container->register(StubAttributePlaceholder::class, StubAttributePlaceholder::class)->setAutoconfigured(true);
         });
     }
 

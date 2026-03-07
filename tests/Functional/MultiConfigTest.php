@@ -17,8 +17,10 @@ use function assert;
 
 use Silarhi\PicassoBundle\Loader\FilesystemLoader;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
+use Silarhi\PicassoBundle\Service\PlaceholderRegistry;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
 use Silarhi\PicassoBundle\Tests\Functional\Stub\StubAttributeLoader;
+use Silarhi\PicassoBundle\Tests\Functional\Stub\StubAttributePlaceholder;
 use Silarhi\PicassoBundle\Tests\Functional\Stub\StubAttributeTransformer;
 use Silarhi\PicassoBundle\Twig\Component\ImageComponent;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -84,6 +86,15 @@ class MultiConfigTest extends KernelTestCase
         self::assertInstanceOf(StubAttributeTransformer::class, $registry->get('stub'));
     }
 
+    public function testAttributePlaceholderIsRegistered(): void
+    {
+        $registry = self::getContainer()->get('picasso.placeholder_registry');
+        assert($registry instanceof PlaceholderRegistry);
+
+        self::assertTrue($registry->has('stub'));
+        self::assertInstanceOf(StubAttributePlaceholder::class, $registry->get('stub'));
+    }
+
     // --- Mount-level tests (computed properties) ---
 
     public function testMountResolvesDefaultLoading(): void
@@ -109,7 +120,7 @@ class MultiConfigTest extends KernelTestCase
 
         self::assertSame('eager', $component->loading);
         self::assertSame('high', $component->fetchPriority);
-        self::assertNull($component->blurDataUri, 'Priority should disable blur placeholder');
+        self::assertNull($component->placeholderUri, 'Priority should disable blur placeholder');
     }
 
     public function testMountUnoptimizedPreservesSrc(): void
@@ -182,16 +193,15 @@ class MultiConfigTest extends KernelTestCase
         self::assertSame(40, $component->height);
     }
 
-    public function testMountGeneratesBlurPlaceholder(): void
+    public function testMountGeneratesPlaceholder(): void
     {
         $component = $this->mountTwigComponent('Picasso:Image', [
             'src' => 'photo.jpg',
             'sizes' => '100vw',
-            'placeholder' => true,
         ]);
         assert($component instanceof ImageComponent);
 
-        self::assertNotNull($component->blurDataUri);
+        self::assertNotNull($component->placeholderUri);
     }
 
     public function testMountWithExplicitLoader(): void

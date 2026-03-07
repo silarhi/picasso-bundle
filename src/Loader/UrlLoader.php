@@ -18,10 +18,10 @@ use Silarhi\PicassoBundle\Dto\ImageReference;
 use Symfony\Component\HttpClient\Response\StreamWrapper;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
-final class UrlLoader implements ImageLoaderInterface
+final readonly class UrlLoader implements ImageLoaderInterface
 {
     public function __construct(
-        private readonly HttpClientInterface $httpClient,
+        private HttpClientInterface $httpClient,
     ) {
     }
 

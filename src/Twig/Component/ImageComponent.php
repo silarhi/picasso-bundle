@@ -13,11 +13,14 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Twig\Component;
 
+use function is_string;
+
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Dto\ImageSource;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
 use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
+use Silarhi\PicassoBundle\Service\PlaceholderRegistry;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
 use Symfony\Component\Stopwatch\Stopwatch;
@@ -60,10 +63,13 @@ class ImageComponent
     /** Fit mode ('contain', 'cover', 'fill', 'crop'). Null defaults to config value. */
     public ?string $fit = null;
 
-    /** Enable/disable blur placeholder for this image. */
-    public ?bool $placeholder = null;
+    /** Enable/disable/select placeholder. Boolean to enable/disable, string to select a named placeholder. */
+    public string|bool|null $placeholder = null;
 
-    /** Mark as high-priority (above the fold): disables lazy loading and blur placeholder. */
+    /** Literal placeholder data URI or URL, bypasses placeholder services. */
+    public ?string $placeholderData = null;
+
+    /** Mark as high-priority (above the fold): disables lazy loading and placeholder. */
     public bool $priority = false;
 
     /** Loading attribute ('lazy' or 'eager'). Resolved in PostMount: defaults to 'eager' when priority, 'lazy' otherwise. */
@@ -78,7 +84,7 @@ class ImageComponent
     // --- Computed state (set in PostMount, used by template) ---
 
     /** @internal */
-    public ?string $blurDataUri = null;
+    public ?string $placeholderUri = null;
 
     /**
      * @internal
@@ -101,13 +107,11 @@ class ImageComponent
         private readonly ImagePipeline $pipeline,
         private readonly TransformerRegistry $transformerRegistry,
         private readonly MetadataGuesserInterface $metadataGuesser,
+        private readonly PlaceholderRegistry $placeholderRegistry,
         private readonly array $formats,
         private readonly int $defaultQuality,
         private readonly string $defaultFit,
-        private readonly bool $blurEnabled,
-        private readonly int $blurSize,
-        private readonly int $blurAmount,
-        private readonly int $blurQuality,
+        private readonly ?string $defaultPlaceholder = null,
         private readonly ?Stopwatch $stopwatch = null,
     ) {
     }
@@ -173,24 +177,26 @@ class ImageComponent
         // Resolve fit from prop or config default
         $fit = $this->fit ?? $this->defaultFit;
 
-        // Generate blur placeholder URL via the transformer (priority disables blur)
-        $shouldBlur = !$this->priority && ($this->placeholder ?? $this->blurEnabled);
-        if ($shouldBlur) {
-            $tinyWidth = $this->blurSize;
-            $tinyHeight = $this->blurSize;
-
-            if (null !== $this->width && null !== $this->height && $this->width > 0) {
-                $tinyHeight = max(1, (int) round($tinyWidth * $this->height / $this->width));
+        // Generate placeholder (priority disables it)
+        if (!$this->priority) {
+            if (null !== $this->placeholderData) {
+                $this->placeholderUri = $this->placeholderData;
+            } else {
+                $placeholderName = $this->resolvePlaceholderName();
+                if (null !== $placeholderName
+                    && $this->placeholderRegistry->has($placeholderName)
+                    && null !== $this->width && null !== $this->height
+                ) {
+                    $this->placeholderUri = $this->placeholderRegistry
+                        ->get($placeholderName)
+                        ->generate($image, new ImageTransformation(
+                            width: $this->width,
+                            height: $this->height,
+                            quality: $this->quality ?? $this->defaultQuality,
+                            fit: $this->fit ?? $this->defaultFit,
+                        ), $transformerContext);
+                }
             }
-
-            $this->blurDataUri = $imageTransformer->url($image, new ImageTransformation(
-                width: $tinyWidth,
-                height: $tinyHeight,
-                format: 'jpg',
-                quality: $this->blurQuality,
-                fit: 'crop',
-                blur: $this->blurAmount,
-            ), $transformerContext);
         }
 
         // Generate sources for each format
@@ -233,6 +239,20 @@ class ImageComponent
                 );
             }
         }
+    }
+
+    private function resolvePlaceholderName(): ?string
+    {
+        if (false === $this->placeholder) {
+            return null;
+        }
+
+        if (is_string($this->placeholder)) {
+            return $this->placeholder;
+        }
+
+        // placeholder === true or null: use default
+        return $this->defaultPlaceholder;
     }
 
     private function getMimeType(string $format): string

@@ -17,15 +17,17 @@ PicassoBundle is a Symfony bundle that provides responsive image components, ins
 
 ```
 src/
-├── Attribute/          # AsImageLoader, AsImageTransformer attributes
+├── Attribute/          # AsImageLoader, AsImageTransformer, AsPlaceholder attributes
 ├── Controller/         # ImageController (serves transformed images)
 ├── Dto/                # Image, ImageReference, ImageSource, ImageTransformation, SrcsetEntry
 ├── Exception/          # Domain exceptions (PicassoExceptionInterface and implementations)
 ├── Loader/             # FilesystemLoader, FlysystemLoader, FlysystemRegistry, UrlLoader,
 │                       #   VichUploaderLoader, VichMappingHelper + interfaces
 │                       #   (ImageLoaderInterface, ServableLoaderInterface, VichMappingHelperInterface)
+├── Placeholder/        # TransformerPlaceholder, BlurHashPlaceholder + PlaceholderInterface
 ├── Service/            # ImageHelper, ImagePipeline, LoaderRegistry, TransformerRegistry,
-│                       #   SrcsetGenerator, MetadataGuesser, MetadataGuesserInterface, UrlEncryption
+│                       #   PlaceholderRegistry, SrcsetGenerator, MetadataGuesser,
+│                       #   MetadataGuesserInterface, UrlEncryption
 ├── Transformer/        # GlideTransformer, ImgixTransformer + interfaces
 │                       #   (ImageTransformerInterface, LocalTransformerInterface)
 ├── Twig/
@@ -80,7 +82,10 @@ vendor/bin/rector process --dry-run
   - `FlysystemRegistry` manages multiple named Flysystem storage instances.
 - **Transformers** generate URLs for on-demand image transformation (Glide locally, Imgix via CDN). They implement `ImageTransformerInterface` and are registered via the `#[AsImageTransformer('name')]` attribute or the `picasso.transformer` service tag.
   - `LocalTransformerInterface` extends `ImageTransformerInterface` for transformers that serve images locally (e.g., Glide) and need a loader to access source files.
-- **Registries** (`LoaderRegistry`, `TransformerRegistry`) use Symfony service locators for lazy-loading.
+- **Placeholders** generate placeholder data URIs or URLs for images (e.g., blurred thumbnails). They implement `PlaceholderInterface` and are registered via the `#[AsPlaceholder('name')]` attribute or the `picasso.placeholder` service tag.
+  - `TransformerPlaceholder` reuses the configured transformer to generate a tiny blurred image URL.
+  - `BlurHashPlaceholder` encodes the image as a BlurHash string and decodes it to a tiny PNG data URI (requires `kornrunner/blurhash`).
+- **Registries** (`LoaderRegistry`, `TransformerRegistry`, `PlaceholderRegistry`) use Symfony service locators for lazy-loading.
 - **ImagePipeline** orchestrates loader + transformer for the Twig function.
 - **ImageHelper** provides a convenience API for generating single image URLs with named parameters.
 - **ImageComponent** is the main Twig component (`<Picasso:Image>`) that generates `<picture>` with `<source>` elements.
@@ -112,4 +117,5 @@ All bundle exceptions implement `PicassoExceptionInterface` (extends `Throwable`
 
 - **Adding a new loader**: Create a class implementing `ImageLoaderInterface` (or `ServableLoaderInterface` if it provides filesystem access), add `#[AsImageLoader('name')]`, and it auto-registers.
 - **Adding a new transformer**: Create a class implementing `ImageTransformerInterface` (or `LocalTransformerInterface` for local serving), add `#[AsImageTransformer('name')]`, and it auto-registers.
+- **Adding a new placeholder**: Create a class implementing `PlaceholderInterface`, add `#[AsPlaceholder('name')]`, and it auto-registers. Alternatively, configure via `type: service` in the `placeholders` config.
 - **Bundle configuration**: All config options are defined in `PicassoBundle::configure()` and wired in `PicassoBundle::loadExtension()`.

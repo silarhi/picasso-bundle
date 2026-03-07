@@ -17,10 +17,10 @@ use League\Flysystem\FilesystemOperator;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 
-final class FlysystemLoader implements ServableLoaderInterface
+final readonly class FlysystemLoader implements ServableLoaderInterface
 {
     public function __construct(
-        private readonly FilesystemOperator $storage,
+        private FilesystemOperator $storage,
     ) {
     }
 

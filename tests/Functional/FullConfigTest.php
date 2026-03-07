@@ -16,11 +16,14 @@ namespace Silarhi\PicassoBundle\Tests\Functional;
 use function assert;
 
 use Silarhi\PicassoBundle\Loader\FilesystemLoader;
+use Silarhi\PicassoBundle\Placeholder\TransformerPlaceholder;
 use Silarhi\PicassoBundle\Service\ImageHelper;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
+use Silarhi\PicassoBundle\Service\PlaceholderRegistry;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
+use Silarhi\PicassoBundle\Tests\Functional\Stub\StubServicePlaceholder;
 use Silarhi\PicassoBundle\Tests\Functional\Stub\StubServiceTransformer;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 use Silarhi\PicassoBundle\Transformer\ImgixTransformer;
@@ -150,7 +153,7 @@ class FullConfigTest extends KernelTestCase
         $pipeline = self::getContainer()->get('picasso.pipeline');
         assert($pipeline instanceof ImagePipeline);
 
-        $resolvedLoader = $pipeline->resolveLoaderName(null);
+        $resolvedLoader = $pipeline->resolveLoaderName();
         self::assertSame('main', $resolvedLoader);
     }
 
@@ -159,7 +162,7 @@ class FullConfigTest extends KernelTestCase
         $pipeline = self::getContainer()->get('picasso.pipeline');
         assert($pipeline instanceof ImagePipeline);
 
-        $resolvedTransformer = $pipeline->resolveTransformerName(null);
+        $resolvedTransformer = $pipeline->resolveTransformerName();
         self::assertSame('local_glide', $resolvedTransformer);
     }
 
@@ -330,7 +333,27 @@ class FullConfigTest extends KernelTestCase
         self::assertStringContainsString('/service-transformer/', $component->fallbackSrc);
     }
 
-    // --- Blur placeholder with custom settings ---
+    // --- Placeholder registry tests ---
+
+    public function testTransformerPlaceholderRegistered(): void
+    {
+        $registry = self::getContainer()->get('picasso.placeholder_registry');
+        assert($registry instanceof PlaceholderRegistry);
+
+        self::assertTrue($registry->has('blur'));
+        self::assertInstanceOf(TransformerPlaceholder::class, $registry->get('blur'));
+    }
+
+    public function testServicePlaceholderRegistered(): void
+    {
+        $registry = self::getContainer()->get('picasso.placeholder_registry');
+        assert($registry instanceof PlaceholderRegistry);
+
+        self::assertTrue($registry->has('custom_placeholder'));
+        self::assertInstanceOf(StubServicePlaceholder::class, $registry->get('custom_placeholder'));
+    }
+
+    // --- Placeholder with custom settings ---
 
     public function testBlurPlaceholderUsesCustomConfig(): void
     {
@@ -338,13 +361,36 @@ class FullConfigTest extends KernelTestCase
         $component = $this->mountTwigComponent('Picasso:Image', [
             'src' => 'photo.jpg',
             'sizes' => '100vw',
-            'placeholder' => true,
         ]);
         assert($component instanceof ImageComponent);
 
-        self::assertNotNull($component->blurDataUri);
+        self::assertNotNull($component->placeholderUri);
         // The blur URL should contain the configured blur amount (10) and quality (50)
-        self::assertStringContainsString('blur=10', $component->blurDataUri);
+        self::assertStringContainsString('blur=10', $component->placeholderUri);
+    }
+
+    public function testPlaceholderStringSelectsNamedPlaceholder(): void
+    {
+        $component = $this->mountTwigComponent('Picasso:Image', [
+            'src' => 'photo.jpg',
+            'sizes' => '100vw',
+            'placeholder' => 'custom_placeholder',
+        ]);
+        assert($component instanceof ImageComponent);
+
+        self::assertSame('data:image/png;base64,service-placeholder', $component->placeholderUri);
+    }
+
+    public function testPlaceholderDataBypassesPlaceholderService(): void
+    {
+        $component = $this->mountTwigComponent('Picasso:Image', [
+            'src' => 'photo.jpg',
+            'sizes' => '100vw',
+            'placeholderData' => 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==',
+        ]);
+        assert($component instanceof ImageComponent);
+
+        self::assertSame('data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==', $component->placeholderUri);
     }
 
     // --- Upscaling prevention ---
@@ -494,12 +540,11 @@ class FullConfigTest extends KernelTestCase
         self::assertStringContainsString('/service-transformer/', $html);
     }
 
-    public function testRenderBlurPlaceholderWithCustomSettings(): void
+    public function testRenderPlaceholderWithCustomSettings(): void
     {
         $rendered = $this->renderTwigComponent('Picasso:Image', [
             'src' => 'photo.jpg',
             'sizes' => '100vw',
-            'placeholder' => true,
         ]);
         $html = $rendered->toString();
 
