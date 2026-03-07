@@ -10,6 +10,7 @@
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.94.2",
+        "kornrunner/blurhash": "^1.2",
         "league/flysystem-bundle": "^3.6",
         "league/glide": "^2.3.2",
         "league/glide-symfony": "^2.0.1",
@@ -32,6 +33,7 @@
         "league/glide": "Required for the Glide transformer (local image transformation)",
         "league/glide-symfony": "Required for the Glide transformer",
         "league/flysystem": "Required for the Flysystem loader",
+        "kornrunner/blurhash": "Required for the BlurHash placeholder",
         "vich/uploader-bundle": "Required for the VichUploader loader"
     },
     "scripts": {

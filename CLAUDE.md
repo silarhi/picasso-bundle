@@ -24,7 +24,7 @@ src/
 ├── Loader/             # FilesystemLoader, FlysystemLoader, FlysystemRegistry, UrlLoader,
 │                       #   VichUploaderLoader, VichMappingHelper + interfaces
 │                       #   (ImageLoaderInterface, ServableLoaderInterface, VichMappingHelperInterface)
-├── Placeholder/        # TransformerPlaceholder + PlaceholderInterface
+├── Placeholder/        # TransformerPlaceholder, BlurHashPlaceholder + PlaceholderInterface
 ├── Service/            # ImageHelper, ImagePipeline, LoaderRegistry, TransformerRegistry,
 │                       #   PlaceholderRegistry, SrcsetGenerator, MetadataGuesser,
 │                       #   MetadataGuesserInterface, UrlEncryption
@@ -84,6 +84,7 @@ vendor/bin/rector process --dry-run
   - `LocalTransformerInterface` extends `ImageTransformerInterface` for transformers that serve images locally (e.g., Glide) and need a loader to access source files.
 - **Placeholders** generate placeholder data URIs or URLs for images (e.g., blurred thumbnails). They implement `PlaceholderInterface` and are registered via the `#[AsPlaceholder('name')]` attribute or the `picasso.placeholder` service tag.
   - `TransformerPlaceholder` reuses the configured transformer to generate a tiny blurred image URL.
+  - `BlurHashPlaceholder` encodes the image as a BlurHash string and decodes it to a tiny PNG data URI (requires `kornrunner/blurhash`).
 - **Registries** (`LoaderRegistry`, `TransformerRegistry`, `PlaceholderRegistry`) use Symfony service locators for lazy-loading.
 - **ImagePipeline** orchestrates loader + transformer for the Twig function.
 - **ImageHelper** provides a convenience API for generating single image URLs with named parameters.

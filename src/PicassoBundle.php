@@ -31,6 +31,7 @@ use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
 use Silarhi\PicassoBundle\Loader\UrlLoader;
 use Silarhi\PicassoBundle\Loader\VichMappingHelper;
 use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
+use Silarhi\PicassoBundle\Placeholder\BlurHashPlaceholder;
 use Silarhi\PicassoBundle\Placeholder\PlaceholderInterface;
 use Silarhi\PicassoBundle\Placeholder\TransformerPlaceholder;
 use Silarhi\PicassoBundle\Service\ImageHelper;
@@ -142,13 +143,15 @@ final class PicassoBundle extends AbstractBundle
                         ->children()
                             ->booleanNode('enabled')->defaultTrue()->end()
                             ->enumNode('type')
-                                ->values(['transformer', 'service'])
+                                ->values(['transformer', 'blurhash', 'service'])
                                 ->defaultNull()
                                 ->info('Placeholder type. Inferred from name when it matches a known type.')
                             ->end()
                             ->integerNode('size')->defaultValue(10)->info('Tiny image size for transformer placeholders.')->end()
                             ->integerNode('blur')->defaultValue(5)->info('Blur amount for transformer placeholders.')->end()
                             ->integerNode('quality')->defaultValue(30)->min(1)->max(100)->info('Quality for transformer placeholders.')->end()
+                            ->integerNode('components_x')->defaultValue(4)->min(1)->max(9)->info('Horizontal BlurHash components (1–9).')->end()
+                            ->integerNode('components_y')->defaultValue(3)->min(1)->max(9)->info('Vertical BlurHash components (1–9).')->end()
                             ->scalarNode('service')
                                 ->defaultNull()
                                 ->info('Service ID for custom placeholders (type: service).')
@@ -238,7 +241,7 @@ final class PicassoBundle extends AbstractBundle
          *     formats: list<string>,
          *     default_quality: int,
          *     default_fit: string,
-         *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int, quality: int, service: string|null}>,
+         *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int, quality: int, components_x: int, components_y: int, service: string|null}>,
          *     loaders: array<string, array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null}>,
          *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, public_cache: array{enabled: bool}}>
          * } $config
@@ -413,7 +416,7 @@ final class PicassoBundle extends AbstractBundle
 
         // --- Placeholders ---
 
-        $knownPlaceholderTypes = ['transformer', 'service'];
+        $knownPlaceholderTypes = ['transformer', 'blurhash', 'service'];
 
         foreach ($config['placeholders'] as $name => $placeholderConfig) {
             if (!$placeholderConfig['enabled']) {
@@ -423,7 +426,7 @@ final class PicassoBundle extends AbstractBundle
             $type = $placeholderConfig['type'] ?? (in_array($name, $knownPlaceholderTypes, true) ? $name : null);
 
             if (null === $type) {
-                throw new LogicException(sprintf('Placeholder "%s" must specify a "type" (transformer or service).', $name));
+                throw new LogicException(sprintf('Placeholder "%s" must specify a "type" (transformer, blurhash, or service).', $name));
             }
 
             switch ($type) {
@@ -434,6 +437,16 @@ final class PicassoBundle extends AbstractBundle
                             $placeholderConfig['size'],
                             $placeholderConfig['blur'],
                             $placeholderConfig['quality'],
+                        ])
+                        ->tag('picasso.placeholder', ['key' => $name]);
+                    break;
+
+                case 'blurhash':
+                    $services->set('picasso.placeholder.' . $name, BlurHashPlaceholder::class)
+                        ->args([
+                            $placeholderConfig['components_x'],
+                            $placeholderConfig['components_y'],
+                            $placeholderConfig['size'],
                         ])
                         ->tag('picasso.placeholder', ['key' => $name]);
                     break;

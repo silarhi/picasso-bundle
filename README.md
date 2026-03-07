@@ -92,10 +92,17 @@ picasso:
             blur: 5            # blur radius
             quality: 30        # JPEG quality for blur image (1–100)
 
+        # BlurHash placeholder — generates a BlurHash-based placeholder (requires kornrunner/blurhash)
+        # blurhash:
+        #     type: blurhash      # inferred from the key name
+        #     components_x: 4    # horizontal components (1–9)
+        #     components_y: 3    # vertical components (1–9)
+        #     size: 32           # decoded placeholder image size in px
+
         # Custom placeholder — delegate to your own service
-        # my_blurhash:
+        # my_placeholder:
         #     type: service
-        #     service: 'App\Image\BlurHashPlaceholder'  # must implement PlaceholderInterface
+        #     service: 'App\Image\MyPlaceholder'  # must implement PlaceholderInterface
 
     loaders:
         # Filesystem loader — reads images from local directories

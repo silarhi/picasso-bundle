@@ -22,7 +22,7 @@ use Symfony\Component\Config\Definition\Loader\DefinitionFileLoader;
 use Symfony\Component\Config\FileLocator;
 
 /**
- * @phpstan-type PlaceholderConfig array{enabled: bool, type: string|null, size: int, blur: int, quality: int, service: string|null}
+ * @phpstan-type PlaceholderConfig array{enabled: bool, type: string|null, size: int, blur: int, quality: int, components_x: int, components_y: int, service: string|null}
  * @phpstan-type LoaderConfig array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null}
  * @phpstan-type PublicCacheConfig array{enabled: bool}
  * @phpstan-type TransformerConfig array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, public_cache: PublicCacheConfig}
@@ -221,6 +221,70 @@ class ConfigurationTest extends TestCase
 
         self::assertSame('service', $config['placeholders']['custom']['type']);
         self::assertSame('app.my_placeholder', $config['placeholders']['custom']['service']);
+    }
+
+    public function testBlurHashPlaceholderConfig(): void
+    {
+        $config = $this->processConfig([
+            'placeholders' => ['hash' => [
+                'type' => 'blurhash',
+                'components_x' => 5,
+                'components_y' => 4,
+                'size' => 16,
+            ]],
+        ]);
+
+        self::assertSame('blurhash', $config['placeholders']['hash']['type']);
+        self::assertSame(5, $config['placeholders']['hash']['components_x']);
+        self::assertSame(4, $config['placeholders']['hash']['components_y']);
+        self::assertSame(16, $config['placeholders']['hash']['size']);
+        self::assertTrue($config['placeholders']['hash']['enabled']);
+    }
+
+    public function testBlurHashPlaceholderDefaults(): void
+    {
+        $config = $this->processConfig([
+            'placeholders' => ['blurhash' => [
+                'type' => 'blurhash',
+            ]],
+        ]);
+
+        self::assertSame(4, $config['placeholders']['blurhash']['components_x']);
+        self::assertSame(3, $config['placeholders']['blurhash']['components_y']);
+        self::assertSame(10, $config['placeholders']['blurhash']['size']);
+    }
+
+    public function testBlurHashComponentsXBoundsThrow(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+
+        $this->processConfig([
+            'placeholders' => ['hash' => [
+                'type' => 'blurhash',
+                'components_x' => 10,
+            ]],
+        ]);
+    }
+
+    public function testBlurHashComponentsYBoundsThrow(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+
+        $this->processConfig([
+            'placeholders' => ['hash' => [
+                'type' => 'blurhash',
+                'components_y' => 0,
+            ]],
+        ]);
+    }
+
+    public function testBlurHashTypeInferredFromName(): void
+    {
+        $config = $this->processConfig([
+            'placeholders' => ['blurhash' => []],
+        ]);
+
+        self::assertNull($config['placeholders']['blurhash']['type']);
     }
 
     public function testDisabledPlaceholderConfig(): void
