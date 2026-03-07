@@ -18,4 +18,9 @@ return static function (RoutingConfigurator $routes): void {
         ->controller('picasso.controller.image')
         ->requirements(['path' => '.+'])
         ->methods(['GET']);
+
+    $routes->add('picasso_image_cached', '/cache/picasso/{transformer}/{loader}/{path}')
+        ->controller('picasso.controller.image::cached')
+        ->requirements(['path' => '.+'])
+        ->methods(['GET']);
 };

@@ -192,6 +192,19 @@ final class PicassoBundle extends AbstractBundle
                             ->integerNode('max_image_size')->defaultNull()->info('Max image size for glide.')->end()
                             ->scalarNode('base_url')->defaultNull()->info('Base URL for imgix (e.g. https://my-source.imgix.net).')->end()
                             ->scalarNode('service')->defaultNull()->info('Service ID for custom transformers (type: service).')->end()
+                            ->arrayNode('public_cache')
+                                ->canBeEnabled()
+                                ->children()
+                                    ->scalarNode('path')
+                                        ->defaultValue('%kernel.project_dir%/public/cache/picasso')
+                                        ->info('Filesystem path to write cached images for direct web server serving.')
+                                    ->end()
+                                    ->scalarNode('url_prefix')
+                                        ->defaultValue('/cache/picasso')
+                                        ->info('URL prefix for cached images (must match the route prefix).')
+                                    ->end()
+                                ->end()
+                            ->end()
                         ->end()
                     ->end()
                 ->end()
@@ -214,7 +227,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_fit: string,
          *     placeholders: array{blur: array{enabled: bool, size: int, blur: int, quality: int}},
          *     loaders: array<string, array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null}>,
-         *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null}>
+         *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, public_cache: array{enabled: bool, path: string, url_prefix: string}}>
          * } $config
          */
         $services = $container->services();
@@ -334,6 +347,10 @@ final class PicassoBundle extends AbstractBundle
                         $urlEncryptionRegistered = true;
                     }
 
+                    $publicCache = $transformerConfig['public_cache']['enabled']
+                        ? $transformerConfig['public_cache']
+                        : null;
+
                     $services->set('picasso.transformer.' . $name, GlideTransformer::class)
                         ->args([
                             service('router'),
@@ -342,6 +359,7 @@ final class PicassoBundle extends AbstractBundle
                             $transformerConfig['cache'] ?? '%kernel.project_dir%/var/glide-cache',
                             $transformerConfig['driver'],
                             $transformerConfig['max_image_size'],
+                            $publicCache,
                         ])
                         ->tag('picasso.transformer', ['key' => $name]);
                     break;

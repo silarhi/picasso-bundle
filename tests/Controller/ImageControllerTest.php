@@ -20,11 +20,14 @@ use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
+use Silarhi\PicassoBundle\Service\UrlEncryption;
+use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 use Silarhi\PicassoBundle\Transformer\LocalTransformerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
 class ImageControllerTest extends TestCase
 {
@@ -109,6 +112,64 @@ class ImageControllerTest extends TestCase
         $this->expectException(NotFoundHttpException::class);
         $this->expectExceptionMessage('does not support serving');
         $controller->__invoke('glide', 'remote', 'photo.jpg', new Request());
+    }
+
+    public function testCachedThrowsNotFoundWhenPublicCacheDisabled(): void
+    {
+        $loader = $this->createMock(ServableLoaderInterface::class);
+        $transformer = new GlideTransformer(
+            $this->createMock(UrlGeneratorInterface::class),
+            new UrlEncryption('test-key'),
+            'test-key',
+            '/tmp/cache',
+        );
+
+        $transformerRegistry = $this->createRegistry(TransformerRegistry::class, 'glide', $transformer);
+        $loaderRegistry = $this->createRegistry(LoaderRegistry::class, 'filesystem', $loader);
+
+        $controller = new ImageController($transformerRegistry, $loaderRegistry);
+
+        $this->expectException(NotFoundHttpException::class);
+        $this->expectExceptionMessage('does not support public cache');
+        $controller->cached('glide', 'filesystem', 'photos/hero.jpg/params.webp');
+    }
+
+    public function testCachedThrowsNotFoundForInvalidPath(): void
+    {
+        $loader = $this->createMock(ServableLoaderInterface::class);
+        $transformer = new GlideTransformer(
+            $this->createMock(UrlGeneratorInterface::class),
+            new UrlEncryption('test-key'),
+            'test-key',
+            '/tmp/cache',
+            'gd',
+            null,
+            ['enabled' => true, 'path' => '/tmp/public-cache', 'url_prefix' => '/cache/picasso'],
+        );
+
+        $transformerRegistry = $this->createRegistry(TransformerRegistry::class, 'glide', $transformer);
+        $loaderRegistry = $this->createRegistry(LoaderRegistry::class, 'filesystem', $loader);
+
+        $controller = new ImageController($transformerRegistry, $loaderRegistry);
+
+        $this->expectException(NotFoundHttpException::class);
+        $this->expectExceptionMessage('Invalid cached image path');
+        $controller->cached('glide', 'filesystem', 'no-slash-in-path');
+    }
+
+    public function testCachedThrowsNotFoundForNonGlideTransformer(): void
+    {
+        $loader = $this->createMock(ServableLoaderInterface::class);
+        $transformer = $this->createMock(LocalTransformerInterface::class);
+
+        $transformerRegistry = $this->createRegistry(TransformerRegistry::class, 'custom', $transformer);
+        $loaderRegistry = $this->createRegistry(LoaderRegistry::class, 'filesystem', $loader);
+
+        $controller = new ImageController($transformerRegistry, $loaderRegistry);
+
+        $this->expectException(NotFoundHttpException::class);
+        $this->expectExceptionMessage('does not support public cache');
+        $controller->cached('custom', 'filesystem', 'photos/hero.jpg/params.webp');
     }
 
     /**
