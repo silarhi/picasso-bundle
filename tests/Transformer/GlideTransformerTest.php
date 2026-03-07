@@ -217,14 +217,15 @@ class GlideTransformerTest extends TestCase
 
         $url = $transformer->url($image, $transformation, ['loader' => 'filesystem', 'transformer' => 'glide']);
 
-        // Path contains params, Glide signature is in query string
+        // Transformation params are in the path, signature is in query string
         self::assertStringContainsString('/picasso/glide/filesystem/uploads/photo.jpg/', $url);
         self::assertStringContainsString('w_300', $url);
         self::assertStringContainsString('fm_webp', $url);
         self::assertStringContainsString('.webp', $url);
         self::assertStringContainsString('s=', $url);
-        // Signature should NOT be in the path segment
-        self::assertStringNotContainsString(',s_', $url);
+        // Transformation params should NOT appear as query params
+        self::assertStringNotContainsString('w=300', $url);
+        self::assertStringNotContainsString('fm=webp', $url);
     }
 
     public function testPublicCacheUrlPassesMetadataAsQueryParam(): void
@@ -381,10 +382,11 @@ class GlideTransformerTest extends TestCase
         parse_str($queryString, $query);
         self::assertIsString($query['s']);
 
-        // The signature should validate against the cached path + params (excluding _metadata)
+        // The signature is computed against the cached path with no extra params
+        // (all transformation params are embedded in the path itself)
         $cachedPath = 'photos/hero.jpg/' . $parsed['paramsSegment'] . '.avif';
         $expectedSignature = SignatureFactory::create(self::SIGN_KEY)
-            ->generateSignature($cachedPath, $parsed['params']);
+            ->generateSignature($cachedPath, []);
         self::assertSame($expectedSignature, $query['s']);
     }
 }

@@ -62,31 +62,15 @@ final readonly class GlideTransformer implements LocalTransformerInterface
         }
 
         if ($this->isPublicCacheEnabled()) {
+            // Move transformation params into the path, keep only _metadata as query param
             $paramsSegment = $this->buildParamsSegment($glideParams);
             $format = isset($glideParams['fm']) ? (string) $glideParams['fm'] : pathinfo($path, \PATHINFO_EXTENSION);
-
-            $cachedPath = $path . '/' . $paramsSegment . '.' . $format;
-
-            // Sign using Glide's SignatureFactory — same as non-cached mode
-            $signature = SignatureFactory::create($this->signKey)
-                ->generateSignature($cachedPath, array_filter(
-                    $glideParams,
-                    static fn (string $key): bool => '_metadata' !== $key,
-                    \ARRAY_FILTER_USE_KEY,
-                ));
-
-            $routeParams = [
-                'transformer' => $transformerName,
-                'loader' => $loaderName,
-                'path' => $cachedPath,
-                's' => $signature,
-            ];
-
-            if (isset($glideParams['_metadata'])) {
-                $routeParams['_metadata'] = $glideParams['_metadata'];
-            }
-
-            return $this->router->generate('picasso_image', $routeParams, UrlGeneratorInterface::ABSOLUTE_PATH);
+            $path = $path . '/' . $paramsSegment . '.' . $format;
+            $glideParams = array_filter(
+                $glideParams,
+                static fn (string $key): bool => str_starts_with($key, '_'),
+                \ARRAY_FILTER_USE_KEY,
+            );
         }
 
         $signature = SignatureFactory::create($this->signKey)
@@ -106,40 +90,27 @@ final readonly class GlideTransformer implements LocalTransformerInterface
         $params = $request->query->all();
         $cacheFilename = null;
 
-        if ($this->isPublicCacheEnabled()) {
-            $lastSlash = strrpos($path, '/');
-            if (false === $lastSlash) {
-                throw new NotFoundHttpException('Invalid cached image path.');
-            }
-
-            $imagePath = substr($path, 0, $lastSlash);
-            $cacheFilename = substr($path, $lastSlash + 1);
-
-            // Parse transformation params from the filename and merge into params
-            $parsed = self::parseParamsFilename($cacheFilename);
-            $params = array_merge($parsed['params'], $params);
-
-            // Validate signature against the full cached path (same as url() generated it)
-            try {
-                SignatureFactory::create($this->signKey)->validateRequest($path, array_filter(
-                    $params,
-                    static fn (string $key): bool => '_metadata' !== $key,
-                    \ARRAY_FILTER_USE_KEY,
-                ));
-            } catch (SignatureException $e) {
-                throw new NotFoundHttpException('Invalid image signature.', $e);
-            }
-
-            return $this->doServe($loader, $imagePath, $params, $cacheFilename);
-        }
-
         try {
             SignatureFactory::create($this->signKey)->validateRequest($path, $params);
         } catch (SignatureException $e) {
             throw new NotFoundHttpException('Invalid image signature.', $e);
         }
 
-        return $this->doServe($loader, $path, $params);
+        if ($this->isPublicCacheEnabled()) {
+            // Extract transformation params from the path and merge into params
+            $lastSlash = strrpos($path, '/');
+            if (false === $lastSlash) {
+                throw new NotFoundHttpException('Invalid cached image path.');
+            }
+
+            $cacheFilename = substr($path, $lastSlash + 1);
+            $path = substr($path, 0, $lastSlash);
+
+            $parsed = self::parseParamsFilename($cacheFilename);
+            $params = array_merge($parsed['params'], $params);
+        }
+
+        return $this->doServe($loader, $path, $params, $cacheFilename);
     }
 
     public function isPublicCacheEnabled(): bool
