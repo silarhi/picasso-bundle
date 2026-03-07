@@ -169,7 +169,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
     /**
      * Build the params segment from Glide params (excluding _metadata and s).
      *
-     * @param array<string, int|string> $glideParams
+     * @param TransformerParams $glideParams
      */
     public function buildParamsSegment(array $glideParams): string
     {
@@ -227,7 +227,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
     }
 
     /**
-     * @return array<string, int|string>
+     * @return TransformerParams
      */
     private function mapToGlideParams(ImageTransformation $transformation): array
     {

@@ -13,6 +13,9 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Service;
 
+/**
+ * @phpstan-import-type ImageGuessedMetadata from MetadataGuesserInterface
+ */
 final class MetadataGuesser implements MetadataGuesserInterface
 {
     private const READ_SIZE = 65536;
@@ -23,7 +26,7 @@ final class MetadataGuesser implements MetadataGuesserInterface
      *
      * @param resource $stream
      *
-     * @return array{width: int|null, height: int|null, mimeType: string|null}
+     * @return ImageGuessedMetadata
      */
     public function guess($stream): array
     {

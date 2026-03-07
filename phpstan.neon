@@ -4,3 +4,5 @@ parameters:
         - src
         - tests
     tmpDir: var/phpstan
+    typeAliases:
+        TransformerParams: 'array<string, int|string>'

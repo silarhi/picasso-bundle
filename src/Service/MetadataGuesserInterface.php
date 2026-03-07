@@ -13,6 +13,9 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Service;
 
+/**
+ * @phpstan-type ImageGuessedMetadata array{width: int|null, height: int|null, mimeType: string|null}
+ */
 interface MetadataGuesserInterface
 {
     /**
@@ -20,7 +23,7 @@ interface MetadataGuesserInterface
      *
      * @param resource $stream
      *
-     * @return array{width: int|null, height: int|null, mimeType: string|null}
+     * @return ImageGuessedMetadata
      */
     public function guess($stream): array;
 }
