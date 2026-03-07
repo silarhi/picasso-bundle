@@ -19,7 +19,7 @@
             {% endfor %}
 
             {% set userStyle = attributes.all.style|default('') %}
-            {% set blurStyle = this.blurDataUri ? 'background-size:cover;background-position:center;background-repeat:no-repeat;background-image:url(' ~ this.blurDataUri ~ ');' : '' %}
+            {% set blurStyle = this.placeholderUri ? 'background-size:cover;background-position:center;background-repeat:no-repeat;background-image:url(' ~ this.placeholderUri ~ ');' : '' %}
             {% set fullStyle = blurStyle ~ userStyle %}
 
             <img
@@ -31,7 +31,7 @@
                 loading="{{ this.loading }}"
                 {% if this.fetchPriority %}fetchpriority="{{ this.fetchPriority }}"{% endif %}
                 {% if fullStyle %}style="{{ fullStyle }}"{% endif %}
-                {% if this.blurDataUri %}onload="this.style.backgroundImage=''"{% endif %}
+                {% if this.placeholderUri %}onload="this.style.backgroundImage=''"{% endif %}
                 {{ attributes.without('style') }}
             />
         </picture>

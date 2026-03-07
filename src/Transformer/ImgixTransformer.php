@@ -19,11 +19,11 @@ use Silarhi\PicassoBundle\Dto\ImageTransformation;
 /**
  * @see https://docs.imgix.com/apis/rendering
  */
-final class ImgixTransformer implements ImageTransformerInterface
+final readonly class ImgixTransformer implements ImageTransformerInterface
 {
     public function __construct(
-        private readonly string $baseUrl,
-        private readonly ?string $signKey = null,
+        private string $baseUrl,
+        private ?string $signKey = null,
     ) {
     }
 

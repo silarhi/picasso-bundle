@@ -20,12 +20,12 @@ use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Exception\InvalidMetadataException;
 
-final class FilesystemLoader implements ServableLoaderInterface
+final readonly class FilesystemLoader implements ServableLoaderInterface
 {
     /**
      * @param list<string> $paths
      */
-    public function __construct(private readonly array $paths)
+    public function __construct(private array $paths)
     {
     }
 

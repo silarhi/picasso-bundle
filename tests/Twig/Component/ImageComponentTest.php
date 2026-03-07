@@ -18,10 +18,11 @@ use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageSource;
-use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Dto\SrcsetEntry;
+use Silarhi\PicassoBundle\Placeholder\PlaceholderInterface;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
 use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
+use Silarhi\PicassoBundle\Service\PlaceholderRegistry;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
@@ -34,6 +35,8 @@ class ImageComponentTest extends TestCase
     private TransformerRegistry $transformerRegistry;
     private MockObject&ImageTransformerInterface $glideTransformer;
     private MockObject&MetadataGuesserInterface $metadataGuesser;
+    private PlaceholderRegistry $placeholderRegistry;
+    private MockObject&PlaceholderInterface $mockPlaceholder;
 
     protected function setUp(): void
     {
@@ -46,25 +49,29 @@ class ImageComponentTest extends TestCase
         $transformerLocator->method('get')->with('glide')->willReturn($this->glideTransformer);
         $this->transformerRegistry = new TransformerRegistry($transformerLocator);
 
+        $this->mockPlaceholder = $this->createMock(PlaceholderInterface::class);
+        $placeholderLocator = $this->createMock(ContainerInterface::class);
+        $placeholderLocator->method('has')->willReturnCallback(static fn (string $name): bool => 'blur' === $name);
+        $placeholderLocator->method('get')->with('blur')->willReturn($this->mockPlaceholder);
+        $this->placeholderRegistry = new PlaceholderRegistry($placeholderLocator);
+
         $this->pipeline = $this->createMock(ImagePipeline::class);
         $this->pipeline->method('resolveLoaderName')->willReturn('filesystem');
         $this->pipeline->method('resolveTransformerName')->willReturn('glide');
     }
 
-    private function createComponent(bool $blurEnabled = false): ImageComponent
+    private function createComponent(?string $defaultPlaceholder = null): ImageComponent
     {
         return new ImageComponent(
             srcsetGenerator: $this->srcsetGenerator,
             pipeline: $this->pipeline,
             transformerRegistry: $this->transformerRegistry,
             metadataGuesser: $this->metadataGuesser,
+            placeholderRegistry: $this->placeholderRegistry,
             formats: ['avif', 'webp', 'jpg'],
             defaultQuality: 75,
             defaultFit: 'contain',
-            blurEnabled: $blurEnabled,
-            blurSize: 10,
-            blurAmount: 50,
-            blurQuality: 30,
+            defaultPlaceholder: $defaultPlaceholder,
         );
     }
 
@@ -156,7 +163,7 @@ class ImageComponentTest extends TestCase
         self::assertSame(768, $component->height);
     }
 
-    public function testComputeImageDataGeneratesBlurPlaceholder(): void
+    public function testComputeImageDataGeneratesPlaceholder(): void
     {
         $stream = fopen('php://memory', 'r+');
         self::assertNotFalse($stream);
@@ -166,28 +173,25 @@ class ImageComponentTest extends TestCase
             ->willReturn(['width' => 1920, 'height' => 1080, 'mimeType' => 'image/jpeg']);
         $this->configureSrcsetGenerator();
 
-        $this->glideTransformer->method('url')
+        $this->mockPlaceholder->expects(self::once())
+            ->method('generate')
             ->with(
                 self::isInstanceOf(Image::class),
-                self::callback(static fn (ImageTransformation $t): bool => 10 === $t->width
-                    && 6 === $t->height
-                    && 'jpg' === $t->format
-                    && 30 === $t->quality
-                    && 'crop' === $t->fit
-                    && 50 === $t->blur),
+                1920,
+                1080,
                 ['loader' => 'filesystem', 'transformer' => 'glide'],
             )
             ->willReturn('/picasso/glide/filesystem/photo.jpg?w=10&h=6&fm=jpg&q=30&blur=50');
 
-        $component = $this->createComponent(blurEnabled: true);
+        $component = $this->createComponent(defaultPlaceholder: 'blur');
         $component->src = 'photo.jpg';
         $component->sizes = '100vw';
         $component->computeImageData();
 
-        self::assertSame('/picasso/glide/filesystem/photo.jpg?w=10&h=6&fm=jpg&q=30&blur=50', $component->blurDataUri);
+        self::assertSame('/picasso/glide/filesystem/photo.jpg?w=10&h=6&fm=jpg&q=30&blur=50', $component->placeholderUri);
     }
 
-    public function testComputeImageDataSkipsBlurWhenPlaceholderFalse(): void
+    public function testComputeImageDataSkipsPlaceholderWhenPlaceholderFalse(): void
     {
         $stream = fopen('php://memory', 'r+');
         self::assertNotFalse($stream);
@@ -195,19 +199,19 @@ class ImageComponentTest extends TestCase
             ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
         $this->metadataGuesser->method('guess')
             ->willReturn(['width' => 1920, 'height' => 1080, 'mimeType' => 'image/jpeg']);
-        $this->glideTransformer->expects(self::never())->method('url');
+        $this->mockPlaceholder->expects(self::never())->method('generate');
         $this->configureSrcsetGenerator();
 
-        $component = $this->createComponent(blurEnabled: true);
+        $component = $this->createComponent(defaultPlaceholder: 'blur');
         $component->src = 'photo.jpg';
         $component->placeholder = false;
         $component->sizes = '100vw';
         $component->computeImageData();
 
-        self::assertNull($component->blurDataUri);
+        self::assertNull($component->placeholderUri);
     }
 
-    public function testComputeImageDataSkipsBlurWhenConfigDisabled(): void
+    public function testComputeImageDataSkipsPlaceholderWhenNoDefault(): void
     {
         $stream = fopen('php://memory', 'r+');
         self::assertNotFalse($stream);
@@ -215,15 +219,15 @@ class ImageComponentTest extends TestCase
             ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
         $this->metadataGuesser->method('guess')
             ->willReturn(['width' => 1920, 'height' => 1080, 'mimeType' => 'image/jpeg']);
-        $this->glideTransformer->expects(self::never())->method('url');
+        $this->mockPlaceholder->expects(self::never())->method('generate');
         $this->configureSrcsetGenerator();
 
-        $component = $this->createComponent(blurEnabled: false);
+        $component = $this->createComponent();
         $component->src = 'photo.jpg';
         $component->sizes = '100vw';
         $component->computeImageData();
 
-        self::assertNull($component->blurDataUri);
+        self::assertNull($component->placeholderUri);
     }
 
     public function testComputeImageDataGeneratesSourcesAndFallback(): void
@@ -284,13 +288,10 @@ class ImageComponentTest extends TestCase
             pipeline: $pipeline,
             transformerRegistry: $this->transformerRegistry,
             metadataGuesser: $metadataGuesser,
+            placeholderRegistry: $this->placeholderRegistry,
             formats: ['avif', 'webp', 'jpg'],
             defaultQuality: 75,
             defaultFit: 'contain',
-            blurEnabled: false,
-            blurSize: 10,
-            blurAmount: 50,
-            blurQuality: 30,
         );
 
         $component->src = 'photo.jpg';
@@ -317,7 +318,7 @@ class ImageComponentTest extends TestCase
         self::assertSame('/images/logo.svg', $component->fallbackSrc);
         self::assertNull($component->fallbackSrcset);
         self::assertSame([], $component->sources);
-        self::assertNull($component->blurDataUri);
+        self::assertNull($component->placeholderUri);
     }
 
     public function testDefaultValues(): void
@@ -330,6 +331,7 @@ class ImageComponentTest extends TestCase
         self::assertNull($component->quality);
         self::assertNull($component->fit);
         self::assertNull($component->placeholder);
+        self::assertNull($component->placeholderData);
         self::assertFalse($component->priority);
         self::assertNull($component->loading);
         self::assertNull($component->fetchPriority);
@@ -347,16 +349,60 @@ class ImageComponentTest extends TestCase
             ->willReturn(['width' => 800, 'height' => 600, 'mimeType' => 'image/jpeg']);
         $this->configureSrcsetGenerator();
 
-        $this->glideTransformer->method('url')
-            ->willReturn('/picasso/glide/filesystem/photo.jpg?w=10&h=8&fm=jpg&q=30&blur=50');
+        $this->mockPlaceholder->method('generate')
+            ->willReturn('/picasso/glide/filesystem/photo.jpg?blur=50');
 
-        $component = $this->createComponent(blurEnabled: false);
+        $component = $this->createComponent(defaultPlaceholder: 'blur');
         $component->src = 'photo.jpg';
         $component->placeholder = true;
         $component->sizes = '100vw';
         $component->computeImageData();
 
-        self::assertNotNull($component->blurDataUri);
+        self::assertNotNull($component->placeholderUri);
+    }
+
+    public function testPlaceholderStringSelectsNamedPlaceholder(): void
+    {
+        $stream = fopen('php://memory', 'r+');
+        self::assertNotFalse($stream);
+        $this->pipeline->method('load')
+            ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
+        $this->metadataGuesser->method('guess')
+            ->willReturn(['width' => 800, 'height' => 600, 'mimeType' => 'image/jpeg']);
+        $this->configureSrcsetGenerator();
+
+        $this->mockPlaceholder->expects(self::once())
+            ->method('generate')
+            ->willReturn('/picasso/blur-url');
+
+        $component = $this->createComponent();
+        $component->src = 'photo.jpg';
+        $component->placeholder = 'blur';
+        $component->sizes = '100vw';
+        $component->computeImageData();
+
+        self::assertSame('/picasso/blur-url', $component->placeholderUri);
+    }
+
+    public function testPlaceholderDataBypassesPlaceholderService(): void
+    {
+        $stream = fopen('php://memory', 'r+');
+        self::assertNotFalse($stream);
+        $this->pipeline->method('load')
+            ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
+        $this->metadataGuesser->method('guess')
+            ->willReturn(['width' => 800, 'height' => 600, 'mimeType' => 'image/jpeg']);
+        $this->configureSrcsetGenerator();
+
+        $this->mockPlaceholder->expects(self::never())->method('generate');
+
+        $component = $this->createComponent(defaultPlaceholder: 'blur');
+        $component->src = 'photo.jpg';
+        $component->placeholderData = 'data:image/png;base64,iVBORw0KGgo=';
+        $component->sizes = '100vw';
+        $component->computeImageData();
+
+        self::assertSame('data:image/png;base64,iVBORw0KGgo=', $component->placeholderUri);
     }
 
     public function testSkipsMetadataGuesserWhenNoStream(): void
@@ -403,13 +449,10 @@ class ImageComponentTest extends TestCase
             pipeline: $this->pipeline,
             transformerRegistry: $this->transformerRegistry,
             metadataGuesser: $this->metadataGuesser,
+            placeholderRegistry: $this->placeholderRegistry,
             formats: ['jpg'],
             defaultQuality: 75,
             defaultFit: 'cover',
-            blurEnabled: false,
-            blurSize: 10,
-            blurAmount: 50,
-            blurQuality: 30,
         );
 
         $component->src = 'photo.jpg';
@@ -417,7 +460,7 @@ class ImageComponentTest extends TestCase
         $component->computeImageData();
     }
 
-    public function testPriorityDisablesBlurAndSetsEagerLoading(): void
+    public function testPriorityDisablesPlaceholderAndSetsEagerLoading(): void
     {
         $stream = fopen('php://memory', 'r+');
         self::assertNotFalse($stream);
@@ -425,16 +468,16 @@ class ImageComponentTest extends TestCase
             ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
         $this->metadataGuesser->method('guess')
             ->willReturn(['width' => 1920, 'height' => 1080, 'mimeType' => 'image/jpeg']);
-        $this->glideTransformer->expects(self::never())->method('url');
+        $this->mockPlaceholder->expects(self::never())->method('generate');
         $this->configureSrcsetGenerator();
 
-        $component = $this->createComponent(blurEnabled: true);
+        $component = $this->createComponent(defaultPlaceholder: 'blur');
         $component->src = 'photo.jpg';
         $component->priority = true;
         $component->sizes = '100vw';
         $component->computeImageData();
 
-        self::assertNull($component->blurDataUri);
+        self::assertNull($component->placeholderUri);
         self::assertSame('eager', $component->loading);
         self::assertSame('high', $component->fetchPriority);
     }

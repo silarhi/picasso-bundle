@@ -22,12 +22,12 @@ use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Exception\InvalidMetadataException;
 use Vich\UploaderBundle\Storage\StorageInterface;
 
-final class VichUploaderLoader implements ServableLoaderInterface
+final readonly class VichUploaderLoader implements ServableLoaderInterface
 {
     public function __construct(
-        private readonly StorageInterface $storage,
-        private readonly VichMappingHelperInterface $mappingHelper,
-        private readonly FlysystemRegistry $flysystemRegistry,
+        private StorageInterface $storage,
+        private VichMappingHelperInterface $mappingHelper,
+        private FlysystemRegistry $flysystemRegistry,
     ) {
     }
 

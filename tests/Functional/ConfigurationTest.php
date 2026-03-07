@@ -22,19 +22,20 @@ use Symfony\Component\Config\Definition\Loader\DefinitionFileLoader;
 use Symfony\Component\Config\FileLocator;
 
 /**
- * @phpstan-type BlurConfig array{enabled: bool, size: int, blur: int, quality: int}
+ * @phpstan-type PlaceholderConfig array{enabled: bool, type: string|null, size: int, blur: int, quality: int, service: string|null}
  * @phpstan-type LoaderConfig array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null}
  * @phpstan-type PublicCacheConfig array{enabled: bool}
  * @phpstan-type TransformerConfig array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, public_cache: PublicCacheConfig}
  * @phpstan-type PicassoConfig array{
  *     default_loader: string|null,
  *     default_transformer: string|null,
+ *     default_placeholder: string|null,
  *     device_sizes: list<int>,
  *     image_sizes: list<int>,
  *     formats: list<string>,
  *     default_quality: int,
  *     default_fit: string,
- *     placeholders: array{blur: BlurConfig},
+ *     placeholders: array<string, PlaceholderConfig>,
  *     loaders: array<string, LoaderConfig>,
  *     transformers: array<string, TransformerConfig>,
  * }
@@ -72,15 +73,13 @@ class ConfigurationTest extends TestCase
 
         self::assertNull($config['default_loader']);
         self::assertNull($config['default_transformer']);
+        self::assertNull($config['default_placeholder']);
         self::assertSame([640, 750, 828, 1080, 1200, 1920, 2048, 3840], $config['device_sizes']);
         self::assertSame([16, 32, 48, 64, 96, 128, 256, 384], $config['image_sizes']);
         self::assertSame(['avif', 'webp', 'jpg'], $config['formats']);
         self::assertSame(75, $config['default_quality']);
         self::assertSame('contain', $config['default_fit']);
-        self::assertTrue($config['placeholders']['blur']['enabled']);
-        self::assertSame(10, $config['placeholders']['blur']['size']);
-        self::assertSame(5, $config['placeholders']['blur']['blur']);
-        self::assertSame(30, $config['placeholders']['blur']['quality']);
+        self::assertSame([], $config['placeholders']);
         self::assertSame([], $config['loaders']);
         self::assertSame([], $config['transformers']);
     }
@@ -153,68 +152,131 @@ class ConfigurationTest extends TestCase
         ]);
     }
 
-    // --- Blur quality validation ---
+    // --- Placeholder quality validation ---
 
-    public function testBlurQualityMinBound(): void
+    public function testPlaceholderQualityMinBound(): void
     {
         $config = $this->processConfig([
-            'placeholders' => ['blur' => ['quality' => 1]],
+            'placeholders' => ['blur' => ['type' => 'transformer', 'quality' => 1]],
         ]);
 
         self::assertSame(1, $config['placeholders']['blur']['quality']);
     }
 
-    public function testBlurQualityMaxBound(): void
+    public function testPlaceholderQualityMaxBound(): void
     {
         $config = $this->processConfig([
-            'placeholders' => ['blur' => ['quality' => 100]],
+            'placeholders' => ['blur' => ['type' => 'transformer', 'quality' => 100]],
         ]);
 
         self::assertSame(100, $config['placeholders']['blur']['quality']);
     }
 
-    public function testBlurQualityBelowMinThrows(): void
+    public function testPlaceholderQualityBelowMinThrows(): void
     {
         $this->expectException(InvalidConfigurationException::class);
 
         $this->processConfig([
-            'placeholders' => ['blur' => ['quality' => 0]],
+            'placeholders' => ['blur' => ['type' => 'transformer', 'quality' => 0]],
         ]);
     }
 
-    public function testBlurQualityAboveMaxThrows(): void
+    public function testPlaceholderQualityAboveMaxThrows(): void
     {
         $this->expectException(InvalidConfigurationException::class);
 
         $this->processConfig([
-            'placeholders' => ['blur' => ['quality' => 101]],
+            'placeholders' => ['blur' => ['type' => 'transformer', 'quality' => 101]],
         ]);
     }
 
-    // --- Blur settings ---
+    // --- Placeholder settings ---
 
-    public function testBlurDisabled(): void
-    {
-        $config = $this->processConfig([
-            'placeholders' => ['blur' => ['enabled' => false]],
-        ]);
-
-        self::assertFalse($config['placeholders']['blur']['enabled']);
-    }
-
-    public function testBlurCustomSettings(): void
+    public function testTransformerPlaceholderConfig(): void
     {
         $config = $this->processConfig([
             'placeholders' => ['blur' => [
+                'type' => 'transformer',
                 'size' => 20,
                 'blur' => 10,
                 'quality' => 50,
             ]],
         ]);
 
+        self::assertSame('transformer', $config['placeholders']['blur']['type']);
         self::assertSame(20, $config['placeholders']['blur']['size']);
         self::assertSame(10, $config['placeholders']['blur']['blur']);
         self::assertSame(50, $config['placeholders']['blur']['quality']);
+        self::assertTrue($config['placeholders']['blur']['enabled']);
+    }
+
+    public function testServicePlaceholderConfig(): void
+    {
+        $config = $this->processConfig([
+            'placeholders' => ['custom' => [
+                'type' => 'service',
+                'service' => 'app.my_placeholder',
+            ]],
+        ]);
+
+        self::assertSame('service', $config['placeholders']['custom']['type']);
+        self::assertSame('app.my_placeholder', $config['placeholders']['custom']['service']);
+    }
+
+    public function testDisabledPlaceholderConfig(): void
+    {
+        $config = $this->processConfig([
+            'placeholders' => ['blur' => [
+                'type' => 'transformer',
+                'enabled' => false,
+            ]],
+        ]);
+
+        self::assertFalse($config['placeholders']['blur']['enabled']);
+    }
+
+    public function testDefaultPlaceholderConfig(): void
+    {
+        $config = $this->processConfig([
+            'default_placeholder' => 'blur',
+        ]);
+
+        self::assertSame('blur', $config['default_placeholder']);
+    }
+
+    public function testPlaceholderTypeInferredFromName(): void
+    {
+        $config = $this->processConfig([
+            'placeholders' => ['transformer' => []],
+        ]);
+
+        // Type is null in config tree (inferred at loadExtension time)
+        self::assertNull($config['placeholders']['transformer']['type']);
+    }
+
+    public function testMultiplePlaceholders(): void
+    {
+        $config = $this->processConfig([
+            'placeholders' => [
+                'blur' => [
+                    'type' => 'transformer',
+                    'size' => 15,
+                ],
+                'custom' => [
+                    'type' => 'service',
+                    'service' => 'app.blurhash',
+                ],
+                'disabled_one' => [
+                    'type' => 'transformer',
+                    'enabled' => false,
+                ],
+            ],
+        ]);
+
+        self::assertCount(3, $config['placeholders']);
+        self::assertTrue($config['placeholders']['blur']['enabled']);
+        self::assertTrue($config['placeholders']['custom']['enabled']);
+        self::assertFalse($config['placeholders']['disabled_one']['enabled']);
     }
 
     // --- Fit values ---
@@ -735,6 +797,7 @@ class ConfigurationTest extends TestCase
         $config = $this->processConfig([
             'default_loader' => 'uploads',
             'default_transformer' => 'cdn',
+            'default_placeholder' => 'blur',
             'device_sizes' => [320, 640, 1024, 1440],
             'image_sizes' => [32, 64, 128],
             'formats' => ['avif', 'webp', 'png'],
@@ -742,7 +805,7 @@ class ConfigurationTest extends TestCase
             'default_fit' => 'cover',
             'placeholders' => [
                 'blur' => [
-                    'enabled' => true,
+                    'type' => 'transformer',
                     'size' => 15,
                     'blur' => 8,
                     'quality' => 20,
@@ -795,6 +858,7 @@ class ConfigurationTest extends TestCase
 
         self::assertSame('uploads', $config['default_loader']);
         self::assertSame('cdn', $config['default_transformer']);
+        self::assertSame('blur', $config['default_placeholder']);
         self::assertSame([320, 640, 1024, 1440], $config['device_sizes']);
         self::assertSame([32, 64, 128], $config['image_sizes']);
         self::assertSame(['avif', 'webp', 'png'], $config['formats']);

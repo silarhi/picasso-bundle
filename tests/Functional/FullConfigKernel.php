@@ -16,6 +16,7 @@ namespace Silarhi\PicassoBundle\Tests\Functional;
 use function dirname;
 
 use Silarhi\PicassoBundle\PicassoBundle;
+use Silarhi\PicassoBundle\Tests\Functional\Stub\StubServicePlaceholder;
 use Silarhi\PicassoBundle\Tests\Functional\Stub\StubServiceTransformer;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\TwigBundle\TwigBundle;
@@ -70,6 +71,7 @@ class FullConfigKernel extends Kernel
             $container->loadFromExtension('picasso', [
                 'default_loader' => 'main',
                 'default_transformer' => 'local_glide',
+                'default_placeholder' => 'blur',
                 'device_sizes' => [320, 640, 1024],
                 'image_sizes' => [24, 48, 96],
                 'formats' => ['webp', 'png'],
@@ -77,10 +79,14 @@ class FullConfigKernel extends Kernel
                 'default_fit' => 'cover',
                 'placeholders' => [
                     'blur' => [
-                        'enabled' => true,
+                        'type' => 'transformer',
                         'size' => 20,
                         'blur' => 10,
                         'quality' => 50,
+                    ],
+                    'custom_placeholder' => [
+                        'type' => 'service',
+                        'service' => StubServicePlaceholder::class,
                     ],
                 ],
                 'loaders' => [
@@ -130,8 +136,9 @@ class FullConfigKernel extends Kernel
                 ],
             ]);
 
-            // Register the stub service transformer
+            // Register stub services
             $container->register(StubServiceTransformer::class, StubServiceTransformer::class);
+            $container->register(StubServicePlaceholder::class, StubServicePlaceholder::class);
         });
     }
 

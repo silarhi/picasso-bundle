@@ -39,14 +39,14 @@ class ImagePipelineTest extends TestCase
 
         $loaderLocator = $this->createMock(ContainerInterface::class);
         $loaderLocator->method('has')->willReturnCallback(static fn (string $key): bool => 'filesystem' === $key);
-        $loaderLocator->method('get')->willReturnCallback(fn (string $key) => match ($key) {
+        $loaderLocator->method('get')->willReturnCallback(fn (string $key): MockObject => match ($key) {
             'filesystem' => $this->loader,
             default => throw new InvalidArgumentException("Unknown loader: $key"),
         });
 
         $transformerLocator = $this->createMock(ContainerInterface::class);
         $transformerLocator->method('has')->willReturnCallback(static fn (string $key): bool => 'glide' === $key);
-        $transformerLocator->method('get')->willReturnCallback(fn (string $key) => match ($key) {
+        $transformerLocator->method('get')->willReturnCallback(fn (string $key): MockObject => match ($key) {
             'glide' => $this->transformer,
             default => throw new InvalidArgumentException("Unknown transformer: $key"),
         });
