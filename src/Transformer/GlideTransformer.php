@@ -21,11 +21,12 @@ use League\Glide\Responses\SymfonyResponseFactory;
 use League\Glide\ServerFactory;
 use League\Glide\Signatures\SignatureException;
 use League\Glide\Signatures\SignatureFactory;
-use LogicException;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Exception\EncryptionException;
 use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
+use Silarhi\PicassoBundle\Exception\LoaderNotFoundException;
+use Silarhi\PicassoBundle\Exception\TransformerNotFoundException;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
 use Silarhi\PicassoBundle\Service\UrlEncryption;
 use Symfony\Component\HttpFoundation\Request;
@@ -50,9 +51,9 @@ final readonly class GlideTransformer implements LocalTransformerInterface
         $path = $image->path ?? '';
         $glideParams = $this->mapToGlideParams($transformation);
         /** @var string $loaderName */
-        $loaderName = $context['loader'] ?? throw new LogicException('The "loader" key is required in the context array.');
+        $loaderName = $context['loader'] ?? throw new LoaderNotFoundException('The "loader" key is required in the context array.');
         /** @var string $transformerName */
-        $transformerName = $context['transformer'] ?? throw new LogicException('The "transformer" key is required in the context array.');
+        $transformerName = $context['transformer'] ?? throw new TransformerNotFoundException('The "transformer" key is required in the context array.');
 
         if ([] !== $image->metadata) {
             $glideParams['_metadata'] = $this->urlEncryption->encrypt(json_encode($image->metadata, \JSON_THROW_ON_ERROR));
