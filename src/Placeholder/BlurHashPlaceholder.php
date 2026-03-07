@@ -22,13 +22,16 @@ use Imagine\Image\Point;
 use function is_string;
 
 use kornrunner\Blurhash\Blurhash;
-use LogicException;
 use Psr\Cache\CacheItemPoolInterface;
-use RuntimeException;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
+use Silarhi\PicassoBundle\Exception\ImageProcessingException;
+use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
 use Silarhi\PicassoBundle\Service\CacheKeyGenerator;
 
+/**
+ * @phpstan-import-type TransformerContext from \Silarhi\PicassoBundle\Transformer\ImageTransformerInterface
+ */
 final readonly class BlurHashPlaceholder implements PlaceholderInterface
 {
     /**
@@ -48,10 +51,11 @@ final readonly class BlurHashPlaceholder implements PlaceholderInterface
     public function generate(Image $image, ImageTransformation $transformation, array $context = []): string
     {
         if (!class_exists(Blurhash::class)) {
-            throw new LogicException('The "kornrunner/blurhash" package is required for the BlurHash placeholder. Install it with: composer require kornrunner/blurhash');
+            throw new InvalidConfigurationException('The "kornrunner/blurhash" package is required for the BlurHash placeholder. Install it with: composer require kornrunner/blurhash');
         }
 
         if ($this->cache instanceof CacheItemPoolInterface && null !== $image->path) {
+            // Loader name is optional for BlurHash — used only for cache key specificity
             $loader = isset($context['loader']) && is_string($context['loader']) ? $context['loader'] : '';
             $cacheKey = CacheKeyGenerator::generate('blurhash', [
                 $loader,
@@ -85,7 +89,7 @@ final readonly class BlurHashPlaceholder implements PlaceholderInterface
     {
         $stream = $image->resolveStream();
         if (null === $stream) {
-            throw new RuntimeException('Cannot generate BlurHash: image stream is not available.');
+            throw new ImageProcessingException('Cannot generate BlurHash: image stream is not available.');
         }
 
         $pixels = $this->extractPixels($stream);
@@ -104,7 +108,7 @@ final readonly class BlurHashPlaceholder implements PlaceholderInterface
     {
         $contents = stream_get_contents($stream);
         if (false === $contents || '' === $contents) {
-            throw new RuntimeException('Cannot read image stream for BlurHash encoding.');
+            throw new ImageProcessingException('Cannot read image stream for BlurHash encoding.');
         }
 
         $img = $this->imagine->load($contents);

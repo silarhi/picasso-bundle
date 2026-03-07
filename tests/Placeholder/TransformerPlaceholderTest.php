@@ -13,11 +13,11 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Tests\Placeholder;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
+use Silarhi\PicassoBundle\Exception\TransformerNotFoundException;
 use Silarhi\PicassoBundle\Placeholder\TransformerPlaceholder;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
@@ -93,7 +93,7 @@ class TransformerPlaceholderTest extends TestCase
 
         $placeholder = new TransformerPlaceholder($registry, size: 10, blur: 5, quality: 30);
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(TransformerNotFoundException::class);
         $placeholder->generate(new Image(path: 'photo.jpg'), new ImageTransformation(width: 100, height: 100));
     }
 }

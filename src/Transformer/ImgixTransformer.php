@@ -17,6 +17,8 @@ use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 
 /**
+ * @phpstan-import-type TransformerContext from ImageTransformerInterface
+ *
  * @see https://docs.imgix.com/apis/rendering
  */
 final readonly class ImgixTransformer implements ImageTransformerInterface
