@@ -13,6 +13,11 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Placeholder;
 
+use Imagine\Image\Box;
+use Imagine\Image\ImagineInterface;
+use Imagine\Image\Palette\Color\ColorInterface;
+use Imagine\Image\Palette\RGB;
+use Imagine\Image\Point;
 use kornrunner\Blurhash\Blurhash;
 use LogicException;
 use RuntimeException;
@@ -27,6 +32,7 @@ final readonly class BlurHashPlaceholder implements PlaceholderInterface
      * @param int $size        Width/height of the decoded placeholder image in pixels
      */
     public function __construct(
+        private ImagineInterface $imagine,
         private int $componentsX = 4,
         private int $componentsY = 3,
         private int $size = 32,
@@ -63,13 +69,10 @@ final readonly class BlurHashPlaceholder implements PlaceholderInterface
             throw new RuntimeException('Cannot read image stream for BlurHash encoding.');
         }
 
-        $gd = @imagecreatefromstring($contents);
-        if (false === $gd) {
-            throw new RuntimeException('Cannot create GD image from stream for BlurHash encoding.');
-        }
-
-        $w = imagesx($gd);
-        $h = imagesy($gd);
+        $img = $this->imagine->load($contents);
+        $size = $img->getSize();
+        $w = $size->getWidth();
+        $h = $size->getHeight();
 
         // Resize to a small image to speed up encoding
         $maxDim = 64;
@@ -77,14 +80,7 @@ final readonly class BlurHashPlaceholder implements PlaceholderInterface
             $ratio = min($maxDim / $w, $maxDim / $h);
             $newW = max(1, (int) round($w * $ratio));
             $newH = max(1, (int) round($h * $ratio));
-            $resized = imagecreatetruecolor($newW, $newH);
-            if (false === $resized) {
-                imagedestroy($gd);
-                throw new RuntimeException('Cannot create resized GD image for BlurHash encoding.');
-            }
-            imagecopyresampled($resized, $gd, 0, 0, 0, 0, $newW, $newH, $w, $h);
-            imagedestroy($gd);
-            $gd = $resized;
+            $img = $img->resize(new Box($newW, $newH));
             $w = $newW;
             $h = $newH;
         }
@@ -93,21 +89,15 @@ final readonly class BlurHashPlaceholder implements PlaceholderInterface
         for ($y = 0; $y < $h; ++$y) {
             $row = [];
             for ($x = 0; $x < $w; ++$x) {
-                $rgb = imagecolorat($gd, $x, $y);
-                if (false === $rgb) {
-                    $row[] = [0, 0, 0];
-                    continue;
-                }
+                $color = $img->getColorAt(new Point($x, $y));
                 $row[] = [
-                    ($rgb >> 16) & 0xFF,
-                    ($rgb >> 8) & 0xFF,
-                    $rgb & 0xFF,
+                    (int) $color->getValue(ColorInterface::COLOR_RED),
+                    (int) $color->getValue(ColorInterface::COLOR_GREEN),
+                    (int) $color->getValue(ColorInterface::COLOR_BLUE),
                 ];
             }
             $pixels[] = $row;
         }
-
-        imagedestroy($gd);
 
         return $pixels;
     }
@@ -127,10 +117,8 @@ final readonly class BlurHashPlaceholder implements PlaceholderInterface
         /** @var list<list<array{int, int, int}>> $pixels */
         $pixels = Blurhash::decode($hash, $decodeWidth, $decodeHeight);
 
-        $gd = imagecreatetruecolor($decodeWidth, $decodeHeight);
-        if (false === $gd) {
-            throw new RuntimeException('Cannot create GD image for BlurHash decoding.');
-        }
+        $palette = new RGB();
+        $img = $this->imagine->create(new Box($decodeWidth, $decodeHeight));
 
         for ($y = 0; $y < $decodeHeight; ++$y) {
             for ($x = 0; $x < $decodeWidth; ++$x) {
@@ -141,21 +129,11 @@ final readonly class BlurHashPlaceholder implements PlaceholderInterface
                 $cg = max(0, min(255, $g));
                 /** @var int<0, 255> $cb */
                 $cb = max(0, min(255, $b));
-                $color = imagecolorallocate($gd, $cr, $cg, $cb);
-                if (false !== $color) {
-                    imagesetpixel($gd, $x, $y, $color);
-                }
+                $img->draw()->dot(new Point($x, $y), $palette->color([$cr, $cg, $cb]));
             }
         }
 
-        ob_start();
-        imagepng($gd);
-        $data = ob_get_clean();
-        imagedestroy($gd);
-
-        if (false === $data || '' === $data) {
-            throw new RuntimeException('Failed to encode BlurHash placeholder as PNG.');
-        }
+        $data = $img->get('png');
 
         return 'data:image/png;base64,' . base64_encode($data);
     }

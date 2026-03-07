@@ -153,6 +153,14 @@ final class PicassoBundle extends AbstractBundle
                             ->integerNode('quality')->defaultValue(30)->min(1)->max(100)->info('Quality for transformer placeholders.')->end()
                             ->integerNode('components_x')->defaultValue(4)->min(1)->max(9)->info('Horizontal BlurHash components (1–9).')->end()
                             ->integerNode('components_y')->defaultValue(3)->min(1)->max(9)->info('Vertical BlurHash components (1–9).')->end()
+                            ->scalarNode('driver')
+                                ->defaultValue('gd')
+                                ->validate()
+                                    ->ifNotInArray(['gd', 'imagick'])
+                                    ->thenInvalid('Driver must be "gd" or "imagick"')
+                                ->end()
+                                ->info('Image processing driver for BlurHash (gd or imagick).')
+                            ->end()
                             ->scalarNode('service')
                                 ->defaultNull()
                                 ->info('Service ID for custom placeholders (type: service).')
@@ -242,7 +250,7 @@ final class PicassoBundle extends AbstractBundle
          *     formats: list<string>,
          *     default_quality: int,
          *     default_fit: string,
-         *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int, quality: int, components_x: int, components_y: int, service: string|null}>,
+         *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int, quality: int, components_x: int, components_y: int, driver: string, service: string|null}>,
          *     loaders: array<string, array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null}>,
          *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, public_cache: array{enabled: bool}}>
          * } $config
@@ -462,8 +470,15 @@ final class PicassoBundle extends AbstractBundle
                     break;
 
                 case 'blurhash':
+                    $imagineClass = 'imagick' === $placeholderConfig['driver']
+                        ? \Imagine\Imagick\Imagine::class
+                        : \Imagine\Gd\Imagine::class;
+                    $imagineServiceId = 'picasso.imagine.' . $name;
+                    $services->set($imagineServiceId, $imagineClass);
+
                     $services->set('picasso.placeholder.' . $name, BlurHashPlaceholder::class)
                         ->args([
+                            service($imagineServiceId),
                             $placeholderConfig['components_x'],
                             $placeholderConfig['components_y'],
                             $placeholderConfig['size'],
