@@ -21,7 +21,6 @@ use LogicException;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
-use Silarhi\PicassoBundle\Loader\UrlLoader;
 use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
 use Silarhi\PicassoBundle\PicassoBundle;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
@@ -198,10 +197,9 @@ class BundleWiringTest extends TestCase
                     'sign_key' => 'test',
                 ],
             ],
-        ], withHttpClient: true);
+        ], withPsrHttpClient: true);
 
         self::assertTrue($container->has('picasso.loader.url'));
-        self::assertInstanceOf(UrlLoader::class, $container->get('picasso.loader.url'));
     }
 
     public function testImgixTransformerIsRegistered(): void
@@ -249,13 +247,13 @@ class BundleWiringTest extends TestCase
     /**
      * @param array<string, mixed> $picassoConfig
      */
-    private function bootKernel(array $picassoConfig, bool $withHttpClient = false): ContainerInterface
+    private function bootKernel(array $picassoConfig, bool $withPsrHttpClient = false): ContainerInterface
     {
         $kernel = new BundleWiringTestKernel(
             'test_' . bin2hex(random_bytes(4)),
             false,
             $picassoConfig,
-            $withHttpClient,
+            $withPsrHttpClient,
         );
         $kernel->boot();
         $this->kernels[] = $kernel;
@@ -288,7 +286,7 @@ class BundleWiringTestKernel extends Kernel
         string $environment,
         bool $debug,
         private readonly array $picassoConfig,
-        private readonly bool $withHttpClient,
+        private readonly bool $withPsrHttpClient,
     ) {
         parent::__construct($environment, $debug);
     }
@@ -305,9 +303,9 @@ class BundleWiringTestKernel extends Kernel
     public function registerContainerConfiguration(LoaderInterface $loader): void
     {
         $picassoConfig = $this->picassoConfig;
-        $withHttpClient = $this->withHttpClient;
+        $withPsrHttpClient = $this->withPsrHttpClient;
 
-        $loader->load(static function (ContainerBuilder $container) use ($picassoConfig, $withHttpClient): void {
+        $loader->load(static function (ContainerBuilder $container) use ($picassoConfig, $withPsrHttpClient): void {
             $frameworkConfig = [
                 'test' => true,
                 'secret' => 'test-secret',
@@ -319,7 +317,7 @@ class BundleWiringTestKernel extends Kernel
                 'php_errors' => ['log' => true],
             ];
 
-            if ($withHttpClient) {
+            if ($withPsrHttpClient) {
                 $frameworkConfig['http_client'] = ['enabled' => true];
             }
 

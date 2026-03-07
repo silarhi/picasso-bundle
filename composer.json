@@ -17,6 +17,8 @@
         "league/glide-symfony": "^2.0.1",
         "phpstan/phpstan": "^2.1.40",
         "phpunit/phpunit": "^11.5.55",
+        "psr/http-client": "^1.0.3",
+        "psr/http-factory": "^1.1",
         "rector/rector": "^2.3.8",
         "symfony/http-client": "^6.4 || ^7.4.4 || ^8.0.6",
         "symfony/twig-bundle": "^6.4 || ^7.4.4 || ^8.0",
@@ -36,7 +38,10 @@
         "league/glide-symfony": "Required for the Glide transformer",
         "league/flysystem": "Required for the Flysystem loader",
         "kornrunner/blurhash": "Required for the BlurHash placeholder",
-        "vich/uploader-bundle": "Required for the VichUploader loader"
+        "vich/uploader-bundle": "Required for the VichUploader loader",
+        "psr/http-client": "Required for the URL loader (PSR-18 HTTP client interface)",
+        "psr/http-factory": "Required for the URL loader (PSR-17 HTTP factory interface)",
+        "symfony/http-client": "Provides a PSR-18 HTTP client implementation for the URL loader"
     },
     "scripts": {
         "test": "phpunit",
