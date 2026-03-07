@@ -17,6 +17,7 @@ use function dirname;
 
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Service\MetadataGuesser;
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
 
 class MetadataGuesserTest extends TestCase
 {
@@ -99,6 +100,45 @@ class MetadataGuesserTest extends TestCase
 
         self::assertSame(1, $result['width']);
         self::assertSame(1, $result['height']);
+    }
+
+    public function testGuessWithCacheStoresAndReturnsResult(): void
+    {
+        $cache = new ArrayAdapter();
+        $guesser = new MetadataGuesser($cache);
+
+        $gif = base64_decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
+        $stream = $this->createStream($gif);
+
+        // First call: populates cache
+        $result = $guesser->guess($stream, 'test-image.gif');
+        self::assertSame(1, $result['width']);
+        self::assertSame(1, $result['height']);
+        self::assertSame('image/gif', $result['mimeType']);
+
+        // Second call with a broken stream: should return cached result
+        $emptyStream = $this->createStream('');
+        $cached = $guesser->guess($emptyStream, 'test-image.gif');
+        self::assertSame(1, $cached['width']);
+        self::assertSame(1, $cached['height']);
+        self::assertSame('image/gif', $cached['mimeType']);
+    }
+
+    public function testGuessWithCacheButNoIdentifierSkipsCache(): void
+    {
+        $cache = new ArrayAdapter();
+        $guesser = new MetadataGuesser($cache);
+
+        $gif = base64_decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
+        $stream = $this->createStream($gif);
+
+        $result = $guesser->guess($stream);
+        self::assertSame(1, $result['width']);
+
+        // Without identifier, each call reads the stream
+        $emptyStream = $this->createStream('');
+        $result2 = $guesser->guess($emptyStream);
+        self::assertNull($result2['width']);
     }
 
     /**

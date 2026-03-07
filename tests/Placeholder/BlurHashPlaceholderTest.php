@@ -22,6 +22,8 @@ use Silarhi\PicassoBundle\Placeholder\BlurHashPlaceholder;
 
 use function strlen;
 
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
+
 class BlurHashPlaceholderTest extends TestCase
 {
     private Imagine $imagine;
@@ -110,6 +112,43 @@ class BlurHashPlaceholderTest extends TestCase
         $result = $placeholder->generate($image, new ImageTransformation(width: 200, height: 150));
 
         self::assertStringStartsWith('data:image/png;base64,', $result);
+    }
+
+    public function testGenerateWithCacheStoresAndReturnsResult(): void
+    {
+        $cache = new ArrayAdapter();
+        $placeholder = new BlurHashPlaceholder($this->imagine, cache: $cache);
+
+        $stream = $this->createTestImageStream(100, 75);
+        $image = new Image(path: 'photo.jpg', stream: $stream);
+        $transformation = new ImageTransformation(width: 100, height: 75);
+
+        // First call: generates and caches
+        $result = $placeholder->generate($image, $transformation);
+        self::assertStringStartsWith('data:image/png;base64,', $result);
+
+        // Second call with null stream: should return cached result
+        $cachedImage = new Image(path: 'photo.jpg');
+        $cached = $placeholder->generate($cachedImage, $transformation);
+        self::assertSame($result, $cached);
+    }
+
+    public function testGenerateWithCacheButNoPathSkipsCache(): void
+    {
+        $cache = new ArrayAdapter();
+        $placeholder = new BlurHashPlaceholder($this->imagine, cache: $cache);
+
+        $stream = $this->createTestImageStream(100, 75);
+        $image = new Image(stream: $stream);
+        $transformation = new ImageTransformation(width: 100, height: 75);
+
+        $result = $placeholder->generate($image, $transformation);
+        self::assertStringStartsWith('data:image/png;base64,', $result);
+
+        // Without path, cache is not used, so null stream throws
+        $noCacheImage = new Image();
+        $this->expectException(RuntimeException::class);
+        $placeholder->generate($noCacheImage, $transformation);
     }
 
     /**

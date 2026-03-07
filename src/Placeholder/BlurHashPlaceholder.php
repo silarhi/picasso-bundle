@@ -20,6 +20,7 @@ use Imagine\Image\Palette\RGB;
 use Imagine\Image\Point;
 use kornrunner\Blurhash\Blurhash;
 use LogicException;
+use Psr\Cache\CacheItemPoolInterface;
 use RuntimeException;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
@@ -36,6 +37,7 @@ final readonly class BlurHashPlaceholder implements PlaceholderInterface
         private int $componentsX,
         private int $componentsY,
         private int $size,
+        private ?CacheItemPoolInterface $cache = null,
     ) {
     }
 
@@ -45,6 +47,37 @@ final readonly class BlurHashPlaceholder implements PlaceholderInterface
             throw new LogicException('The "kornrunner/blurhash" package is required for the BlurHash placeholder. Install it with: composer require kornrunner/blurhash');
         }
 
+        if (null !== $this->cache && null !== $image->path) {
+            $cacheKey = 'picasso_blurhash_' . hash('xxh128', implode('|', [
+                $context['loader'] ?? '',
+                $image->path,
+                (string) ($transformation->width ?? 0),
+                (string) ($transformation->height ?? 0),
+                (string) $this->componentsX,
+                (string) $this->componentsY,
+                (string) $this->size,
+            ]));
+            $item = $this->cache->getItem($cacheKey);
+
+            if ($item->isHit()) {
+                /** @var string $cached */
+                $cached = $item->get();
+
+                return $cached;
+            }
+
+            $result = $this->doGenerate($image, $transformation);
+            $item->set($result);
+            $this->cache->save($item);
+
+            return $result;
+        }
+
+        return $this->doGenerate($image, $transformation);
+    }
+
+    private function doGenerate(Image $image, ImageTransformation $transformation): string
+    {
         $stream = $image->resolveStream();
         if (null === $stream) {
             throw new RuntimeException('Cannot generate BlurHash: image stream is not available.');

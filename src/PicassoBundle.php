@@ -132,6 +132,10 @@ final class PicassoBundle extends AbstractBundle
                     ->defaultValue('contain')
                     ->info('Default fit mode (contain, cover, crop, fill).')
                 ->end()
+                ->scalarNode('cache')
+                    ->defaultValue('cache.app')
+                    ->info('PSR-6 cache pool service ID for metadata guessing and BlurHash generation. Set to null to disable caching.')
+                ->end()
                 ->scalarNode('default_placeholder')
                     ->defaultNull()
                     ->info('Default placeholder name. Auto-detected when only one is configured.')
@@ -244,6 +248,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_loader: string|null,
          *     default_transformer: string|null,
          *     default_placeholder: string|null,
+         *     cache: string|null,
          *     device_sizes: list<int>,
          *     image_sizes: list<int>,
          *     formats: list<string>,
@@ -258,7 +263,11 @@ final class PicassoBundle extends AbstractBundle
 
         // --- MetadataGuesser ---
 
-        $services->set('picasso.metadata_guesser', MetadataGuesser::class);
+        $cacheServiceId = $config['cache'];
+        $metadataGuesserDef = $services->set('picasso.metadata_guesser', MetadataGuesser::class);
+        if (null !== $cacheServiceId) {
+            $metadataGuesserDef->args([service($cacheServiceId)]);
+        }
         $services->alias(MetadataGuesser::class, 'picasso.metadata_guesser');
         $services->alias(MetadataGuesserInterface::class, 'picasso.metadata_guesser');
 
@@ -456,13 +465,18 @@ final class PicassoBundle extends AbstractBundle
                     $imagineServiceId = 'picasso.imagine.' . $name;
                     $services->set($imagineServiceId, $imagineClass);
 
+                    $blurhashArgs = [
+                        service($imagineServiceId),
+                        $placeholderConfig['components_x'],
+                        $placeholderConfig['components_y'],
+                        $placeholderConfig['size'],
+                    ];
+                    if (null !== $cacheServiceId) {
+                        $blurhashArgs[] = service($cacheServiceId);
+                    }
+
                     $services->set('picasso.placeholder.' . $name, BlurHashPlaceholder::class)
-                        ->args([
-                            service($imagineServiceId),
-                            $placeholderConfig['components_x'],
-                            $placeholderConfig['components_y'],
-                            $placeholderConfig['size'],
-                        ])
+                        ->args($blurhashArgs)
                         ->tag('picasso.placeholder', ['key' => $name]);
                     break;
 
