@@ -26,6 +26,6 @@ final class CacheKeyGenerator
      */
     public static function generate(string $name, array $arguments): string
     {
-        return 'picasso_' . $name . '_' . hash('xxh128', implode('|', array_map('strval', $arguments)));
+        return 'picasso:' . $name . ':' . hash('xxh128', implode('|', array_map(strval(...), $arguments)));
     }
 }

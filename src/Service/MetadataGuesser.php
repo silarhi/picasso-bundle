@@ -18,12 +18,12 @@ use Psr\Cache\CacheItemPoolInterface;
 /**
  * @phpstan-import-type ImageGuessedMetadata from MetadataGuesserInterface
  */
-final class MetadataGuesser implements MetadataGuesserInterface
+final readonly class MetadataGuesser implements MetadataGuesserInterface
 {
     private const READ_SIZE = 65536;
 
     public function __construct(
-        private readonly ?CacheItemPoolInterface $cache = null,
+        private ?CacheItemPoolInterface $cache = null,
     ) {
     }
 
@@ -37,7 +37,7 @@ final class MetadataGuesser implements MetadataGuesserInterface
      */
     public function guess($stream, ?string $identifier = null): array
     {
-        if (null !== $this->cache && null !== $identifier) {
+        if ($this->cache instanceof CacheItemPoolInterface && null !== $identifier) {
             $cacheKey = CacheKeyGenerator::generate('metadata', [$identifier]);
             $item = $this->cache->getItem($cacheKey);
 

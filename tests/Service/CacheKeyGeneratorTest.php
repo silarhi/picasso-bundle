@@ -30,7 +30,7 @@ class CacheKeyGeneratorTest extends TestCase
     {
         $key = CacheKeyGenerator::generate('metadata', ['photo.jpg']);
 
-        self::assertStringStartsWith('picasso_metadata_', $key);
+        self::assertStringStartsWith('picasso:metadata:', $key);
     }
 
     public function testGenerateDiffersForDifferentNames(): void
@@ -53,6 +53,6 @@ class CacheKeyGeneratorTest extends TestCase
     {
         $key = CacheKeyGenerator::generate('blurhash', ['fs', 'photo.jpg', 100, 75, 4, 3, 32]);
 
-        self::assertStringStartsWith('picasso_blurhash_', $key);
+        self::assertStringStartsWith('picasso:blurhash:', $key);
     }
 }

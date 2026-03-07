@@ -38,9 +38,9 @@ final readonly class BlurHashPlaceholder implements PlaceholderInterface
      */
     public function __construct(
         private ImagineInterface $imagine,
-        private int $componentsX,
-        private int $componentsY,
-        private int $size,
+        private int $componentsX = 4,
+        private int $componentsY = 3,
+        private int $size = 32,
         private ?CacheItemPoolInterface $cache = null,
     ) {
     }
@@ -51,7 +51,7 @@ final readonly class BlurHashPlaceholder implements PlaceholderInterface
             throw new LogicException('The "kornrunner/blurhash" package is required for the BlurHash placeholder. Install it with: composer require kornrunner/blurhash');
         }
 
-        if (null !== $this->cache && null !== $image->path) {
+        if ($this->cache instanceof CacheItemPoolInterface && null !== $image->path) {
             $loader = isset($context['loader']) && is_string($context['loader']) ? $context['loader'] : '';
             $cacheKey = CacheKeyGenerator::generate('blurhash', [
                 $loader,
