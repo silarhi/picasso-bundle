@@ -89,7 +89,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
         $cachePrefix = null;
 
         try {
-            SignatureFactory::create($this->signKey)->validateRequest($path, $request->query->all());
+            SignatureFactory::create($this->signKey)->validateRequest($path, $params);
         } catch (SignatureException $e) {
             throw new ImageNotFoundException('Invalid image signature.', previous: $e);
         }
