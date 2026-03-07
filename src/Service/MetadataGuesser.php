@@ -13,12 +13,19 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Service;
 
+use Psr\Cache\CacheItemPoolInterface;
+
 /**
  * @phpstan-import-type ImageGuessedMetadata from MetadataGuesserInterface
  */
-final class MetadataGuesser implements MetadataGuesserInterface
+final readonly class MetadataGuesser implements MetadataGuesserInterface
 {
     private const READ_SIZE = 65536;
+
+    public function __construct(
+        private ?CacheItemPoolInterface $cache = null,
+    ) {
+    }
 
     /**
      * Guess image dimensions and MIME type from a stream.
@@ -28,7 +35,35 @@ final class MetadataGuesser implements MetadataGuesserInterface
      *
      * @return ImageGuessedMetadata
      */
-    public function guess($stream): array
+    public function guess($stream, ?string $identifier = null): array
+    {
+        if ($this->cache instanceof CacheItemPoolInterface && null !== $identifier) {
+            $cacheKey = CacheKeyGenerator::generate('metadata', [$identifier]);
+            $item = $this->cache->getItem($cacheKey);
+
+            if ($item->isHit()) {
+                /** @var array{width: int|null, height: int|null, mimeType: string|null} $cached */
+                $cached = $item->get();
+
+                return $cached;
+            }
+
+            $result = $this->doGuess($stream);
+            $item->set($result);
+            $this->cache->save($item);
+
+            return $result;
+        }
+
+        return $this->doGuess($stream);
+    }
+
+    /**
+     * @param resource $stream
+     *
+     * @return array{width: int|null, height: int|null, mimeType: string|null}
+     */
+    private function doGuess($stream): array
     {
         $data = stream_get_contents($stream, self::READ_SIZE, 0);
 

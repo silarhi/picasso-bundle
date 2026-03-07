@@ -21,9 +21,10 @@ interface MetadataGuesserInterface
     /**
      * Guess image dimensions and MIME type from a stream.
      *
-     * @param resource $stream
+     * @param resource    $stream
+     * @param string|null $identifier Optional stable identifier (e.g. image path) used as cache key
      *
      * @return ImageGuessedMetadata
      */
-    public function guess($stream): array;
+    public function guess($stream, ?string $identifier = null): array;
 }

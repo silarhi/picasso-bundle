@@ -142,7 +142,7 @@ class ImageComponent
             $this->stopwatch?->start('picasso.metadata_guess', 'picasso');
             $stream = $image->resolveStream();
             if (null !== $stream) {
-                $guessed = $this->metadataGuesser->guess($stream);
+                $guessed = $this->metadataGuesser->guess($stream, $loaderName . ':' . $image->path);
                 $w ??= $guessed['width'];
                 $h ??= $guessed['height'];
             }

@@ -18,11 +18,16 @@ use Imagine\Image\ImagineInterface;
 use Imagine\Image\Palette\Color\ColorInterface;
 use Imagine\Image\Palette\RGB;
 use Imagine\Image\Point;
+
+use function is_string;
+
 use kornrunner\Blurhash\Blurhash;
 use LogicException;
+use Psr\Cache\CacheItemPoolInterface;
 use RuntimeException;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
+use Silarhi\PicassoBundle\Service\CacheKeyGenerator;
 
 final readonly class BlurHashPlaceholder implements PlaceholderInterface
 {
@@ -33,9 +38,10 @@ final readonly class BlurHashPlaceholder implements PlaceholderInterface
      */
     public function __construct(
         private ImagineInterface $imagine,
-        private int $componentsX,
-        private int $componentsY,
-        private int $size,
+        private int $componentsX = 4,
+        private int $componentsY = 3,
+        private int $size = 32,
+        private ?CacheItemPoolInterface $cache = null,
     ) {
     }
 
@@ -45,6 +51,38 @@ final readonly class BlurHashPlaceholder implements PlaceholderInterface
             throw new LogicException('The "kornrunner/blurhash" package is required for the BlurHash placeholder. Install it with: composer require kornrunner/blurhash');
         }
 
+        if ($this->cache instanceof CacheItemPoolInterface && null !== $image->path) {
+            $loader = isset($context['loader']) && is_string($context['loader']) ? $context['loader'] : '';
+            $cacheKey = CacheKeyGenerator::generate('blurhash', [
+                $loader,
+                $image->path,
+                $transformation->width ?? 0,
+                $transformation->height ?? 0,
+                $this->componentsX,
+                $this->componentsY,
+                $this->size,
+            ]);
+            $item = $this->cache->getItem($cacheKey);
+
+            if ($item->isHit()) {
+                /** @var string $cached */
+                $cached = $item->get();
+
+                return $cached;
+            }
+
+            $result = $this->doGenerate($image, $transformation);
+            $item->set($result);
+            $this->cache->save($item);
+
+            return $result;
+        }
+
+        return $this->doGenerate($image, $transformation);
+    }
+
+    private function doGenerate(Image $image, ImageTransformation $transformation): string
+    {
         $stream = $image->resolveStream();
         if (null === $stream) {
             throw new RuntimeException('Cannot generate BlurHash: image stream is not available.');
