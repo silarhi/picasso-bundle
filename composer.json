@@ -15,7 +15,6 @@
         "league/flysystem-bundle": "^3.6",
         "league/glide": "^2.3.2",
         "league/glide-symfony": "^2.0.1",
-        "nyholm/psr7": "^1.8",
         "phpstan/phpstan": "^2.1.40",
         "phpunit/phpunit": "^11.5.55",
         "psr/http-client": "^1.0.3",
@@ -42,8 +41,7 @@
         "vich/uploader-bundle": "Required for the VichUploader loader",
         "psr/http-client": "Required for the URL loader (PSR-18 HTTP client interface)",
         "psr/http-factory": "Required for the URL loader (PSR-17 HTTP factory interface)",
-        "symfony/http-client": "Provides a PSR-18 HTTP client implementation for the URL loader",
-        "nyholm/psr7": "Provides a PSR-7/PSR-17 implementation for the URL loader"
+        "symfony/http-client": "Provides a PSR-18 HTTP client implementation for the URL loader"
     },
     "scripts": {
         "test": "phpunit",

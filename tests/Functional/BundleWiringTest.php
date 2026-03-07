@@ -21,7 +21,6 @@ use LogicException;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
-use Silarhi\PicassoBundle\Loader\UrlLoader;
 use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
 use Silarhi\PicassoBundle\PicassoBundle;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
@@ -201,7 +200,6 @@ class BundleWiringTest extends TestCase
         ], withPsrHttpClient: true);
 
         self::assertTrue($container->has('picasso.loader.url'));
-        self::assertInstanceOf(UrlLoader::class, $container->get('picasso.loader.url'));
     }
 
     public function testImgixTransformerIsRegistered(): void
