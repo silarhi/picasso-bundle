@@ -58,6 +58,9 @@ class GlideTransformerTest extends TestCase
             new UrlEncryption(self::SIGN_KEY),
             self::SIGN_KEY,
             '/tmp/cache',
+            'gd',
+            null,
+            false,
         );
     }
 

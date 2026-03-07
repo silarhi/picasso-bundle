@@ -40,9 +40,9 @@ final readonly class GlideTransformer implements LocalTransformerInterface
         private UrlEncryption $urlEncryption,
         private string $signKey,
         private string $cache,
-        private string $driver = 'gd',
-        private ?int $maxImageSize = null,
-        private bool $publicCache = false,
+        private string $driver,
+        private ?int $maxImageSize,
+        private bool $publicCache,
     ) {
     }
 

@@ -46,7 +46,7 @@ class TransformerPlaceholderTest extends TestCase
         $locator->method('get')->with('glide')->willReturn($transformer);
         $registry = new TransformerRegistry($locator);
 
-        $placeholder = new TransformerPlaceholder($registry);
+        $placeholder = new TransformerPlaceholder($registry, size: 10, blur: 5, quality: 30);
         $result = $placeholder->generate(
             new Image(path: 'photo.jpg'),
             new ImageTransformation(width: 1920, height: 1080),
@@ -91,7 +91,7 @@ class TransformerPlaceholderTest extends TestCase
         $locator = $this->createMock(ContainerInterface::class);
         $registry = new TransformerRegistry($locator);
 
-        $placeholder = new TransformerPlaceholder($registry);
+        $placeholder = new TransformerPlaceholder($registry, size: 10, blur: 5, quality: 30);
 
         $this->expectException(InvalidArgumentException::class);
         $placeholder->generate(new Image(path: 'photo.jpg'), new ImageTransformation(width: 100, height: 100));

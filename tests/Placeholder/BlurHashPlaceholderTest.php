@@ -33,7 +33,7 @@ class BlurHashPlaceholderTest extends TestCase
 
     public function testGenerateReturnsDataUri(): void
     {
-        $placeholder = new BlurHashPlaceholder($this->imagine);
+        $placeholder = new BlurHashPlaceholder($this->imagine, componentsX: 4, componentsY: 3, size: 32);
 
         $stream = $this->createTestImageStream(100, 75);
         $image = new Image(path: 'photo.jpg', stream: $stream);
@@ -58,7 +58,7 @@ class BlurHashPlaceholderTest extends TestCase
 
     public function testGenerateWithLazyStream(): void
     {
-        $placeholder = new BlurHashPlaceholder($this->imagine);
+        $placeholder = new BlurHashPlaceholder($this->imagine, componentsX: 4, componentsY: 3, size: 32);
 
         $stream = $this->createTestImageStream(80, 60);
         $image = new Image(path: 'photo.jpg', stream: static fn () => $stream);
@@ -70,7 +70,7 @@ class BlurHashPlaceholderTest extends TestCase
 
     public function testGenerateThrowsWithNullStream(): void
     {
-        $placeholder = new BlurHashPlaceholder($this->imagine);
+        $placeholder = new BlurHashPlaceholder($this->imagine, componentsX: 4, componentsY: 3, size: 32);
         $image = new Image(path: 'photo.jpg');
 
         $this->expectException(RuntimeException::class);
@@ -80,7 +80,7 @@ class BlurHashPlaceholderTest extends TestCase
 
     public function testGenerateProducesValidPng(): void
     {
-        $placeholder = new BlurHashPlaceholder($this->imagine, size: 8);
+        $placeholder = new BlurHashPlaceholder($this->imagine, componentsX: 4, componentsY: 3, size: 8);
 
         $stream = $this->createTestImageStream(200, 100);
         $image = new Image(path: 'photo.jpg', stream: $stream);
@@ -101,7 +101,7 @@ class BlurHashPlaceholderTest extends TestCase
 
     public function testGenerateWithLargeSourceImage(): void
     {
-        $placeholder = new BlurHashPlaceholder($this->imagine);
+        $placeholder = new BlurHashPlaceholder($this->imagine, componentsX: 4, componentsY: 3, size: 32);
 
         // Create a larger image (200x150) to trigger internal downscale
         $stream = $this->createTestImageStream(200, 150);
