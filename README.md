@@ -1,22 +1,91 @@
 <p align="center">
-    <img src="https://img.shields.io/packagist/v/silarhi/picasso-bundle?style=flat-square&label=stable" alt="Latest Stable Version">
-    <img src="https://img.shields.io/packagist/dt/silarhi/picasso-bundle?style=flat-square" alt="Total Downloads">
-    <img src="https://img.shields.io/packagist/l/silarhi/picasso-bundle?style=flat-square" alt="License">
-    <img src="https://img.shields.io/packagist/php-v/silarhi/picasso-bundle?style=flat-square" alt="PHP Version">
-    <img src="https://img.shields.io/github/actions/workflow/status/silarhi/picasso-bundle/continuous-integration.yml?style=flat-square&label=CI" alt="CI Status">
+    <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/packagist/v/silarhi/picasso-bundle?style=for-the-badge&label=stable&color=0d6efd&labelColor=1a1a2e">
+        <img src="https://img.shields.io/packagist/v/silarhi/picasso-bundle?style=for-the-badge&label=stable&color=0d6efd" alt="Latest Stable Version">
+    </picture>
+    <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/packagist/dt/silarhi/picasso-bundle?style=for-the-badge&color=198754&labelColor=1a1a2e">
+        <img src="https://img.shields.io/packagist/dt/silarhi/picasso-bundle?style=for-the-badge&color=198754" alt="Total Downloads">
+    </picture>
+    <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/packagist/l/silarhi/picasso-bundle?style=for-the-badge&color=6f42c1&labelColor=1a1a2e">
+        <img src="https://img.shields.io/packagist/l/silarhi/picasso-bundle?style=for-the-badge&color=6f42c1" alt="License">
+    </picture>
+    <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/packagist/php-v/silarhi/picasso-bundle?style=for-the-badge&color=777bb4&labelColor=1a1a2e">
+        <img src="https://img.shields.io/packagist/php-v/silarhi/picasso-bundle?style=for-the-badge&color=777bb4" alt="PHP Version">
+    </picture>
+    <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/github/actions/workflow/status/silarhi/picasso-bundle/continuous-integration.yml?style=for-the-badge&label=CI&color=20c997&labelColor=1a1a2e">
+        <img src="https://img.shields.io/github/actions/workflow/status/silarhi/picasso-bundle/continuous-integration.yml?style=for-the-badge&label=CI&color=20c997" alt="CI Status">
+    </picture>
 </p>
 
-# PicassoBundle
+<h1 align="center">PicassoBundle</h1>
 
-Responsive image component for Symfony, inspired by [Next.js Image](https://nextjs.org/docs/app/api-reference/components/image).
+<p align="center">
+    <strong>The missing image component for Symfony.</strong><br>
+    Inspired by <a href="https://nextjs.org/docs/app/api-reference/components/image">Next.js Image</a> — built for the Symfony ecosystem.
+</p>
 
-PicassoBundle automatically generates optimized, responsive `<picture>` elements with multiple formats (AVIF, WebP, JPEG),
-srcset generation, and blur placeholders — all from a single Twig component.
+<p align="center">
+    Write one line of Twig. Get AVIF, WebP, responsive srcset, blur placeholders, and lazy loading — automatically.
+</p>
+
+---
+
+### Before PicassoBundle
+
+```html
+<!-- You write all of this manually... and maintain it forever -->
+<picture>
+    <source type="image/avif"
+            srcset="/images/hero-640.avif 640w, /images/hero-1080.avif 1080w, /images/hero-1920.avif 1920w"
+            sizes="100vw" />
+    <source type="image/webp"
+            srcset="/images/hero-640.webp 640w, /images/hero-1080.webp 1080w, /images/hero-1920.webp 1920w"
+            sizes="100vw" />
+    <img src="/images/hero-1080.jpg"
+         srcset="/images/hero-640.jpg 640w, /images/hero-1080.jpg 1080w, /images/hero-1920.jpg 1920w"
+         sizes="100vw"
+         width="1920" height="1080"
+         loading="lazy"
+         alt="Hero" />
+</picture>
+```
+
+### After PicassoBundle
+
+```twig
+<Picasso:Image src="hero.jpg" width="1920" height="1080" sizes="100vw" alt="Hero" />
+```
+
+> Same output. Zero boilerplate. All formats, srcsets, and placeholders generated automatically.
+
+---
+
+## Why PicassoBundle?
+
+Images account for the largest share of page weight on most websites. Serving them correctly — with modern formats, responsive srcsets, proper lazy loading, and blur placeholders — is critical for both **Core Web Vitals** and **user experience**, but the implementation is tedious and error-prone.
+
+PicassoBundle solves this the same way Next.js Image did for React:
+**a single component that handles everything**.
+
+| | Without PicassoBundle | With PicassoBundle |
+|---|---|---|
+| **Format negotiation** | Manual AVIF/WebP/JPEG `<source>` tags | Automatic from config |
+| **Responsive srcset** | Hand-crafted per breakpoint | Generated from `sizes` prop |
+| **Blur placeholders** | DIY or skip it | Built-in (LQIP, BlurHash, or custom) |
+| **Dimension detection** | Hardcoded or forgotten | Auto-detected from image stream |
+| **LCP optimization** | Manually set loading/fetchpriority | One `priority` prop |
+| **Image sources** | Filesystem only | Filesystem, S3, Flysystem, Vich, URL |
+| **CDN support** | Build your own integration | Imgix out of the box, or plug in any CDN |
 
 ---
 
 ## Table of Contents
 
+- [Why PicassoBundle?](#why-picassobundle)
 - [Features](#features)
 - [Requirements](#requirements)
 - [Installation](#installation)
@@ -48,24 +117,24 @@ srcset generation, and blur placeholders — all from a single Twig component.
 - [Routes](#routes)
 - [How It Works](#how-it-works)
 - [Testing & Quality](#testing--quality)
+- [Contributing](#contributing)
 - [License](#license)
 
 ---
 
 ## Features
 
-- **Responsive `<picture>` output** with automatic srcset and multiple format generation
-- **Pluggable placeholders** — blur (LQIP), blurhash, or custom placeholder services for smooth loading transitions
-- **Pluggable loaders** — Filesystem,
-  [Flysystem](https://flysystem.thephpleague.com/),
-  [VichUploaderBundle](https://github.com/dustin10/VichUploaderBundle), URL
-- **Pluggable transformers** — [Glide](https://glide.thephpleague.com/) (local), [Imgix](https://imgix.com/) (CDN), or custom service
-- **Twig component** (`<Picasso:Image>`) and **Twig function** (`picasso_image_url()`)
-- **Automatic image dimension detection** from streams
-- **URL signing** for secure on-demand transformation
-- **Priority images** — eager loading + `fetchpriority="high"` for above-the-fold content
-- **Metadata caching** — PSR-6 cache support for image dimensions and BlurHash data
-- **Extensible** via `#[AsImageLoader]`, `#[AsImageTransformer]`, and `#[AsPlaceholder]` attributes
+- **One component, full optimization** — `<Picasso:Image>` renders a complete `<picture>` with AVIF, WebP, and JPEG sources
+- **Automatic responsive srcset** — generates width descriptors for all configured breakpoints, no manual work
+- **Blur placeholders** — built-in LQIP and [BlurHash](https://blurha.sh/) support for instant perceived loading
+- **Smart dimension detection** — reads image dimensions from the stream automatically, preserves aspect ratio
+- **Priority images** — one prop for `loading="eager"` + `fetchpriority="high"` (LCP optimization)
+- **Multiple image sources** — Local filesystem, [Flysystem](https://flysystem.thephpleague.com/) (S3, GCS, Azure),
+  [VichUploaderBundle](https://github.com/dustin10/VichUploaderBundle), remote URLs
+- **Local or CDN transforms** — [Glide](https://glide.thephpleague.com/) for self-hosted, [Imgix](https://imgix.com/) for CDN, or bring your own
+- **Signed URLs** — HMAC-signed transformation URLs prevent abuse of your image endpoint
+- **PSR-6 metadata caching** — dimension detection and BlurHash results are cached for performance
+- **Fully extensible** — add custom loaders, transformers, or placeholders with PHP attributes (`#[AsImageLoader]`, `#[AsImageTransformer]`, `#[AsPlaceholder]`)
 
 ## Requirements
 
@@ -800,6 +869,21 @@ vendor/bin/twig-cs-fixer lint
 vendor/bin/rector process --dry-run
 ```
 
+## Contributing
+
+Contributions are welcome! Please make sure your changes pass all quality checks before submitting a pull request:
+
+```bash
+vendor/bin/phpunit && vendor/bin/phpstan analyse && vendor/bin/php-cs-fixer fix --dry-run --diff
+```
+
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
+
+---
+
+<p align="center">
+    Built with care by <a href="https://github.com/silarhi">SILARHI</a>.<br>
+    If PicassoBundle saves you time, consider giving it a star on GitHub.
+</p>
