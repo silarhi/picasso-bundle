@@ -20,6 +20,7 @@ src/
 ├── Attribute/          # AsImageLoader, AsImageTransformer attributes
 ├── Controller/         # ImageController (serves transformed images)
 ├── Dto/                # Image, ImageReference, ImageSource, ImageTransformation, SrcsetEntry
+├── Exception/          # Domain exceptions (PicassoExceptionInterface and implementations)
 ├── Loader/             # FilesystemLoader, FlysystemLoader, FlysystemRegistry, UrlLoader,
 │                       #   VichUploaderLoader, VichMappingHelper + interfaces
 │                       #   (ImageLoaderInterface, ServableLoaderInterface, VichMappingHelperInterface)
@@ -85,6 +86,18 @@ vendor/bin/rector process --dry-run
 - **ImageComponent** is the main Twig component (`<Picasso:Image>`) that generates `<picture>` with `<source>` elements.
 - **SrcsetGenerator** builds responsive srcset strings across configured widths and formats.
 - All bundle configuration and service wiring lives in `PicassoBundle.php` (uses `AbstractBundle`).
+
+## Domain Exceptions
+
+All bundle exceptions implement `PicassoExceptionInterface` (extends `Throwable`), allowing consumers to catch any bundle-level error with a single type. Always throw domain-specific exceptions rather than generic PHP exceptions (`LogicException`, `RuntimeException`, etc.).
+
+| Exception                      | Extends                    | When to use                                               |
+|-------------------------------|---------------------------|-----------------------------------------------------------|
+| `LoaderNotFoundException`      | `InvalidArgumentException` | Requested loader name is unknown or missing from context  |
+| `TransformerNotFoundException` | `InvalidArgumentException` | Requested transformer name is unknown or missing from context |
+| `ImageNotFoundException`       | `RuntimeException`         | Source image could not be found or signature is invalid    |
+| `EncryptionException`          | `RuntimeException`         | URL encryption/decryption failure                         |
+| `InvalidMetadataException`     | `LogicException`           | Image metadata is malformed or invalid                    |
 
 ## Coding Conventions
 

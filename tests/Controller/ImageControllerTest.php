@@ -37,7 +37,7 @@ class ImageControllerTest extends TestCase
         $transformer = $this->createMock(LocalTransformerInterface::class);
         $transformer->expects(self::once())
             ->method('serve')
-            ->with($loader, 'photo.jpg', $request)
+            ->with($loader, 'photo.jpg', $request, ['transformer' => 'glide', 'loader' => 'filesystem'])
             ->willReturn($expectedResponse);
 
         $transformerRegistry = $this->createRegistry(TransformerRegistry::class, 'glide', $transformer);

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Controller;
 
+use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
 use Silarhi\PicassoBundle\Exception\LoaderNotFoundException;
 use Silarhi\PicassoBundle\Exception\TransformerNotFoundException;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
@@ -57,8 +58,17 @@ final readonly class ImageController
         }
 
         $this->stopwatch?->start('picasso.image_response', 'picasso');
-        $response = $imageTransformer->serve($imageLoader, $path, $request);
-        $this->stopwatch?->stop('picasso.image_response');
+
+        try {
+            $response = $imageTransformer->serve($imageLoader, $path, $request, [
+                'transformer' => $transformer,
+                'loader' => $loader,
+            ]);
+        } catch (ImageNotFoundException $e) {
+            throw new NotFoundHttpException($e->getMessage(), $e);
+        } finally {
+            $this->stopwatch?->stop('picasso.image_response');
+        }
 
         return $response;
     }

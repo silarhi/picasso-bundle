@@ -17,6 +17,7 @@ use function assert;
 use function in_array;
 use function is_string;
 
+use League\Glide\Signatures\SignatureFactory;
 use LogicException;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\Image;
@@ -41,9 +42,15 @@ class GlideTransformerTest extends TestCase
                 assert(is_string($params['loader']));
                 assert(is_string($params['path']));
 
-                return '/picasso/' . $params['transformer'] . '/' . $params['loader'] . '/' . $params['path'] . '?' . http_build_query(
-                    array_filter($params, static fn ($k): bool => !in_array($k, ['transformer', 'loader', 'path'], true), \ARRAY_FILTER_USE_KEY),
-                );
+                $base = '/picasso/' . $params['transformer'] . '/' . $params['loader'] . '/' . $params['path'];
+
+                $extra = array_filter($params, static fn ($k): bool => !in_array($k, ['transformer', 'loader', 'path'], true), \ARRAY_FILTER_USE_KEY);
+
+                if ([] === $extra) {
+                    return $base;
+                }
+
+                return $base . '?' . http_build_query($extra);
             });
 
         $this->transformer = new GlideTransformer(
@@ -189,5 +196,197 @@ class GlideTransformerTest extends TestCase
         $url = $this->transformer->url($image, $transformation, ['loader' => 'filesystem', 'transformer' => 'glide']);
 
         self::assertStringNotContainsString('_metadata=', $url);
+    }
+
+    // --- Public cache URL generation ---
+
+    public function testUrlGeneratesPublicCacheUrlWhenEnabled(): void
+    {
+        $transformer = new GlideTransformer(
+            $this->router,
+            new UrlEncryption(self::SIGN_KEY),
+            self::SIGN_KEY,
+            '/tmp/cache',
+            'gd',
+            null,
+            true,
+        );
+
+        $image = new Image(path: 'uploads/photo.jpg');
+        $transformation = new ImageTransformation(width: 300, format: 'webp');
+
+        $url = $transformer->url($image, $transformation, ['loader' => 'filesystem', 'transformer' => 'glide']);
+
+        // Transformation params are in the path, signature is in query string
+        self::assertStringContainsString('/picasso/glide/filesystem/uploads/photo.jpg/', $url);
+        self::assertStringContainsString('w_300', $url);
+        self::assertStringContainsString('fm_webp', $url);
+        self::assertStringContainsString('.webp', $url);
+        self::assertStringContainsString('s=', $url);
+        // Transformation params should NOT appear as query params
+        self::assertStringNotContainsString('w=300', $url);
+        self::assertStringNotContainsString('fm=webp', $url);
+    }
+
+    public function testPublicCacheUrlPassesMetadataAsQueryParam(): void
+    {
+        $transformer = new GlideTransformer(
+            $this->router,
+            new UrlEncryption(self::SIGN_KEY),
+            self::SIGN_KEY,
+            '/tmp/cache',
+            'gd',
+            null,
+            true,
+        );
+
+        $image = new Image(path: 'photo.jpg', metadata: ['upload_destination' => '/var/uploads']);
+        $transformation = new ImageTransformation(width: 300, format: 'webp');
+
+        $url = $transformer->url($image, $transformation, ['loader' => 'vich', 'transformer' => 'glide']);
+
+        // metadata should be in query string, not in path
+        $parsedUrl = parse_url($url);
+        self::assertIsString($parsedUrl['query'] ?? null);
+        self::assertStringContainsString('_metadata=', $parsedUrl['query']);
+        // Path should only contain transformation params
+        self::assertStringContainsString('w_300', $parsedUrl['path'] ?? '');
+        self::assertStringNotContainsString('_metadata', $parsedUrl['path'] ?? '');
+    }
+
+    public function testPublicCacheUrlParamsAreSorted(): void
+    {
+        $transformer = new GlideTransformer(
+            $this->router,
+            new UrlEncryption(self::SIGN_KEY),
+            self::SIGN_KEY,
+            '/tmp/cache',
+            'gd',
+            null,
+            true,
+        );
+
+        $image = new Image(path: 'photo.jpg');
+        $transformation = new ImageTransformation(width: 300, height: 200, format: 'webp', quality: 85, fit: 'crop');
+
+        $url = $transformer->url($image, $transformation, ['loader' => 'filesystem', 'transformer' => 'glide']);
+
+        // Extract filename from URL path (before query string)
+        $urlPath = parse_url($url, \PHP_URL_PATH);
+        self::assertIsString($urlPath);
+        $filename = basename($urlPath);
+        $paramsString = substr($filename, 0, (int) strrpos($filename, '.'));
+
+        // Params should be sorted alphabetically
+        $pairs = explode(',', $paramsString);
+        $keys = [];
+        foreach ($pairs as $pair) {
+            $keys[] = substr($pair, 0, (int) strpos($pair, '_'));
+        }
+        $sorted = $keys;
+        sort($sorted);
+        self::assertSame($sorted, $keys);
+    }
+
+    public function testIsPublicCacheEnabledReturnsFalseByDefault(): void
+    {
+        self::assertFalse($this->transformer->isPublicCacheEnabled());
+    }
+
+    public function testIsPublicCacheEnabledReturnsTrueWhenConfigured(): void
+    {
+        $transformer = new GlideTransformer(
+            $this->router,
+            new UrlEncryption(self::SIGN_KEY),
+            self::SIGN_KEY,
+            '/tmp/cache',
+            'gd',
+            null,
+            true,
+        );
+
+        self::assertTrue($transformer->isPublicCacheEnabled());
+    }
+
+    // --- Params segment building and parsing ---
+
+    public function testBuildParamsSegment(): void
+    {
+        $params = ['w' => 300, 'h' => 200, 'fm' => 'webp', 'q' => 75, 'fit' => 'contain'];
+
+        $segment = $this->transformer->buildParamsSegment($params);
+
+        self::assertSame('fit_contain,fm_webp,h_200,q_75,w_300', $segment);
+    }
+
+    public function testBuildParamsSegmentExcludesMetadataAndSignature(): void
+    {
+        $params = ['w' => 300, '_metadata' => 'encrypted_data', 's' => 'signature', 'fm' => 'webp'];
+
+        $segment = $this->transformer->buildParamsSegment($params);
+
+        self::assertSame('fm_webp,w_300', $segment);
+    }
+
+    public function testParseParamsFilename(): void
+    {
+        $filename = 'fit_contain,fm_webp,h_200,q_75,w_300.webp';
+
+        $result = GlideTransformer::parseParamsFilename($filename);
+
+        self::assertSame(['fit' => 'contain', 'fm' => 'webp', 'h' => '200', 'q' => '75', 'w' => '300'], $result['params']);
+        self::assertSame('fit_contain,fm_webp,h_200,q_75,w_300', $result['paramsSegment']);
+        self::assertSame('webp', $result['format']);
+    }
+
+    public function testParseParamsFilenameThrowsWithoutExtension(): void
+    {
+        $this->expectException(\Silarhi\PicassoBundle\Exception\ImageNotFoundException::class);
+
+        GlideTransformer::parseParamsFilename('no-extension');
+    }
+
+    public function testRoundTripBuildAndParseParams(): void
+    {
+        $transformer = new GlideTransformer(
+            $this->router,
+            new UrlEncryption(self::SIGN_KEY),
+            self::SIGN_KEY,
+            '/tmp/cache',
+            'gd',
+            null,
+            true,
+        );
+
+        $image = new Image(path: 'photos/hero.jpg');
+        $transformation = new ImageTransformation(width: 800, height: 600, format: 'avif', quality: 90, fit: 'cover');
+
+        $url = $transformer->url($image, $transformation, ['loader' => 'filesystem', 'transformer' => 'glide']);
+
+        // Extract filename from URL path
+        $urlPath = parse_url($url, \PHP_URL_PATH);
+        self::assertIsString($urlPath);
+        $filename = basename($urlPath);
+        $parsed = GlideTransformer::parseParamsFilename($filename);
+
+        self::assertSame('800', $parsed['params']['w']);
+        self::assertSame('600', $parsed['params']['h']);
+        self::assertSame('avif', $parsed['params']['fm']);
+        self::assertSame('90', $parsed['params']['q']);
+        self::assertSame('cover', $parsed['params']['fit']);
+        self::assertSame('avif', $parsed['format']);
+
+        // Verify Glide signature from query string is valid
+        $queryString = parse_url($url, \PHP_URL_QUERY);
+        self::assertIsString($queryString);
+        parse_str($queryString, $query);
+        self::assertIsString($query['s']);
+
+        // The signature is computed against the cached path with no extra params
+        // (all transformation params are embedded in the path itself)
+        $cachedPath = 'photos/hero.jpg/' . $parsed['paramsSegment'] . '.avif';
+        $expectedSignature = SignatureFactory::create(self::SIGN_KEY)
+            ->generateSignature($cachedPath, []);
+        self::assertSame($expectedSignature, $query['s']);
     }
 }
