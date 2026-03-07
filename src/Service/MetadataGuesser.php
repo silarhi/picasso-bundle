@@ -38,7 +38,7 @@ final class MetadataGuesser implements MetadataGuesserInterface
     public function guess($stream, ?string $identifier = null): array
     {
         if (null !== $this->cache && null !== $identifier) {
-            $cacheKey = 'picasso_metadata_' . hash('xxh128', $identifier);
+            $cacheKey = CacheKeyGenerator::generate('metadata', [$identifier]);
             $item = $this->cache->getItem($cacheKey);
 
             if ($item->isHit()) {

@@ -18,12 +18,16 @@ use Imagine\Image\ImagineInterface;
 use Imagine\Image\Palette\Color\ColorInterface;
 use Imagine\Image\Palette\RGB;
 use Imagine\Image\Point;
+
+use function is_string;
+
 use kornrunner\Blurhash\Blurhash;
 use LogicException;
 use Psr\Cache\CacheItemPoolInterface;
 use RuntimeException;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
+use Silarhi\PicassoBundle\Service\CacheKeyGenerator;
 
 final readonly class BlurHashPlaceholder implements PlaceholderInterface
 {
@@ -48,15 +52,16 @@ final readonly class BlurHashPlaceholder implements PlaceholderInterface
         }
 
         if (null !== $this->cache && null !== $image->path) {
-            $cacheKey = 'picasso_blurhash_' . hash('xxh128', implode('|', [
-                $context['loader'] ?? '',
+            $loader = isset($context['loader']) && is_string($context['loader']) ? $context['loader'] : '';
+            $cacheKey = CacheKeyGenerator::generate('blurhash', [
+                $loader,
                 $image->path,
-                (string) ($transformation->width ?? 0),
-                (string) ($transformation->height ?? 0),
-                (string) $this->componentsX,
-                (string) $this->componentsY,
-                (string) $this->size,
-            ]));
+                $transformation->width ?? 0,
+                $transformation->height ?? 0,
+                $this->componentsX,
+                $this->componentsY,
+                $this->size,
+            ]);
             $item = $this->cache->getItem($cacheKey);
 
             if ($item->isHit()) {
