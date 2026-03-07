@@ -84,6 +84,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
 
     public function serve(ServableLoaderInterface $loader, string $path, Request $request, array $context = []): Response
     {
+        $params = $request->query->all();
         $cacheFilename = null;
         $cachePrefix = null;
 
@@ -92,8 +93,6 @@ final readonly class GlideTransformer implements LocalTransformerInterface
         } catch (SignatureException $e) {
             throw new ImageNotFoundException('Invalid image signature.', previous: $e);
         }
-
-        $params = $request->query->all();
 
         if ($this->isPublicCacheEnabled()) {
             // Extract transformation params from the path
