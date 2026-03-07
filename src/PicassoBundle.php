@@ -45,6 +45,7 @@ use Silarhi\PicassoBundle\Service\TransformerRegistry;
 use Silarhi\PicassoBundle\Service\UrlEncryption;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
+use Silarhi\PicassoBundle\Transformer\ImagineTransformer;
 use Silarhi\PicassoBundle\Transformer\ImgixTransformer;
 use Silarhi\PicassoBundle\Twig\Component\ImageComponent;
 use Silarhi\PicassoBundle\Twig\Extension\PicassoExtension;
@@ -201,7 +202,7 @@ final class PicassoBundle extends AbstractBundle
                         ->children()
                             ->booleanNode('enabled')->defaultTrue()->end()
                             ->enumNode('type')
-                                ->values(['glide', 'imgix', 'service'])
+                                ->values(['glide', 'imagine', 'imgix', 'service'])
                                 ->defaultNull()
                                 ->info('Transformer type. Inferred from name when it matches a known type.')
                             ->end()
@@ -344,7 +345,7 @@ final class PicassoBundle extends AbstractBundle
 
         // --- Transformers ---
 
-        $knownTransformerTypes = ['glide', 'imgix', 'service'];
+        $knownTransformerTypes = ['glide', 'imagine', 'imgix', 'service'];
         $urlEncryptionRegistered = false;
 
         foreach ($config['transformers'] as $name => $transformerConfig) {
@@ -355,7 +356,7 @@ final class PicassoBundle extends AbstractBundle
             $type = $transformerConfig['type'] ?? (in_array($name, $knownTransformerTypes, true) ? $name : null);
 
             if (null === $type) {
-                throw new LogicException(sprintf('Transformer "%s" must specify a "type" (glide, imgix, or service).', $name));
+                throw new LogicException(sprintf('Transformer "%s" must specify a "type" (glide, imagine, imgix, or service).', $name));
             }
 
             switch ($type) {
@@ -376,6 +377,25 @@ final class PicassoBundle extends AbstractBundle
                             $transformerConfig['driver'],
                             $transformerConfig['max_image_size'],
                             $transformerConfig['public_cache']['enabled'],
+                        ])
+                        ->tag('picasso.transformer', ['key' => $name]);
+                    break;
+
+                case 'imagine':
+                    if (!$urlEncryptionRegistered) {
+                        $services->set('picasso.url_encryption', UrlEncryption::class)
+                            ->args([$transformerConfig['sign_key']]);
+                        $services->alias(UrlEncryption::class, 'picasso.url_encryption');
+                        $urlEncryptionRegistered = true;
+                    }
+
+                    $services->set('picasso.transformer.' . $name, ImagineTransformer::class)
+                        ->args([
+                            service('router'),
+                            service('picasso.url_encryption'),
+                            $transformerConfig['sign_key'],
+                            $transformerConfig['cache'] ?? '%kernel.project_dir%/var/imagine-cache',
+                            $transformerConfig['driver'],
                         ])
                         ->tag('picasso.transformer', ['key' => $name]);
                     break;
