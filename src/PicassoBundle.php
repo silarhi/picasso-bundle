@@ -194,12 +194,6 @@ final class PicassoBundle extends AbstractBundle
                             ->scalarNode('service')->defaultNull()->info('Service ID for custom transformers (type: service).')->end()
                             ->arrayNode('public_cache')
                                 ->canBeEnabled()
-                                ->children()
-                                    ->scalarNode('path')
-                                        ->defaultValue('%kernel.project_dir%/public/cache/picasso')
-                                        ->info('Filesystem path to write cached images for direct web server serving.')
-                                    ->end()
-                                ->end()
                             ->end()
                         ->end()
                     ->end()
@@ -223,7 +217,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_fit: string,
          *     placeholders: array{blur: array{enabled: bool, size: int, blur: int, quality: int}},
          *     loaders: array<string, array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null}>,
-         *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, public_cache: array{enabled: bool, path: string}}>
+         *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, public_cache: array{enabled: bool}}>
          * } $config
          */
         $services = $container->services();
@@ -343,10 +337,6 @@ final class PicassoBundle extends AbstractBundle
                         $urlEncryptionRegistered = true;
                     }
 
-                    $publicCache = $transformerConfig['public_cache']['enabled']
-                        ? $transformerConfig['public_cache']
-                        : null;
-
                     $services->set('picasso.transformer.' . $name, GlideTransformer::class)
                         ->args([
                             service('router'),
@@ -355,7 +345,7 @@ final class PicassoBundle extends AbstractBundle
                             $transformerConfig['cache'] ?? '%kernel.project_dir%/var/glide-cache',
                             $transformerConfig['driver'],
                             $transformerConfig['max_image_size'],
-                            $publicCache,
+                            $transformerConfig['public_cache']['enabled'],
                         ])
                         ->tag('picasso.transformer', ['key' => $name]);
                     break;

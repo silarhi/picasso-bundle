@@ -34,9 +34,6 @@ use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
 final readonly class GlideTransformer implements LocalTransformerInterface
 {
-    /**
-     * @param array{enabled: bool, path: string}|null $publicCache
-     */
     public function __construct(
         private UrlGeneratorInterface $router,
         private UrlEncryption $urlEncryption,
@@ -44,7 +41,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
         private string $cache,
         private string $driver = 'gd',
         private ?int $maxImageSize = null,
-        private ?array $publicCache = null,
+        private bool $publicCache = false,
     ) {
     }
 
@@ -115,7 +112,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
 
     public function isPublicCacheEnabled(): bool
     {
-        return null !== $this->publicCache && $this->publicCache['enabled'];
+        return $this->publicCache;
     }
 
     /**
@@ -199,28 +196,17 @@ final readonly class GlideTransformer implements LocalTransformerInterface
         /** @var array<string, mixed> $metadata */
         $source = $loader->getSource($metadata);
 
-        // When public cache is enabled, Glide writes directly to the public
-        // directory using a cache_path_callable that produces the readable
-        // params-based filename.
-        $cacheDir = $this->cache;
-        $cachePathCallable = null;
-
-        if (null !== $cacheFilename && $this->isPublicCacheEnabled()) {
-            /** @var array{enabled: bool, path: string} $publicCache */
-            $publicCache = $this->publicCache;
-            $cacheDir = $publicCache['path'];
-            $cachePathCallable = static fn (string $path, array $params): string => $path . '/' . $cacheFilename;
-        }
-
         $serverConfig = [
             'source' => $source,
-            'cache' => $cacheDir,
+            'cache' => $this->cache,
             'driver' => $this->driver,
             'response' => new SymfonyResponseFactory(),
         ];
 
-        if (null !== $cachePathCallable) {
-            $serverConfig['cache_path_callable'] = Closure::fromCallable($cachePathCallable);
+        if (null !== $cacheFilename) {
+            $serverConfig['cache_path_callable'] = Closure::fromCallable(
+                static fn (string $path, array $params): string => $path . '/' . $cacheFilename,
+            );
         }
 
         if (null !== $this->maxImageSize) {

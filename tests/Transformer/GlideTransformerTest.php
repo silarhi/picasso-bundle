@@ -209,7 +209,7 @@ class GlideTransformerTest extends TestCase
             '/tmp/cache',
             'gd',
             null,
-            ['enabled' => true, 'path' => '/public/cache/picasso'],
+            true,
         );
 
         $image = new Image(path: 'uploads/photo.jpg');
@@ -237,7 +237,7 @@ class GlideTransformerTest extends TestCase
             '/tmp/cache',
             'gd',
             null,
-            ['enabled' => true, 'path' => '/public/cache/picasso'],
+            true,
         );
 
         $image = new Image(path: 'photo.jpg', metadata: ['upload_destination' => '/var/uploads']);
@@ -263,7 +263,7 @@ class GlideTransformerTest extends TestCase
             '/tmp/cache',
             'gd',
             null,
-            ['enabled' => true, 'path' => '/public/cache/picasso'],
+            true,
         );
 
         $image = new Image(path: 'photo.jpg');
@@ -302,7 +302,7 @@ class GlideTransformerTest extends TestCase
             '/tmp/cache',
             'gd',
             null,
-            ['enabled' => true, 'path' => '/public/cache/picasso'],
+            true,
         );
 
         self::assertTrue($transformer->isPublicCacheEnabled());
@@ -355,7 +355,7 @@ class GlideTransformerTest extends TestCase
             '/tmp/cache',
             'gd',
             null,
-            ['enabled' => true, 'path' => '/public/cache/picasso'],
+            true,
         );
 
         $image = new Image(path: 'photos/hero.jpg');
