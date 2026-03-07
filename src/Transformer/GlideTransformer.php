@@ -93,8 +93,6 @@ final readonly class GlideTransformer implements LocalTransformerInterface
             throw new ImageNotFoundException('Invalid image signature.', previous: $e);
         }
 
-        $params = $request->query->all();
-
         if ($this->isPublicCacheEnabled()) {
             // Extract transformation params from the path
             $lastSlash = strrpos($path, '/');
@@ -106,7 +104,6 @@ final readonly class GlideTransformer implements LocalTransformerInterface
             $path = substr($path, 0, $lastSlash);
 
             $parsed = self::parseParamsFilename($cacheFilename);
-            $params = array_merge($params, $parsed['params']);
 
             // Include transformer/loader in cache path so it mirrors the URL structure
             /** @var string $transformerName */
@@ -115,6 +112,8 @@ final readonly class GlideTransformer implements LocalTransformerInterface
             $loaderName = $context['loader'] ?? '';
             $cachePrefix = $transformerName . '/' . $loaderName;
         }
+
+        $params = array_merge($request->query->all(), isset($parsed) ? $parsed['params'] : []);
 
         if (isset($params['_metadata'])) {
             try {
