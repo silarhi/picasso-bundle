@@ -84,18 +84,17 @@ final readonly class GlideTransformer implements LocalTransformerInterface
 
     public function serve(ServableLoaderInterface $loader, string $path, Request $request): Response
     {
-        $params = $request->query->all();
         $cacheFilename = null;
         $cachePrefix = null;
 
         try {
-            SignatureFactory::create($this->signKey)->validateRequest($path, $params);
+            SignatureFactory::create($this->signKey)->validateRequest($path, $request->query->all());
         } catch (SignatureException $e) {
             throw new NotFoundHttpException('Invalid image signature.', $e);
         }
 
         if ($this->isPublicCacheEnabled()) {
-            // Extract transformation params from the path and merge into params
+            // Extract transformation params from the path and add them to the request query
             $lastSlash = strrpos($path, '/');
             if (false === $lastSlash) {
                 throw new NotFoundHttpException('Invalid cached image path.');
@@ -105,14 +104,14 @@ final readonly class GlideTransformer implements LocalTransformerInterface
             $path = substr($path, 0, $lastSlash);
 
             $parsed = self::parseParamsFilename($cacheFilename);
-            $params = array_merge($parsed['params'], $params);
+            $request->query->add($parsed['params']);
 
             // Include transformer/loader in cache path so it mirrors the URL structure
             $cachePrefix = $request->attributes->getString('transformer')
                 . '/' . $request->attributes->getString('loader');
         }
 
-        return $this->doServe($loader, $path, $params, $request, $cacheFilename, $cachePrefix);
+        return $this->doServe($loader, $path, $request, $cacheFilename, $cachePrefix);
     }
 
     public function isPublicCacheEnabled(): bool
@@ -180,16 +179,16 @@ final readonly class GlideTransformer implements LocalTransformerInterface
         ];
     }
 
-    /**
-     * @param array<string, mixed> $params
-     */
-    private function doServe(ServableLoaderInterface $loader, string $path, array $params, Request $request, ?string $cacheFilename = null, ?string $cachePrefix = null): Response
+    private function doServe(ServableLoaderInterface $loader, string $path, Request $request, ?string $cacheFilename = null, ?string $cachePrefix = null): Response
     {
+        $params = $request->query->all();
+
         if (isset($params['_metadata'])) {
             try {
                 /** @var string $encryptedMetadata */
                 $encryptedMetadata = $params['_metadata'];
                 unset($params['_metadata']);
+                $request->query->remove('_metadata');
                 $metadata = json_decode($this->urlEncryption->decrypt($encryptedMetadata), true, flags: \JSON_THROW_ON_ERROR);
             } catch (EncryptionException|JsonException $e) {
                 throw new NotFoundHttpException('Invalid metadata parameter.', $e);
