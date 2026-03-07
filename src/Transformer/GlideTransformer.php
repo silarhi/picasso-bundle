@@ -93,8 +93,10 @@ final readonly class GlideTransformer implements LocalTransformerInterface
             throw new ImageNotFoundException('Invalid image signature.', previous: $e);
         }
 
+        $params = $request->query->all();
+
         if ($this->isPublicCacheEnabled()) {
-            // Extract transformation params from the path and add them to the request query
+            // Extract transformation params from the path
             $lastSlash = strrpos($path, '/');
             if (false === $lastSlash) {
                 throw new ImageNotFoundException('Invalid cached image path.');
@@ -104,7 +106,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
             $path = substr($path, 0, $lastSlash);
 
             $parsed = self::parseParamsFilename($cacheFilename);
-            $request->query->add($parsed['params']);
+            $params = array_merge($params, $parsed['params']);
 
             // Include transformer/loader in cache path so it mirrors the URL structure
             /** @var string $transformerName */
@@ -114,14 +116,11 @@ final readonly class GlideTransformer implements LocalTransformerInterface
             $cachePrefix = $transformerName . '/' . $loaderName;
         }
 
-        $params = $request->query->all();
-
         if (isset($params['_metadata'])) {
             try {
                 /** @var string $encryptedMetadata */
                 $encryptedMetadata = $params['_metadata'];
                 unset($params['_metadata']);
-                $request->query->remove('_metadata');
                 $metadata = json_decode($this->urlEncryption->decrypt($encryptedMetadata), true, flags: \JSON_THROW_ON_ERROR);
             } catch (EncryptionException|JsonException $e) {
                 throw new ImageNotFoundException('Invalid metadata parameter.', previous: $e);
