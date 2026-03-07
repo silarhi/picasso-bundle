@@ -68,13 +68,20 @@ final readonly class GlideTransformer implements LocalTransformerInterface
             $hmac = $this->buildHmac($paramsSegment);
             $format = isset($glideParams['fm']) ? (string) $glideParams['fm'] : pathinfo($path, \PATHINFO_EXTENSION);
 
-            $cachedPath = $path . '/' . $paramsSegment . ',s_' . $hmac . '.' . $format;
+            $cachedPath = $path . '/' . $paramsSegment . '.' . $format;
 
-            return $this->router->generate('picasso_image', [
+            $routeParams = [
                 'transformer' => $transformerName,
                 'loader' => $loaderName,
                 'path' => $cachedPath,
-            ], UrlGeneratorInterface::ABSOLUTE_PATH);
+                's' => $hmac,
+            ];
+
+            if (isset($glideParams['_metadata'])) {
+                $routeParams['_metadata'] = $glideParams['_metadata'];
+            }
+
+            return $this->router->generate('picasso_image', $routeParams, UrlGeneratorInterface::ABSOLUTE_PATH);
         }
 
         $signature = SignatureFactory::create($this->signKey)
@@ -91,8 +98,8 @@ final readonly class GlideTransformer implements LocalTransformerInterface
 
     public function serve(ServableLoaderInterface $loader, string $path, Request $request): Response
     {
-        if ($this->isPublicCacheEnabled() && !$request->query->has('s')) {
-            return $this->serveCached($loader, $path);
+        if ($this->isPublicCacheEnabled()) {
+            return $this->serveCached($loader, $path, $request);
         }
 
         $params = $request->query->all();
@@ -143,10 +150,10 @@ final readonly class GlideTransformer implements LocalTransformerInterface
     }
 
     /**
-     * Parse a params filename like "fit_contain,fm_webp,q_75,w_300,s_abc1234567.webp"
+     * Parse a params filename like "fit_contain,fm_webp,q_75,w_300.webp"
      * into its component parts.
      *
-     * @return array{params: array<string, string>, paramsSegment: string, hmac: string, format: string}
+     * @return array{params: array<string, string>, paramsSegment: string, format: string}
      */
     public static function parseParamsFilename(string $filename): array
     {
@@ -159,7 +166,6 @@ final readonly class GlideTransformer implements LocalTransformerInterface
         $paramsString = substr($filename, 0, $dotPos);
 
         $pairs = explode(',', $paramsString);
-        $hmac = null;
         $paramPairs = [];
 
         foreach ($pairs as $pair) {
@@ -170,33 +176,17 @@ final readonly class GlideTransformer implements LocalTransformerInterface
 
             $key = substr($pair, 0, $separatorPos);
             $value = substr($pair, $separatorPos + 1);
-
-            if ('s' === $key) {
-                $hmac = $value;
-            } else {
-                $paramPairs[$key] = $value;
-            }
+            $paramPairs[$key] = $value;
         }
-
-        if (null === $hmac) {
-            throw new NotFoundHttpException('Missing signature in cached image URL.');
-        }
-
-        $segmentParts = [];
-        foreach ($paramPairs as $key => $value) {
-            $segmentParts[] = $key . '_' . $value;
-        }
-        $paramsSegment = implode(',', $segmentParts);
 
         return [
             'params' => $paramPairs,
-            'paramsSegment' => $paramsSegment,
-            'hmac' => $hmac,
+            'paramsSegment' => $paramsString,
             'format' => $format,
         ];
     }
 
-    private function serveCached(ServableLoaderInterface $loader, string $path): Response
+    private function serveCached(ServableLoaderInterface $loader, string $path, Request $request): Response
     {
         $lastSlash = strrpos($path, '/');
         if (false === $lastSlash) {
@@ -207,9 +197,21 @@ final readonly class GlideTransformer implements LocalTransformerInterface
         $paramsFilename = substr($path, $lastSlash + 1);
 
         $parsed = self::parseParamsFilename($paramsFilename);
-        $this->validateHmac($parsed['paramsSegment'], $parsed['hmac']);
 
-        return $this->doServe($loader, $imagePath, $parsed['params'], $paramsFilename);
+        /** @var string $hmac */
+        $hmac = $request->query->get('s', '');
+        $this->validateHmac($parsed['paramsSegment'], $hmac);
+
+        $glideParams = $parsed['params'];
+
+        // Restore metadata from query param if present
+        if ($request->query->has('_metadata')) {
+            /** @var string $metadata */
+            $metadata = $request->query->get('_metadata');
+            $glideParams['_metadata'] = $metadata;
+        }
+
+        return $this->doServe($loader, $imagePath, $glideParams, $paramsFilename);
     }
 
     private function validateHmac(string $paramsSegment, string $hmac): void

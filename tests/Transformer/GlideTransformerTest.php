@@ -219,16 +219,17 @@ class GlideTransformerTest extends TestCase
 
         $url = $transformer->url($image, $transformation, ['loader' => 'filesystem', 'transformer' => 'glide']);
 
-        self::assertStringStartsWith('/picasso/glide/filesystem/uploads/photo.jpg/', $url);
+        // Path contains params, signature is in query string
+        self::assertStringContainsString('/picasso/glide/filesystem/uploads/photo.jpg/', $url);
         self::assertStringContainsString('w_300', $url);
         self::assertStringContainsString('fm_webp', $url);
-        self::assertStringContainsString(',s_', $url);
-        self::assertStringEndsWith('.webp', $url);
-        // Should NOT contain query params
-        self::assertStringNotContainsString('?', $url);
+        self::assertStringContainsString('.webp', $url);
+        self::assertStringContainsString('s=', $url);
+        // Signature should NOT be in the path segment
+        self::assertStringNotContainsString(',s_', $url);
     }
 
-    public function testPublicCacheUrlExcludesMetadataFromPath(): void
+    public function testPublicCacheUrlPassesMetadataAsQueryParam(): void
     {
         $transformer = new GlideTransformer(
             $this->router,
@@ -245,8 +246,13 @@ class GlideTransformerTest extends TestCase
 
         $url = $transformer->url($image, $transformation, ['loader' => 'vich', 'transformer' => 'glide']);
 
-        self::assertStringNotContainsString('_metadata', $url);
-        self::assertStringContainsString('w_300', $url);
+        // metadata should be in query string, not in path
+        $parsedUrl = parse_url($url);
+        self::assertIsString($parsedUrl['query'] ?? null);
+        self::assertStringContainsString('_metadata=', $parsedUrl['query']);
+        // Path should only contain transformation params
+        self::assertStringContainsString('w_300', $parsedUrl['path'] ?? '');
+        self::assertStringNotContainsString('_metadata', $parsedUrl['path'] ?? '');
     }
 
     public function testPublicCacheUrlParamsAreSorted(): void
@@ -266,8 +272,10 @@ class GlideTransformerTest extends TestCase
 
         $url = $transformer->url($image, $transformation, ['loader' => 'filesystem', 'transformer' => 'glide']);
 
-        // Extract filename from URL
-        $filename = basename($url);
+        // Extract filename from URL path (before query string)
+        $urlPath = parse_url($url, \PHP_URL_PATH);
+        self::assertIsString($urlPath);
+        $filename = basename($urlPath);
         $paramsString = substr($filename, 0, (int) strrpos($filename, '.'));
 
         // Params should be sorted alphabetically
@@ -276,11 +284,9 @@ class GlideTransformerTest extends TestCase
         foreach ($pairs as $pair) {
             $keys[] = substr($pair, 0, (int) strpos($pair, '_'));
         }
-        // Remove 's' (hmac) for sorting check
-        $paramKeys = array_filter($keys, static fn (string $k): bool => 's' !== $k);
-        $sorted = $paramKeys;
+        $sorted = $keys;
         sort($sorted);
-        self::assertSame($sorted, array_values($paramKeys));
+        self::assertSame($sorted, $keys);
     }
 
     public function testIsPublicCacheEnabledReturnsFalseByDefault(): void
@@ -336,13 +342,12 @@ class GlideTransformerTest extends TestCase
 
     public function testParseParamsFilename(): void
     {
-        $filename = 'fit_contain,fm_webp,h_200,q_75,w_300,s_abc1234567.webp';
+        $filename = 'fit_contain,fm_webp,h_200,q_75,w_300.webp';
 
         $result = GlideTransformer::parseParamsFilename($filename);
 
         self::assertSame(['fit' => 'contain', 'fm' => 'webp', 'h' => '200', 'q' => '75', 'w' => '300'], $result['params']);
         self::assertSame('fit_contain,fm_webp,h_200,q_75,w_300', $result['paramsSegment']);
-        self::assertSame('abc1234567', $result['hmac']);
         self::assertSame('webp', $result['format']);
     }
 
@@ -351,13 +356,6 @@ class GlideTransformerTest extends TestCase
         $this->expectException(\Symfony\Component\HttpKernel\Exception\NotFoundHttpException::class);
 
         GlideTransformer::parseParamsFilename('no-extension');
-    }
-
-    public function testParseParamsFilenameThrowsWithoutHmac(): void
-    {
-        $this->expectException(\Symfony\Component\HttpKernel\Exception\NotFoundHttpException::class);
-
-        GlideTransformer::parseParamsFilename('w_300,fm_webp.webp');
     }
 
     public function testRoundTripBuildAndParseParams(): void
@@ -377,8 +375,10 @@ class GlideTransformerTest extends TestCase
 
         $url = $transformer->url($image, $transformation, ['loader' => 'filesystem', 'transformer' => 'glide']);
 
-        // Extract filename
-        $filename = basename($url);
+        // Extract filename from URL path
+        $urlPath = parse_url($url, \PHP_URL_PATH);
+        self::assertIsString($urlPath);
+        $filename = basename($urlPath);
         $parsed = GlideTransformer::parseParamsFilename($filename);
 
         self::assertSame('800', $parsed['params']['w']);
@@ -388,8 +388,12 @@ class GlideTransformerTest extends TestCase
         self::assertSame('cover', $parsed['params']['fit']);
         self::assertSame('avif', $parsed['format']);
 
-        // Verify HMAC is valid
+        // Verify HMAC from query string is valid
+        $queryString = parse_url($url, \PHP_URL_QUERY);
+        self::assertIsString($queryString);
+        parse_str($queryString, $query);
+        self::assertIsString($query['s']);
         $expectedHmac = $transformer->buildHmac($parsed['paramsSegment']);
-        self::assertSame($expectedHmac, $parsed['hmac']);
+        self::assertSame($expectedHmac, $query['s']);
     }
 }
