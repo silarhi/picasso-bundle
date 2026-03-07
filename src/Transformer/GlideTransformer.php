@@ -111,7 +111,52 @@ final readonly class GlideTransformer implements LocalTransformerInterface
                 . '/' . $request->attributes->getString('loader');
         }
 
-        return $this->doServe($loader, $path, $request, $cacheFilename, $cachePrefix);
+        $params = $request->query->all();
+
+        if (isset($params['_metadata'])) {
+            try {
+                /** @var string $encryptedMetadata */
+                $encryptedMetadata = $params['_metadata'];
+                unset($params['_metadata']);
+                $request->query->remove('_metadata');
+                $metadata = json_decode($this->urlEncryption->decrypt($encryptedMetadata), true, flags: \JSON_THROW_ON_ERROR);
+            } catch (EncryptionException|JsonException $e) {
+                throw new NotFoundHttpException('Invalid metadata parameter.', $e);
+            }
+        } else {
+            $metadata = [];
+        }
+
+        /** @var array<string, mixed> $metadata */
+        $source = $loader->getSource($metadata);
+
+        $serverConfig = [
+            'source' => $source,
+            'cache' => $this->cache,
+            'driver' => $this->driver,
+            'response' => new SymfonyResponseFactory($request),
+        ];
+
+        if (null !== $cacheFilename) {
+            $serverConfig['cache_path_callable'] = Closure::fromCallable(
+                static fn (string $path, array $params): string => ($cachePrefix ? $cachePrefix . '/' : '') . $path . '/' . $cacheFilename,
+            );
+        }
+
+        if (null !== $this->maxImageSize) {
+            $serverConfig['max_image_size'] = $this->maxImageSize;
+        }
+
+        $server = ServerFactory::create($serverConfig);
+
+        try {
+            /** @var Response $response */
+            $response = $server->getImageResponse($path, $params);
+
+            return $response;
+        } catch (FileNotFoundException|InvalidArgumentException $e) {
+            throw new NotFoundHttpException('Image not found.', $e);
+        }
     }
 
     public function isPublicCacheEnabled(): bool
@@ -177,56 +222,6 @@ final readonly class GlideTransformer implements LocalTransformerInterface
             'paramsSegment' => $paramsString,
             'format' => $format,
         ];
-    }
-
-    private function doServe(ServableLoaderInterface $loader, string $path, Request $request, ?string $cacheFilename = null, ?string $cachePrefix = null): Response
-    {
-        $params = $request->query->all();
-
-        if (isset($params['_metadata'])) {
-            try {
-                /** @var string $encryptedMetadata */
-                $encryptedMetadata = $params['_metadata'];
-                unset($params['_metadata']);
-                $request->query->remove('_metadata');
-                $metadata = json_decode($this->urlEncryption->decrypt($encryptedMetadata), true, flags: \JSON_THROW_ON_ERROR);
-            } catch (EncryptionException|JsonException $e) {
-                throw new NotFoundHttpException('Invalid metadata parameter.', $e);
-            }
-        } else {
-            $metadata = [];
-        }
-
-        /** @var array<string, mixed> $metadata */
-        $source = $loader->getSource($metadata);
-
-        $serverConfig = [
-            'source' => $source,
-            'cache' => $this->cache,
-            'driver' => $this->driver,
-            'response' => new SymfonyResponseFactory($request),
-        ];
-
-        if (null !== $cacheFilename) {
-            $serverConfig['cache_path_callable'] = Closure::fromCallable(
-                static fn (string $path, array $params): string => ($cachePrefix ? $cachePrefix . '/' : '') . $path . '/' . $cacheFilename,
-            );
-        }
-
-        if (null !== $this->maxImageSize) {
-            $serverConfig['max_image_size'] = $this->maxImageSize;
-        }
-
-        $server = ServerFactory::create($serverConfig);
-
-        try {
-            /** @var Response $response */
-            $response = $server->getImageResponse($path, $params);
-
-            return $response;
-        } catch (FileNotFoundException|InvalidArgumentException $e) {
-            throw new NotFoundHttpException('Image not found.', $e);
-        }
     }
 
     /**
