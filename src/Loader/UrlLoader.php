@@ -13,15 +13,16 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Loader;
 
+use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\RequestFactoryInterface;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
-use Symfony\Component\HttpClient\Response\StreamWrapper;
-use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 final readonly class UrlLoader implements ImageLoaderInterface
 {
     public function __construct(
-        private HttpClientInterface $httpClient,
+        private ClientInterface $httpClient,
+        private RequestFactoryInterface $requestFactory,
     ) {
     }
 
@@ -34,7 +35,12 @@ final readonly class UrlLoader implements ImageLoaderInterface
 
         return new Image(
             url: $url,
-            stream: fn () => StreamWrapper::createResource($this->httpClient->request('GET', $url), $this->httpClient),
+            stream: function () use ($url) {
+                $request = $this->requestFactory->createRequest('GET', $url);
+                $response = $this->httpClient->sendRequest($request);
+
+                return $response->getBody()->detach();
+            },
         );
     }
 }

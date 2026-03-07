@@ -5,6 +5,8 @@
     "license": "MIT",
     "require": {
         "php": ">=8.2",
+        "psr/http-client": "^1.0",
+        "psr/http-factory": "^1.0",
         "symfony/framework-bundle": "^6.4 || ^7.0 || ^8.0",
         "symfony/ux-twig-component": "^2.13"
     },
@@ -15,6 +17,7 @@
         "league/flysystem-bundle": "^3.6",
         "league/glide": "^2.3.2",
         "league/glide-symfony": "^2.0.1",
+        "nyholm/psr7": "^1.8",
         "phpstan/phpstan": "^2.1.40",
         "phpunit/phpunit": "^11.5.55",
         "rector/rector": "^2.3.8",
@@ -36,7 +39,9 @@
         "league/glide-symfony": "Required for the Glide transformer",
         "league/flysystem": "Required for the Flysystem loader",
         "kornrunner/blurhash": "Required for the BlurHash placeholder",
-        "vich/uploader-bundle": "Required for the VichUploader loader"
+        "vich/uploader-bundle": "Required for the VichUploader loader",
+        "symfony/http-client": "Provides a PSR-18 HTTP client implementation",
+        "nyholm/psr7": "Provides a PSR-7/PSR-17 implementation for the URL loader"
     },
     "scripts": {
         "test": "phpunit",

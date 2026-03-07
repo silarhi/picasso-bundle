@@ -189,7 +189,11 @@ final class PicassoBundle extends AbstractBundle
                             ->end()
                             ->scalarNode('http_client')
                                 ->defaultNull()
-                                ->info('HTTP client service ID for url loaders.')
+                                ->info('PSR-18 HTTP client service ID for url loaders.')
+                            ->end()
+                            ->scalarNode('request_factory')
+                                ->defaultNull()
+                                ->info('PSR-17 request factory service ID for url loaders.')
                             ->end()
                         ->end()
                         ->validate()
@@ -250,7 +254,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_quality: int,
          *     default_fit: string,
          *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int, quality: int, components_x: int, components_y: int, driver: string, service: string|null}>,
-         *     loaders: array<string, array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null}>,
+         *     loaders: array<string, array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null, request_factory: string|null}>,
          *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, public_cache: array{enabled: bool}}>
          * } $config
          */
@@ -295,8 +299,12 @@ final class PicassoBundle extends AbstractBundle
                     break;
 
                 case 'url':
+                    $httpClientService = $loaderConfig['http_client'] ?? 'psr18.http_client';
                     $services->set('picasso.loader.' . $name, UrlLoader::class)
-                        ->args([service($loaderConfig['http_client'] ?? 'http_client')])
+                        ->args([
+                            service($httpClientService),
+                            service($loaderConfig['request_factory'] ?? $httpClientService),
+                        ])
                         ->tag('picasso.loader', ['key' => $name]);
                     break;
 
