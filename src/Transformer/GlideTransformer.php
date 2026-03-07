@@ -63,7 +63,17 @@ final readonly class GlideTransformer implements LocalTransformerInterface
         }
 
         if ($this->isPublicCacheEnabled()) {
-            return $this->generatePublicCacheUrl($path, $glideParams, $loaderName, $transformerName);
+            $paramsSegment = $this->buildParamsSegment($glideParams);
+            $hmac = $this->buildHmac($paramsSegment);
+            $format = isset($glideParams['fm']) ? (string) $glideParams['fm'] : pathinfo($path, \PATHINFO_EXTENSION);
+
+            $cachedPath = $path . '/' . $paramsSegment . ',s_' . $hmac . '.' . $format;
+
+            return $this->router->generate('picasso_image', [
+                'transformer' => $transformerName,
+                'loader' => $loaderName,
+                'path' => $cachedPath,
+            ], UrlGeneratorInterface::ABSOLUTE_PATH);
         }
 
         $signature = SignatureFactory::create($this->signKey)
@@ -80,6 +90,11 @@ final readonly class GlideTransformer implements LocalTransformerInterface
 
     public function serve(ServableLoaderInterface $loader, string $path, Request $request): Response
     {
+        // When public cache is enabled and no query signature, params are encoded in the path
+        if ($this->isPublicCacheEnabled() && !$request->query->has('s')) {
+            return $this->serveCached($loader, $path);
+        }
+
         $params = $request->query->all();
 
         try {
@@ -91,34 +106,9 @@ final readonly class GlideTransformer implements LocalTransformerInterface
         return $this->doServe($loader, $path, $params);
     }
 
-    /**
-     * Serve a cached image by parsing params from the path segment and writing the result to the public cache directory.
-     */
-    public function serveCached(ServableLoaderInterface $loader, string $imagePath, string $paramsFilename): Response
-    {
-        $parsed = self::parseParamsFilename($paramsFilename);
-        $this->validateHmac($parsed['paramsSegment'], $parsed['hmac']);
-
-        $glideParams = $parsed['params'];
-
-        $response = $this->doServe($loader, $imagePath, $glideParams);
-
-        $this->writePublicCache($imagePath, $paramsFilename, $response);
-
-        return $response;
-    }
-
     public function isPublicCacheEnabled(): bool
     {
         return null !== $this->publicCache && $this->publicCache['enabled'];
-    }
-
-    /**
-     * @return array{enabled: bool, path: string}|null
-     */
-    public function getPublicCache(): ?array
-    {
-        return $this->publicCache;
     }
 
     /**
@@ -208,22 +198,27 @@ final readonly class GlideTransformer implements LocalTransformerInterface
     }
 
     /**
-     * @param array<string, int|string> $glideParams
+     * Serve a cached image: parse params from the path, validate HMAC, serve via Glide,
+     * and write the result to the public cache directory.
      */
-    private function generatePublicCacheUrl(string $path, array $glideParams, string $loaderName, string $transformerName): string
+    private function serveCached(ServableLoaderInterface $loader, string $path): Response
     {
-        $paramsSegment = $this->buildParamsSegment($glideParams);
-        $hmac = $this->buildHmac($paramsSegment);
+        $lastSlash = strrpos($path, '/');
+        if (false === $lastSlash) {
+            throw new NotFoundHttpException('Invalid cached image path.');
+        }
 
-        $format = isset($glideParams['fm']) ? (string) $glideParams['fm'] : pathinfo($path, \PATHINFO_EXTENSION);
+        $imagePath = substr($path, 0, $lastSlash);
+        $paramsFilename = substr($path, $lastSlash + 1);
 
-        $cachedPath = $path . '/' . $paramsSegment . ',s_' . $hmac . '.' . $format;
+        $parsed = self::parseParamsFilename($paramsFilename);
+        $this->validateHmac($parsed['paramsSegment'], $parsed['hmac']);
 
-        return $this->router->generate('picasso_image_cached', [
-            'transformer' => $transformerName,
-            'loader' => $loaderName,
-            'path' => $cachedPath,
-        ], UrlGeneratorInterface::ABSOLUTE_PATH);
+        $response = $this->doServe($loader, $imagePath, $parsed['params']);
+
+        $this->writePublicCache($imagePath, $paramsFilename, $response);
+
+        return $response;
     }
 
     private function validateHmac(string $paramsSegment, string $hmac): void
@@ -281,10 +276,6 @@ final readonly class GlideTransformer implements LocalTransformerInterface
 
     private function writePublicCache(string $imagePath, string $paramsFilename, Response $response): void
     {
-        if (!$this->isPublicCacheEnabled()) {
-            return;
-        }
-
         /** @var array{enabled: bool, path: string} $publicCache */
         $publicCache = $this->publicCache;
         $cacheDir = rtrim($publicCache['path'], '/') . '/' . $imagePath;

@@ -46,15 +46,13 @@ class GlideTransformerTest extends TestCase
 
                 $base = '/picasso/' . $params['transformer'] . '/' . $params['loader'] . '/' . $params['path'];
 
-                if ('picasso_image_cached' === $name) {
+                $extra = array_filter($params, static fn ($k): bool => !in_array($k, ['transformer', 'loader', 'path'], true), \ARRAY_FILTER_USE_KEY);
+
+                if ([] === $extra) {
                     return $base;
                 }
 
-                $query = http_build_query(
-                    array_filter($params, static fn ($k): bool => !in_array($k, ['transformer', 'loader', 'path'], true), \ARRAY_FILTER_USE_KEY),
-                );
-
-                return $base . '?' . $query;
+                return $base . '?' . http_build_query($extra);
             });
 
         $this->transformer = new GlideTransformer(
