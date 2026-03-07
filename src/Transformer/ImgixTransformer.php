@@ -43,7 +43,7 @@ final class ImgixTransformer implements ImageTransformerInterface
     }
 
     /**
-     * @return array<string, int|string>
+     * @return TransformerParams
      */
     private function mapToImgixParams(ImageTransformation $transformation): array
     {

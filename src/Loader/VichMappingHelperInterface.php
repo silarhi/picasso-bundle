@@ -13,6 +13,9 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Loader;
 
+/**
+ * @phpstan-type ImageDimensions array{0: int, 1: int}
+ */
 interface VichMappingHelperInterface
 {
     /**
@@ -34,7 +37,7 @@ interface VichMappingHelperInterface
     /**
      * Reads the dimensions from the entity's mapped property.
      *
-     * @return array{0: int, 1: int}|null [width, height] or null
+     * @return ImageDimensions|null [width, height] or null
      */
     public function readDimensions(object $entity, ?string $field): ?array;
 }

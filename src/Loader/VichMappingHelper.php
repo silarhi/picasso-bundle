@@ -19,6 +19,9 @@ use function is_string;
 use Vich\UploaderBundle\Mapping\PropertyMapping;
 use Vich\UploaderBundle\Mapping\PropertyMappingFactory;
 
+/**
+ * @phpstan-import-type ImageDimensions from VichMappingHelperInterface
+ */
 final readonly class VichMappingHelper implements VichMappingHelperInterface
 {
     public function __construct(

@@ -108,6 +108,29 @@ All bundle exceptions implement `PicassoExceptionInterface` (extends `Throwable`
 - Twig style enforced by Twig-CS-Fixer (`.twig-cs-fixer.php`)
 - Code modernization managed by Rector (`rector.php`) — targets PHP 8.2+, includes deadCode, codeQuality, and typeDeclarations rulesets
 
+### PHPStan Custom Types
+
+The project uses PHPStan custom type aliases to avoid duplicating complex type annotations across classes. When a structured type is used in multiple files, define it once and import it.
+
+**Global type aliases** (defined in `phpstan.neon` via `typeAliases`):
+
+| Alias              | Type                          | Used in                                   |
+|-------------------|-------------------------------|-------------------------------------------|
+| `TransformerParams` | `array<string, int\|string>` | `GlideTransformer`, `ImgixTransformer`    |
+
+**Local type aliases** (defined with `@phpstan-type` on an interface, imported with `@phpstan-import-type` in implementations):
+
+| Alias                  | Type                                                               | Defined on                    | Imported in           |
+|-----------------------|-------------------------------------------------------------------|-------------------------------|-----------------------|
+| `ImageGuessedMetadata` | `array{width: int\|null, height: int\|null, mimeType: string\|null}` | `MetadataGuesserInterface`    | `MetadataGuesser`     |
+| `ImageDimensions`      | `array{0: int, 1: int}`                                          | `VichMappingHelperInterface`  | `VichMappingHelper`   |
+
+**Guidelines for adding new custom types:**
+- Use `@phpstan-type` on the canonical interface when the type is part of a contract (interface + implementations).
+- Use `@phpstan-import-type from InterfaceName` in implementing classes to reference the type.
+- Use `typeAliases` in `phpstan.neon` when the type is shared between unrelated classes (no common interface).
+- Only extract a type alias when the same structured type (array shapes, complex unions) appears in 2+ files. Simple generic types like `array<string, mixed>` do not need aliases.
+
 ## Common Patterns
 
 - **Adding a new loader**: Create a class implementing `ImageLoaderInterface` (or `ServableLoaderInterface` if it provides filesystem access), add `#[AsImageLoader('name')]`, and it auto-registers.
