@@ -34,8 +34,6 @@ use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
 final readonly class GlideTransformer implements LocalTransformerInterface
 {
-    private const HMAC_LENGTH = 10;
-
     /**
      * @param array{enabled: bool, path: string}|null $publicCache
      */
@@ -65,16 +63,23 @@ final readonly class GlideTransformer implements LocalTransformerInterface
 
         if ($this->isPublicCacheEnabled()) {
             $paramsSegment = $this->buildParamsSegment($glideParams);
-            $hmac = $this->buildHmac($paramsSegment);
             $format = isset($glideParams['fm']) ? (string) $glideParams['fm'] : pathinfo($path, \PATHINFO_EXTENSION);
 
             $cachedPath = $path . '/' . $paramsSegment . '.' . $format;
+
+            // Sign using Glide's SignatureFactory — same as non-cached mode
+            $signature = SignatureFactory::create($this->signKey)
+                ->generateSignature($cachedPath, array_filter(
+                    $glideParams,
+                    static fn (string $key): bool => '_metadata' !== $key,
+                    \ARRAY_FILTER_USE_KEY,
+                ));
 
             $routeParams = [
                 'transformer' => $transformerName,
                 'loader' => $loaderName,
                 'path' => $cachedPath,
-                's' => $hmac,
+                's' => $signature,
             ];
 
             if (isset($glideParams['_metadata'])) {
@@ -98,11 +103,35 @@ final readonly class GlideTransformer implements LocalTransformerInterface
 
     public function serve(ServableLoaderInterface $loader, string $path, Request $request): Response
     {
-        if ($this->isPublicCacheEnabled()) {
-            return $this->serveCached($loader, $path, $request);
-        }
-
         $params = $request->query->all();
+        $cacheFilename = null;
+
+        if ($this->isPublicCacheEnabled()) {
+            $lastSlash = strrpos($path, '/');
+            if (false === $lastSlash) {
+                throw new NotFoundHttpException('Invalid cached image path.');
+            }
+
+            $imagePath = substr($path, 0, $lastSlash);
+            $cacheFilename = substr($path, $lastSlash + 1);
+
+            // Parse transformation params from the filename and merge into params
+            $parsed = self::parseParamsFilename($cacheFilename);
+            $params = array_merge($parsed['params'], $params);
+
+            // Validate signature against the full cached path (same as url() generated it)
+            try {
+                SignatureFactory::create($this->signKey)->validateRequest($path, array_filter(
+                    $params,
+                    static fn (string $key): bool => '_metadata' !== $key,
+                    \ARRAY_FILTER_USE_KEY,
+                ));
+            } catch (SignatureException $e) {
+                throw new NotFoundHttpException('Invalid image signature.', $e);
+            }
+
+            return $this->doServe($loader, $imagePath, $params, $cacheFilename);
+        }
 
         try {
             SignatureFactory::create($this->signKey)->validateRequest($path, $params);
@@ -142,14 +171,6 @@ final readonly class GlideTransformer implements LocalTransformerInterface
     }
 
     /**
-     * Build an HMAC for a params segment using the sign key.
-     */
-    public function buildHmac(string $paramsSegment): string
-    {
-        return substr(hash_hmac('sha256', $paramsSegment, $this->signKey), 0, self::HMAC_LENGTH);
-    }
-
-    /**
      * Parse a params filename like "fit_contain,fm_webp,q_75,w_300.webp"
      * into its component parts.
      *
@@ -184,43 +205,6 @@ final readonly class GlideTransformer implements LocalTransformerInterface
             'paramsSegment' => $paramsString,
             'format' => $format,
         ];
-    }
-
-    private function serveCached(ServableLoaderInterface $loader, string $path, Request $request): Response
-    {
-        $lastSlash = strrpos($path, '/');
-        if (false === $lastSlash) {
-            throw new NotFoundHttpException('Invalid cached image path.');
-        }
-
-        $imagePath = substr($path, 0, $lastSlash);
-        $paramsFilename = substr($path, $lastSlash + 1);
-
-        $parsed = self::parseParamsFilename($paramsFilename);
-
-        /** @var string $hmac */
-        $hmac = $request->query->get('s', '');
-        $this->validateHmac($parsed['paramsSegment'], $hmac);
-
-        $glideParams = $parsed['params'];
-
-        // Restore metadata from query param if present
-        if ($request->query->has('_metadata')) {
-            /** @var string $metadata */
-            $metadata = $request->query->get('_metadata');
-            $glideParams['_metadata'] = $metadata;
-        }
-
-        return $this->doServe($loader, $imagePath, $glideParams, $paramsFilename);
-    }
-
-    private function validateHmac(string $paramsSegment, string $hmac): void
-    {
-        $expected = $this->buildHmac($paramsSegment);
-
-        if (!hash_equals($expected, $hmac)) {
-            throw new NotFoundHttpException('Invalid cached image signature.');
-        }
     }
 
     /**

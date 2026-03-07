@@ -17,15 +17,13 @@ use function assert;
 use function in_array;
 use function is_string;
 
+use League\Glide\Signatures\SignatureFactory;
 use LogicException;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Service\UrlEncryption;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
-
-use function strlen;
-
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
 class GlideTransformerTest extends TestCase
@@ -219,7 +217,7 @@ class GlideTransformerTest extends TestCase
 
         $url = $transformer->url($image, $transformation, ['loader' => 'filesystem', 'transformer' => 'glide']);
 
-        // Path contains params, signature is in query string
+        // Path contains params, Glide signature is in query string
         self::assertStringContainsString('/picasso/glide/filesystem/uploads/photo.jpg/', $url);
         self::assertStringContainsString('w_300', $url);
         self::assertStringContainsString('fm_webp', $url);
@@ -329,17 +327,6 @@ class GlideTransformerTest extends TestCase
         self::assertSame('fm_webp,w_300', $segment);
     }
 
-    public function testBuildHmacIsDeterministic(): void
-    {
-        $segment = 'fit_contain,fm_webp,q_75,w_300';
-
-        $hmac1 = $this->transformer->buildHmac($segment);
-        $hmac2 = $this->transformer->buildHmac($segment);
-
-        self::assertSame($hmac1, $hmac2);
-        self::assertSame(10, strlen($hmac1));
-    }
-
     public function testParseParamsFilename(): void
     {
         $filename = 'fit_contain,fm_webp,h_200,q_75,w_300.webp';
@@ -388,12 +375,16 @@ class GlideTransformerTest extends TestCase
         self::assertSame('cover', $parsed['params']['fit']);
         self::assertSame('avif', $parsed['format']);
 
-        // Verify HMAC from query string is valid
+        // Verify Glide signature from query string is valid
         $queryString = parse_url($url, \PHP_URL_QUERY);
         self::assertIsString($queryString);
         parse_str($queryString, $query);
         self::assertIsString($query['s']);
-        $expectedHmac = $transformer->buildHmac($parsed['paramsSegment']);
-        self::assertSame($expectedHmac, $query['s']);
+
+        // The signature should validate against the cached path + params (excluding _metadata)
+        $cachedPath = 'photos/hero.jpg/' . $parsed['paramsSegment'] . '.avif';
+        $expectedSignature = SignatureFactory::create(self::SIGN_KEY)
+            ->generateSignature($cachedPath, $parsed['params']);
+        self::assertSame($expectedSignature, $query['s']);
     }
 }
