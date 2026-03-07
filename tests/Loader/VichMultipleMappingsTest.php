@@ -372,6 +372,6 @@ class VichMultipleMappingsTest extends TestCase
                 );
             });
 
-        return new GlideTransformer($router, $this->encryption, self::SIGN_KEY, '/tmp/cache');
+        return new GlideTransformer($router, $this->encryption, self::SIGN_KEY, '/tmp/cache', 'gd', null, false);
     }
 }

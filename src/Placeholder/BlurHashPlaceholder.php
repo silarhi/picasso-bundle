@@ -33,9 +33,9 @@ final readonly class BlurHashPlaceholder implements PlaceholderInterface
      */
     public function __construct(
         private ImagineInterface $imagine,
-        private int $componentsX = 4,
-        private int $componentsY = 3,
-        private int $size = 32,
+        private int $componentsX,
+        private int $componentsY,
+        private int $size,
     ) {
     }
 

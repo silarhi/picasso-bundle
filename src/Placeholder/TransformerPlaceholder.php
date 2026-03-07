@@ -25,9 +25,9 @@ final readonly class TransformerPlaceholder implements PlaceholderInterface
 {
     public function __construct(
         private TransformerRegistry $transformerRegistry,
-        private int $size = 10,
-        private int $blur = 5,
-        private int $quality = 30,
+        private int $size,
+        private int $blur,
+        private int $quality,
     ) {
     }
 
