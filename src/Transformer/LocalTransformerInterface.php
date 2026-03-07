@@ -25,5 +25,8 @@ use Symfony\Component\HttpFoundation\Response;
  */
 interface LocalTransformerInterface extends ImageTransformerInterface
 {
-    public function serve(ServableLoaderInterface $loader, string $path, Request $request): Response;
+    /**
+     * @param array<string, string> $context
+     */
+    public function serve(ServableLoaderInterface $loader, string $path, Request $request, array $context = []): Response;
 }

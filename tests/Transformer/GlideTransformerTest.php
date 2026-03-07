@@ -341,7 +341,7 @@ class GlideTransformerTest extends TestCase
 
     public function testParseParamsFilenameThrowsWithoutExtension(): void
     {
-        $this->expectException(\Symfony\Component\HttpKernel\Exception\NotFoundHttpException::class);
+        $this->expectException(\Silarhi\PicassoBundle\Exception\ImageNotFoundException::class);
 
         GlideTransformer::parseParamsFilename('no-extension');
     }

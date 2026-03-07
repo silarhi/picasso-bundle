@@ -25,11 +25,11 @@ use LogicException;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Exception\EncryptionException;
+use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
 use Silarhi\PicassoBundle\Service\UrlEncryption;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
 final readonly class GlideTransformer implements LocalTransformerInterface
@@ -82,7 +82,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
         ], UrlGeneratorInterface::ABSOLUTE_PATH);
     }
 
-    public function serve(ServableLoaderInterface $loader, string $path, Request $request): Response
+    public function serve(ServableLoaderInterface $loader, string $path, Request $request, array $context = []): Response
     {
         $cacheFilename = null;
         $cachePrefix = null;
@@ -90,14 +90,14 @@ final readonly class GlideTransformer implements LocalTransformerInterface
         try {
             SignatureFactory::create($this->signKey)->validateRequest($path, $request->query->all());
         } catch (SignatureException $e) {
-            throw new NotFoundHttpException('Invalid image signature.', $e);
+            throw new ImageNotFoundException('Invalid image signature.', previous: $e);
         }
 
         if ($this->isPublicCacheEnabled()) {
             // Extract transformation params from the path and add them to the request query
             $lastSlash = strrpos($path, '/');
             if (false === $lastSlash) {
-                throw new NotFoundHttpException('Invalid cached image path.');
+                throw new ImageNotFoundException('Invalid cached image path.');
             }
 
             $cacheFilename = substr($path, $lastSlash + 1);
@@ -107,8 +107,11 @@ final readonly class GlideTransformer implements LocalTransformerInterface
             $request->query->add($parsed['params']);
 
             // Include transformer/loader in cache path so it mirrors the URL structure
-            $cachePrefix = $request->attributes->getString('transformer')
-                . '/' . $request->attributes->getString('loader');
+            /** @var string $transformerName */
+            $transformerName = $context['transformer'] ?? '';
+            /** @var string $loaderName */
+            $loaderName = $context['loader'] ?? '';
+            $cachePrefix = $transformerName . '/' . $loaderName;
         }
 
         $params = $request->query->all();
@@ -121,7 +124,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
                 $request->query->remove('_metadata');
                 $metadata = json_decode($this->urlEncryption->decrypt($encryptedMetadata), true, flags: \JSON_THROW_ON_ERROR);
             } catch (EncryptionException|JsonException $e) {
-                throw new NotFoundHttpException('Invalid metadata parameter.', $e);
+                throw new ImageNotFoundException('Invalid metadata parameter.', previous: $e);
             }
         } else {
             $metadata = [];
@@ -155,7 +158,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
 
             return $response;
         } catch (FileNotFoundException|InvalidArgumentException $e) {
-            throw new NotFoundHttpException('Image not found.', $e);
+            throw new ImageNotFoundException('Image not found.', previous: $e);
         }
     }
 
@@ -197,7 +200,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
     {
         $dotPos = strrpos($filename, '.');
         if (false === $dotPos) {
-            throw new NotFoundHttpException('Invalid cached image filename.');
+            throw new ImageNotFoundException('Invalid cached image filename.');
         }
 
         $format = substr($filename, $dotPos + 1);
@@ -209,7 +212,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
         foreach ($pairs as $pair) {
             $separatorPos = strpos($pair, '_');
             if (false === $separatorPos) {
-                throw new NotFoundHttpException('Invalid cached image param format.');
+                throw new ImageNotFoundException('Invalid cached image param format.');
             }
 
             $key = substr($pair, 0, $separatorPos);
