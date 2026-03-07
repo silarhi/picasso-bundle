@@ -86,6 +86,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
     {
         $params = $request->query->all();
         $cacheFilename = null;
+        $cachePrefix = null;
 
         try {
             SignatureFactory::create($this->signKey)->validateRequest($path, $params);
@@ -105,9 +106,13 @@ final readonly class GlideTransformer implements LocalTransformerInterface
 
             $parsed = self::parseParamsFilename($cacheFilename);
             $params = array_merge($parsed['params'], $params);
+
+            // Include transformer/loader in cache path so it mirrors the URL structure
+            $cachePrefix = $request->attributes->getString('transformer')
+                . '/' . $request->attributes->getString('loader');
         }
 
-        return $this->doServe($loader, $path, $params, $cacheFilename);
+        return $this->doServe($loader, $path, $params, $cacheFilename, $cachePrefix);
     }
 
     public function isPublicCacheEnabled(): bool
@@ -178,7 +183,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
     /**
      * @param array<string, mixed> $params
      */
-    private function doServe(ServableLoaderInterface $loader, string $path, array $params, ?string $cacheFilename = null): Response
+    private function doServe(ServableLoaderInterface $loader, string $path, array $params, ?string $cacheFilename = null, ?string $cachePrefix = null): Response
     {
         if (isset($params['_metadata'])) {
             try {
@@ -205,7 +210,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
 
         if (null !== $cacheFilename) {
             $serverConfig['cache_path_callable'] = Closure::fromCallable(
-                static fn (string $path, array $params): string => $path . '/' . $cacheFilename,
+                static fn (string $path, array $params): string => ($cachePrefix ? $cachePrefix . '/' : '') . $path . '/' . $cacheFilename,
             );
         }
 
