@@ -17,6 +17,7 @@ use function assert;
 use function count;
 use function dirname;
 use function in_array;
+use function is_bool;
 use function is_string;
 
 use LogicException;
@@ -133,8 +134,12 @@ final class PicassoBundle extends AbstractBundle
                     ->info('Default fit mode (contain, cover, crop, fill).')
                 ->end()
                 ->scalarNode('cache')
-                    ->defaultValue('cache.app')
-                    ->info('PSR-6 cache pool service ID for metadata guessing and BlurHash generation. Set to null to disable caching.')
+                    ->defaultTrue()
+                    ->info('PSR-6 cache pool for metadata guessing and BlurHash generation. true (default) uses cache.app, false disables caching, or pass a service ID string.')
+                    ->validate()
+                        ->ifTrue(static fn (mixed $v): bool => !is_bool($v) && !is_string($v))
+                        ->thenInvalid('The "cache" option must be true, false, or a cache pool service ID string.')
+                    ->end()
                 ->end()
                 ->scalarNode('default_placeholder')
                     ->defaultNull()
@@ -248,7 +253,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_loader: string|null,
          *     default_transformer: string|null,
          *     default_placeholder: string|null,
-         *     cache: string|null,
+         *     cache: bool|string,
          *     device_sizes: list<int>,
          *     image_sizes: list<int>,
          *     formats: list<string>,
@@ -263,7 +268,11 @@ final class PicassoBundle extends AbstractBundle
 
         // --- MetadataGuesser ---
 
-        $cacheServiceId = $config['cache'];
+        $cacheServiceId = match (true) {
+            true === $config['cache'] => 'cache.app',
+            is_string($config['cache']) => $config['cache'],
+            default => null,
+        };
         $metadataGuesserDef = $services->set('picasso.metadata_guesser', MetadataGuesser::class);
         if (null !== $cacheServiceId) {
             $metadataGuesserDef->args([service($cacheServiceId)]);
