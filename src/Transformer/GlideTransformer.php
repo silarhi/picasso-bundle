@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Transformer;
 
+use Closure;
 use InvalidArgumentException;
 use JsonException;
 use League\Glide\Filesystem\FileNotFoundException;
@@ -90,7 +91,6 @@ final readonly class GlideTransformer implements LocalTransformerInterface
 
     public function serve(ServableLoaderInterface $loader, string $path, Request $request): Response
     {
-        // When public cache is enabled and no query signature, params are encoded in the path
         if ($this->isPublicCacheEnabled() && !$request->query->has('s')) {
             return $this->serveCached($loader, $path);
         }
@@ -182,7 +182,6 @@ final readonly class GlideTransformer implements LocalTransformerInterface
             throw new NotFoundHttpException('Missing signature in cached image URL.');
         }
 
-        // Rebuild the params segment without the HMAC for verification
         $segmentParts = [];
         foreach ($paramPairs as $key => $value) {
             $segmentParts[] = $key . '_' . $value;
@@ -197,10 +196,6 @@ final readonly class GlideTransformer implements LocalTransformerInterface
         ];
     }
 
-    /**
-     * Serve a cached image: parse params from the path, validate HMAC, serve via Glide,
-     * and write the result to the public cache directory.
-     */
     private function serveCached(ServableLoaderInterface $loader, string $path): Response
     {
         $lastSlash = strrpos($path, '/');
@@ -214,11 +209,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
         $parsed = self::parseParamsFilename($paramsFilename);
         $this->validateHmac($parsed['paramsSegment'], $parsed['hmac']);
 
-        $response = $this->doServe($loader, $imagePath, $parsed['params']);
-
-        $this->writePublicCache($imagePath, $paramsFilename, $response);
-
-        return $response;
+        return $this->doServe($loader, $imagePath, $parsed['params'], $paramsFilename);
     }
 
     private function validateHmac(string $paramsSegment, string $hmac): void
@@ -233,9 +224,8 @@ final readonly class GlideTransformer implements LocalTransformerInterface
     /**
      * @param array<string, mixed> $params
      */
-    private function doServe(ServableLoaderInterface $loader, string $path, array $params): Response
+    private function doServe(ServableLoaderInterface $loader, string $path, array $params, ?string $cacheFilename = null): Response
     {
-        // Decrypt source from URL metadata if present, otherwise fall back to loader
         if (isset($params['_metadata'])) {
             try {
                 /** @var string $encryptedMetadata */
@@ -251,12 +241,30 @@ final readonly class GlideTransformer implements LocalTransformerInterface
 
         /** @var array<string, mixed> $metadata */
         $source = $loader->getSource($metadata);
+
+        // When public cache is enabled, Glide writes directly to the public
+        // directory using a cache_path_callable that produces the readable
+        // params-based filename.
+        $cacheDir = $this->cache;
+        $cachePathCallable = null;
+
+        if (null !== $cacheFilename && $this->isPublicCacheEnabled()) {
+            /** @var array{enabled: bool, path: string} $publicCache */
+            $publicCache = $this->publicCache;
+            $cacheDir = $publicCache['path'];
+            $cachePathCallable = static fn (string $path, array $params): string => $path . '/' . $cacheFilename;
+        }
+
         $serverConfig = [
             'source' => $source,
-            'cache' => $this->cache,
+            'cache' => $cacheDir,
             'driver' => $this->driver,
             'response' => new SymfonyResponseFactory(),
         ];
+
+        if (null !== $cachePathCallable) {
+            $serverConfig['cache_path_callable'] = Closure::fromCallable($cachePathCallable);
+        }
 
         if (null !== $this->maxImageSize) {
             $serverConfig['max_image_size'] = $this->maxImageSize;
@@ -272,20 +280,6 @@ final readonly class GlideTransformer implements LocalTransformerInterface
         } catch (FileNotFoundException|InvalidArgumentException $e) {
             throw new NotFoundHttpException('Image not found.', $e);
         }
-    }
-
-    private function writePublicCache(string $imagePath, string $paramsFilename, Response $response): void
-    {
-        /** @var array{enabled: bool, path: string} $publicCache */
-        $publicCache = $this->publicCache;
-        $cacheDir = rtrim($publicCache['path'], '/') . '/' . $imagePath;
-
-        if (!is_dir($cacheDir)) {
-            mkdir($cacheDir, 0o777, true);
-        }
-
-        $cacheFile = $cacheDir . '/' . $paramsFilename;
-        file_put_contents($cacheFile, $response->getContent());
     }
 
     /**
