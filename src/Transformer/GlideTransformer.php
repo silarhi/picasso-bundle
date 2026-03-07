@@ -112,7 +112,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
                 . '/' . $request->attributes->getString('loader');
         }
 
-        return $this->doServe($loader, $path, $params, $cacheFilename, $cachePrefix);
+        return $this->doServe($loader, $path, $params, $request, $cacheFilename, $cachePrefix);
     }
 
     public function isPublicCacheEnabled(): bool
@@ -183,7 +183,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
     /**
      * @param array<string, mixed> $params
      */
-    private function doServe(ServableLoaderInterface $loader, string $path, array $params, ?string $cacheFilename = null, ?string $cachePrefix = null): Response
+    private function doServe(ServableLoaderInterface $loader, string $path, array $params, Request $request, ?string $cacheFilename = null, ?string $cachePrefix = null): Response
     {
         if (isset($params['_metadata'])) {
             try {
@@ -205,7 +205,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
             'source' => $source,
             'cache' => $this->cache,
             'driver' => $this->driver,
-            'response' => new SymfonyResponseFactory(),
+            'response' => new SymfonyResponseFactory($request),
         ];
 
         if (null !== $cacheFilename) {
