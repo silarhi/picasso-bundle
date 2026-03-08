@@ -13,7 +13,7 @@
         "imagine/imagine": "^1.5.2",
         "kornrunner/blurhash": "^1.2",
         "league/flysystem-bundle": "^3.6",
-        "league/glide": "^2.3.2",
+        "league/glide": "^3.0.0",
         "league/glide-symfony": "^2.0.1",
         "phpstan/phpstan": "^2.1.40",
         "phpunit/phpunit": "^11.5.55",
