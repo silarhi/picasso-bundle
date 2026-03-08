@@ -16,9 +16,14 @@ namespace Silarhi\PicassoBundle\Transformer;
 use Closure;
 use InvalidArgumentException;
 use JsonException;
+use League\Flysystem\Filesystem;
+use League\Flysystem\FilesystemOperator;
+use League\Flysystem\Local\LocalFilesystemAdapter;
 use League\Glide\Filesystem\FileNotFoundException;
 use League\Glide\Responses\SymfonyResponseFactory;
+use League\Glide\Server;
 use League\Glide\ServerFactory;
+use League\Glide\Signatures\Signature;
 use League\Glide\Signatures\SignatureException;
 use League\Glide\Signatures\SignatureFactory;
 use Silarhi\PicassoBundle\Dto\Image;
@@ -38,15 +43,31 @@ use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
  */
 final readonly class GlideTransformer implements LocalTransformerInterface
 {
+    private Signature $signature;
+    private Server $server;
+
     public function __construct(
         private UrlGeneratorInterface $router,
         private UrlEncryption $urlEncryption,
-        private string $signKey,
-        private string $cache,
-        private string $driver,
-        private ?int $maxImageSize,
+        string $signKey,
+        string $cache,
+        string $driver,
+        ?int $maxImageSize,
         private bool $publicCache,
     ) {
+        $this->signature = SignatureFactory::create($signKey);
+
+        $serverConfig = [
+            'source' => $cache,
+            'cache' => $cache,
+            'driver' => $driver,
+        ];
+
+        if (null !== $maxImageSize) {
+            $serverConfig['max_image_size'] = $maxImageSize;
+        }
+
+        $this->server = ServerFactory::create($serverConfig);
     }
 
     public function url(Image $image, ImageTransformation $transformation, array $context = []): string
@@ -74,7 +95,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
             );
         }
 
-        $signature = SignatureFactory::create($this->signKey)
+        $signature = $this->signature
             ->generateSignature($path, $glideParams);
 
         return $this->router->generate('picasso_image', [
@@ -93,7 +114,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
         $cachePrefix = null;
 
         try {
-            SignatureFactory::create($this->signKey)->validateRequest($path, $params);
+            $this->signature->validateRequest($path, $params);
         } catch (SignatureException $e) {
             throw new ImageNotFoundException('Invalid image signature.', $e->getCode(), previous: $e);
         }
@@ -134,29 +155,27 @@ final readonly class GlideTransformer implements LocalTransformerInterface
 
         /** @var array<string, mixed> $metadata */
         $source = $loader->getSource($metadata);
+        if ($source instanceof FilesystemOperator) {
+            $sourceFilesystem = $source;
+        } else {
+            /** @var string $source */
+            $sourceFilesystem = new Filesystem(new LocalFilesystemAdapter($source));
+        }
 
-        $serverConfig = [
-            'source' => $source,
-            'cache' => $this->cache,
-            'driver' => $this->driver,
-            'response' => new SymfonyResponseFactory($request),
-        ];
+        $this->server->setSource($sourceFilesystem);
+        $this->server->setResponseFactory(new SymfonyResponseFactory($request));
 
         if (null !== $cacheFilename) {
-            $serverConfig['cache_path_callable'] = Closure::fromCallable(
+            $this->server->setCachePathCallable(Closure::fromCallable(
                 static fn (string $path, array $params): string => ($cachePrefix ? $cachePrefix . '/' : '') . $path . '/' . $cacheFilename,
-            );
+            ));
+        } else {
+            $this->server->setCachePathCallable(null);
         }
-
-        if (null !== $this->maxImageSize) {
-            $serverConfig['max_image_size'] = $this->maxImageSize;
-        }
-
-        $server = ServerFactory::create($serverConfig);
 
         try {
             /** @var Response $response */
-            $response = $server->getImageResponse($path, $params);
+            $response = $this->server->getImageResponse($path, $params);
 
             return $response;
         } catch (FileNotFoundException|InvalidArgumentException $e) {

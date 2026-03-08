@@ -34,6 +34,8 @@ use Silarhi\PicassoBundle\Service\CacheKeyGenerator;
  */
 final readonly class BlurHashPlaceholder implements PlaceholderInterface
 {
+    private RGB $palette;
+
     /**
      * @param int $componentsX Number of horizontal BlurHash components (1–9)
      * @param int $componentsY Number of vertical BlurHash components (1–9)
@@ -46,6 +48,7 @@ final readonly class BlurHashPlaceholder implements PlaceholderInterface
         private int $size = 32,
         private ?CacheItemPoolInterface $cache = null,
     ) {
+        $this->palette = new RGB();
     }
 
     public function generate(Image $image, ImageTransformation $transformation, array $context = []): string
@@ -159,7 +162,6 @@ final readonly class BlurHashPlaceholder implements PlaceholderInterface
         /** @var list<list<array{int, int, int}>> $pixels */
         $pixels = Blurhash::decode($hash, $decodeWidth, $decodeHeight);
 
-        $palette = new RGB();
         $img = $this->imagine->create(new Box($decodeWidth, $decodeHeight));
 
         for ($y = 0; $y < $decodeHeight; ++$y) {
@@ -171,7 +173,7 @@ final readonly class BlurHashPlaceholder implements PlaceholderInterface
                 $cg = max(0, min(255, $g));
                 /** @var int<0, 255> $cb */
                 $cb = max(0, min(255, $b));
-                $img->draw()->dot(new Point($x, $y), $palette->color([$cr, $cg, $cb]));
+                $img->draw()->dot(new Point($x, $y), $this->palette->color([$cr, $cg, $cb]));
             }
         }
 
