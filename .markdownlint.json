@@ -18,5 +18,8 @@
     "heading_line_length": 140,
     "code_block_line_length": 140
   },
+  "MD007": {
+    "indent": 4
+  },
   "MD041": false
 }
