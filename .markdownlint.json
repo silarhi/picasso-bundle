@@ -2,10 +2,21 @@
   "MD033": {
     "allowed_elements": [
       "details",
-      "summary"
+      "summary",
+      "p",
+      "picture",
+      "source",
+      "img",
+      "h1",
+      "strong",
+      "br",
+      "a"
     ]
   },
   "MD013": {
-    "line_length": 140
-  }
+    "line_length": 140,
+    "heading_line_length": 140,
+    "code_block_line_length": 140
+  },
+  "MD041": false
 }

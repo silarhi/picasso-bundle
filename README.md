@@ -1,7 +1,8 @@
 <p align="center">
     <picture>
         <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/packagist/v/silarhi/picasso-bundle?style=for-the-badge&label=stable&color=0d6efd&labelColor=1a1a2e">
-        <img src="https://img.shields.io/packagist/v/silarhi/picasso-bundle?style=for-the-badge&label=stable&color=0d6efd" alt="Latest Stable Version">
+        <img src="https://img.shields.io/packagist/v/silarhi/picasso-bundle?style=for-the-badge&label=stable&color=0d6efd"
+            alt="Latest Stable Version">
     </picture>
     <picture>
         <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/packagist/dt/silarhi/picasso-bundle?style=for-the-badge&color=198754&labelColor=1a1a2e">
@@ -17,7 +18,8 @@
     </picture>
     <picture>
         <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/github/actions/workflow/status/silarhi/picasso-bundle/continuous-integration.yml?style=for-the-badge&label=CI&color=20c997&labelColor=1a1a2e">
-        <img src="https://img.shields.io/github/actions/workflow/status/silarhi/picasso-bundle/continuous-integration.yml?style=for-the-badge&label=CI&color=20c997" alt="CI Status">
+        <img src="https://img.shields.io/github/actions/workflow/status/silarhi/picasso-bundle/continuous-integration.yml?style=for-the-badge&label=CI&color=20c997"
+            alt="CI Status">
     </picture>
 </p>
 
@@ -39,18 +41,25 @@
 ```html
 <!-- You write all of this manually... and maintain it forever -->
 <picture>
-    <source type="image/avif"
-            srcset="/images/hero-640.avif 640w, /images/hero-1080.avif 1080w, /images/hero-1920.avif 1920w"
-            sizes="100vw" />
-    <source type="image/webp"
-            srcset="/images/hero-640.webp 640w, /images/hero-1080.webp 1080w, /images/hero-1920.webp 1920w"
-            sizes="100vw" />
-    <img src="/images/hero-1080.jpg"
-         srcset="/images/hero-640.jpg 640w, /images/hero-1080.jpg 1080w, /images/hero-1920.jpg 1920w"
-         sizes="100vw"
-         width="1920" height="1080"
-         loading="lazy"
-         alt="Hero" />
+    <source
+        type="image/avif"
+        srcset="/images/hero-640.avif 640w, /images/hero-1080.avif 1080w, /images/hero-1920.avif 1920w"
+        sizes="100vw"
+    />
+    <source
+        type="image/webp"
+        srcset="/images/hero-640.webp 640w, /images/hero-1080.webp 1080w, /images/hero-1920.webp 1920w"
+        sizes="100vw"
+    />
+    <img
+        src="/images/hero-1080.jpg"
+        srcset="/images/hero-640.jpg 640w, /images/hero-1080.jpg 1080w, /images/hero-1920.jpg 1920w"
+        sizes="100vw"
+        width="1920"
+        height="1080"
+        loading="lazy"
+        alt="Hero"
+    />
 </picture>
 ```
 
@@ -66,20 +75,24 @@
 
 ## Why PicassoBundle?
 
-Images account for the largest share of page weight on most websites. Serving them correctly — with modern formats, responsive srcsets, proper lazy loading, and blur placeholders — is critical for both **Core Web Vitals** and **user experience**, but the implementation is tedious and error-prone.
+Images account for the largest share of page weight on most websites.
+Serving them correctly — with modern formats, responsive srcsets, proper
+lazy loading, and blur placeholders — is critical for both
+**Core Web Vitals** and **user experience**, but the implementation is
+tedious and error-prone.
 
 PicassoBundle solves this the same way Next.js Image did for React:
 **a single component that handles everything**.
 
-| | Without PicassoBundle | With PicassoBundle |
-|---|---|---|
-| **Format negotiation** | Manual AVIF/WebP/JPEG `<source>` tags | Automatic from config |
-| **Responsive srcset** | Hand-crafted per breakpoint | Generated from `sizes` prop |
-| **Blur placeholders** | DIY or skip it | Built-in (LQIP, BlurHash, or custom) |
-| **Dimension detection** | Hardcoded or forgotten | Auto-detected from image stream |
-| **LCP optimization** | Manually set loading/fetchpriority | One `priority` prop |
-| **Image sources** | Filesystem only | Filesystem, S3, Flysystem, Vich, URL |
-| **CDN support** | Build your own integration | Imgix out of the box, or plug in any CDN |
+|                         | Without PicassoBundle                 | With PicassoBundle                       |
+| ----------------------- | ------------------------------------- | ---------------------------------------- |
+| **Format negotiation**  | Manual AVIF/WebP/JPEG `<source>` tags | Automatic from config                    |
+| **Responsive srcset**   | Hand-crafted per breakpoint           | Generated from `sizes` prop              |
+| **Blur placeholders**   | DIY or skip it                        | Built-in (LQIP, BlurHash, or custom)     |
+| **Dimension detection** | Hardcoded or forgotten                | Auto-detected from image stream          |
+| **LCP optimization**    | Manually set loading/fetchpriority    | One `priority` prop                      |
+| **Image sources**       | Filesystem only                       | Filesystem, S3, Flysystem, Vich, URL     |
+| **CDN support**         | Build your own integration            | Imgix out of the box, or plug in any CDN |
 
 ---
 
@@ -91,29 +104,29 @@ PicassoBundle solves this the same way Next.js Image did for React:
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Configuration](#configuration)
-  - [Minimal Configuration](#minimal-configuration)
-  - [Full Configuration Reference](#full-configuration-reference)
-  - [Configuration Options Explained](#configuration-options-explained)
+    - [Minimal Configuration](#minimal-configuration)
+    - [Full Configuration Reference](#full-configuration-reference)
+    - [Configuration Options Explained](#configuration-options-explained)
 - [Usage](#usage)
-  - [Twig Component](#twig-component-recommended)
-  - [Twig Function](#twig-function)
-  - [ImageHelper Service](#imagehelper-service)
+    - [Twig Component](#twig-component-recommended)
+    - [Twig Function](#twig-function)
+    - [ImageHelper Service](#imagehelper-service)
 - [Placeholders](#placeholders)
-  - [Transformer Placeholder (LQIP)](#transformer-placeholder-lqip)
-  - [BlurHash Placeholder](#blurhash-placeholder)
-  - [Custom Placeholder Service](#custom-placeholder-service)
-  - [Controlling Placeholders Per Image](#controlling-placeholders-per-image)
+    - [Transformer Placeholder (LQIP)](#transformer-placeholder-lqip)
+    - [BlurHash Placeholder](#blurhash-placeholder)
+    - [Custom Placeholder Service](#custom-placeholder-service)
+    - [Controlling Placeholders Per Image](#controlling-placeholders-per-image)
 - [Priority Images](#priority-images)
 - [Loaders](#loaders)
-  - [Filesystem Loader](#filesystem-loader)
-  - [Flysystem Loader](#flysystem-loader)
-  - [VichUploaderBundle Loader](#vichuploaderbundle-loader)
-  - [URL Loader](#url-loader)
-  - [Custom Loader](#custom-loader)
+    - [Filesystem Loader](#filesystem-loader)
+    - [Flysystem Loader](#flysystem-loader)
+    - [VichUploaderBundle Loader](#vichuploaderbundle-loader)
+    - [URL Loader](#url-loader)
+    - [Custom Loader](#custom-loader)
 - [Transformers](#transformers)
-  - [Glide (Local)](#glide-local)
-  - [Imgix (CDN)](#imgix-cdn)
-  - [Custom Transformer](#custom-transformer)
+    - [Glide (Local)](#glide-local)
+    - [Imgix (CDN)](#imgix-cdn)
+    - [Custom Transformer](#custom-transformer)
 - [Routes](#routes)
 - [How It Works](#how-it-works)
 - [Testing & Quality](#testing--quality)
@@ -131,28 +144,32 @@ PicassoBundle solves this the same way Next.js Image did for React:
 - **Priority images** — one prop for `loading="eager"` + `fetchpriority="high"` (LCP optimization)
 - **Multiple image sources** — Local filesystem, [Flysystem](https://flysystem.thephpleague.com/) (S3, GCS, Azure),
   [VichUploaderBundle](https://github.com/dustin10/VichUploaderBundle), remote URLs
-- **Local or CDN transforms** — [Glide](https://glide.thephpleague.com/) for self-hosted, [Imgix](https://imgix.com/) for CDN, or bring your own
-- **Signed URLs** — HMAC-signed transformation URLs prevent abuse of your image endpoint
-- **PSR-6 metadata caching** — dimension detection and BlurHash results are cached for performance
-- **Fully extensible** — add custom loaders, transformers, or placeholders with PHP attributes (`#[AsImageLoader]`, `#[AsImageTransformer]`, `#[AsPlaceholder]`)
+- **Local or CDN transforms** —
+  [Glide](https://glide.thephpleague.com/) for self-hosted,
+  [Imgix](https://imgix.com/) for CDN, or bring your own
+- **Signed URLs** — HMAC-signed transformation URLs prevent abuse
+- **PSR-6 metadata caching** — dimension detection and BlurHash results cached
+- **Fully extensible** — add custom loaders, transformers, or placeholders
+  with PHP attributes (`#[AsImageLoader]`, `#[AsImageTransformer]`,
+  `#[AsPlaceholder]`)
 
 ## Requirements
 
-| Dependency | Version |
-|---|---|
-| PHP | 8.2+ |
-| Symfony | 6.4 / 7.0 / 8.0 |
-| [Symfony UX Twig Component](https://symfony.com/bundles/ux-twig-component/current/index.html) | 2.13+ |
+| Dependency                                                                                    | Version         |
+| --------------------------------------------------------------------------------------------- | --------------- |
+| PHP                                                                                           | 8.2+            |
+| Symfony                                                                                       | 6.4 / 7.0 / 8.0 |
+| [Symfony UX Twig Component](https://symfony.com/bundles/ux-twig-component/current/index.html) | 2.13+           |
 
 ### Optional Dependencies
 
-| Package | Required for |
-|---|---|
-| `league/glide` + `league/glide-symfony` | Glide transformer (local image processing) |
-| `kornrunner/blurhash` + `imagine/imagine` | BlurHash placeholder |
-| `league/flysystem-bundle` | Flysystem loader |
-| `vich/uploader-bundle` | VichUploader loader |
-| `symfony/http-client` | URL loader |
+| Package                                   | Required for                               |
+| ----------------------------------------- | ------------------------------------------ |
+| `league/glide` + `league/glide-symfony`   | Glide transformer (local image processing) |
+| `kornrunner/blurhash` + `imagine/imagine` | BlurHash placeholder                       |
+| `league/flysystem-bundle`                 | Flysystem loader                           |
+| `vich/uploader-bundle`                    | VichUploader loader                        |
+| `symfony/http-client`                     | URL loader                                 |
 
 ## Installation
 
@@ -215,13 +232,17 @@ picasso:
 />
 ```
 
-This renders a `<picture>` element with `<source>` tags for AVIF and WebP, a fallback `<img>` with JPEG srcset, and an inline blur placeholder — all automatically.
+This renders a `<picture>` element with `<source>` tags for AVIF and
+WebP, a fallback `<img>` with JPEG srcset, and an inline blur
+placeholder — all automatically.
 
 ## Configuration
 
 ### Minimal Configuration
 
-When only one loader and one transformer are configured, they are automatically used as defaults — no need to set `default_loader` or `default_transformer`.
+When only one loader and one transformer are configured, they are
+automatically used as defaults — no need to set `default_loader` or
+`default_transformer`.
 
 ```yaml
 picasso:
@@ -251,19 +272,19 @@ picasso:
     formats: [avif, webp, jpg]
 
     # --- Image quality & fit ---
-    default_quality: 75        # 1–100
-    default_fit: contain       # contain | cover | crop | fill
+    default_quality: 75 # 1–100
+    default_fit: contain # contain | cover | crop | fill
 
     # --- Metadata cache ---
-    cache: true                # true = cache.app, false = disabled, or a PSR-6 service ID
+    cache: true # true = cache.app, false = disabled, or a PSR-6 service ID
 
     # --- Placeholders ---
     placeholders:
         blur:
-            type: transformer  # inferred from key name when matching a known type
-            size: 10           # tiny image width/height in px
-            blur: 5            # blur radius
-            quality: 30        # JPEG quality for blur image (1–100)
+            type: transformer # inferred from key name when matching a known type
+            size: 10 # tiny image width/height in px
+            blur: 5 # blur radius
+            quality: 30 # JPEG quality for blur image (1–100)
 
         # blurhash:
         #     type: blurhash
@@ -279,7 +300,7 @@ picasso:
     # --- Loaders ---
     loaders:
         filesystem:
-            type: filesystem   # inferred from key name
+            type: filesystem # inferred from key name
             paths:
                 - '%kernel.project_dir%/public/uploads'
 
@@ -298,13 +319,14 @@ picasso:
     # --- Transformers ---
     transformers:
         glide:
-            type: glide        # inferred from key name
-            sign_key: ~        # signing key for secure URLs
+            type: glide # inferred from key name
+            sign_key: ~ # signing key for secure URLs
             cache: '%kernel.project_dir%/var/glide-cache'
-            driver: gd         # gd | imagick
-            max_image_size: ~  # optional max pixel count
+            driver: gd # gd | imagick
+            max_image_size: ~ # optional max pixel count
             public_cache:
                 enabled: false # serve transformed images from public directory
+
 
         # imgix:
         #     type: imgix
@@ -322,18 +344,25 @@ picasso:
 
 These arrays define which widths are generated in the srcset attribute:
 
-- **`device_sizes`** — Breakpoint widths for responsive (fluid) images. When the component has a `sizes` attribute, all device and image sizes are merged and included in the srcset.
-- **`image_sizes`** — Smaller widths for fixed-size images (icons, thumbnails). When no `sizes` attribute is provided, srcset includes only `1x` and `2x` descriptors based on the specified `width`.
+- **`device_sizes`** — Breakpoint widths for responsive (fluid) images.
+  When the component has a `sizes` attribute, all device and image sizes
+  are merged and included in the srcset.
+- **`image_sizes`** — Smaller widths for fixed-size images (icons,
+  thumbnails). When no `sizes` attribute is provided, srcset includes
+  only `1x` and `2x` descriptors based on the specified `width`.
 
 #### `formats`
 
-The list of output formats. A `<source>` element is generated for each format except the last one, which is used as the `<img>` fallback. The default `[avif, webp, jpg]` produces:
+The list of output formats. A `<source>` element is generated for each
+format except the last one, which is used as the `<img>` fallback. The
+default `[avif, webp, jpg]` produces:
 
 ```html
 <picture>
     <source type="image/avif" srcset="..." />
     <source type="image/webp" srcset="..." />
-    <img src="..." srcset="..." />  <!-- jpg fallback -->
+    <img src="..." srcset="..." />
+    <!-- jpg fallback -->
 </picture>
 ```
 
@@ -343,12 +372,12 @@ Supported formats: `avif`, `webp`, `jpg`, `jpeg`, `pjpg`, `png`, `gif`.
 
 Controls how images are resized within the target dimensions:
 
-| Fit | Description |
-|---|---|
+| Fit       | Description                                                          |
+| --------- | -------------------------------------------------------------------- |
 | `contain` | Scales down to fit within the box, preserving aspect ratio (default) |
-| `cover` | Scales to fill the box, cropping excess |
-| `crop` | Crops to exact dimensions |
-| `fill` | Stretches to fill the box exactly |
+| `cover`   | Scales to fill the box, cropping excess                              |
+| `crop`    | Crops to exact dimensions                                            |
+| `fill`    | Stretches to fill the box exactly                                    |
 
 #### `cache`
 
@@ -382,29 +411,32 @@ with a full srcset.
 
 #### Component Properties
 
-| Property | Type | Default | Description |
-|---|---|---|---|
-| `src` | `string` | — | Image path relative to the loader's base |
-| `width` | `int` | auto | Display width (auto-detected from source) |
-| `height` | `int` | auto | Display height (auto-detected from source) |
-| `sizes` | `string` | — | Responsive `sizes` attribute |
-| `sourceWidth` | `int` | auto | Explicit source width (skips detection) |
-| `sourceHeight` | `int` | auto | Explicit source height (skips detection) |
-| `loader` | `string` | — | Override default loader |
-| `transformer` | `string` | — | Override default transformer |
-| `quality` | `int` | 75 | Override quality (1–100) |
-| `fit` | `string` | contain | Fit mode: `contain`, `cover`, `crop`, `fill` |
-| `placeholder` | `string\|bool` | — | `true`/`false` to enable/disable, or a placeholder name |
-| `placeholderData` | `string` | — | Literal data URI, bypasses placeholder services |
-| `priority` | `bool` | false | Eager loading, `fetchpriority="high"`, no placeholder |
-| `loading` | `string` | lazy | `lazy` or `eager`. Auto-set when priority |
-| `fetchPriority` | `string` | — | `high`, `low`, `auto`. Auto-set when priority |
-| `unoptimized` | `bool` | false | Serve original image without transformation |
-| `context` | `array` | `[]` | Extra context for the loader (e.g. Vich) |
+| Property          | Type           | Default | Description                                             |
+| ----------------- | -------------- | ------- | ------------------------------------------------------- |
+| `src`             | `string`       | —       | Image path relative to the loader's base                |
+| `width`           | `int`          | auto    | Display width (auto-detected from source)               |
+| `height`          | `int`          | auto    | Display height (auto-detected from source)              |
+| `sizes`           | `string`       | —       | Responsive `sizes` attribute                            |
+| `sourceWidth`     | `int`          | auto    | Explicit source width (skips detection)                 |
+| `sourceHeight`    | `int`          | auto    | Explicit source height (skips detection)                |
+| `loader`          | `string`       | —       | Override default loader                                 |
+| `transformer`     | `string`       | —       | Override default transformer                            |
+| `quality`         | `int`          | 75      | Override quality (1–100)                                |
+| `fit`             | `string`       | contain | Fit mode: `contain`, `cover`, `crop`, `fill`            |
+| `placeholder`     | `string\|bool` | —       | `true`/`false` to enable/disable, or a placeholder name |
+| `placeholderData` | `string`       | —       | Literal data URI, bypasses placeholder services         |
+| `priority`        | `bool`         | false   | Eager loading, `fetchpriority="high"`, no placeholder   |
+| `loading`         | `string`       | lazy    | `lazy` or `eager`. Auto-set when priority               |
+| `fetchPriority`   | `string`       | —       | `high`, `low`, `auto`. Auto-set when priority           |
+| `unoptimized`     | `bool`         | false   | Serve original image without transformation             |
+| `context`         | `array`        | `[]`    | Extra context for the loader (e.g. Vich)                |
 
 #### Automatic Dimension Detection
 
-When `width` and `height` are not provided, PicassoBundle automatically detects them from the image stream. You can also provide `sourceWidth` and `sourceHeight` to skip detection entirely, which is useful for performance when you already know the image dimensions:
+When `width` and `height` are not provided, PicassoBundle automatically
+detects them from the image stream. You can also provide `sourceWidth`
+and `sourceHeight` to skip detection entirely, which is useful for
+performance when you already know the image dimensions:
 
 ```twig
 {# Auto-detected dimensions #}
@@ -479,18 +511,18 @@ All available parameters:
 ) }}
 ```
 
-| Parameter | Type | Description |
-|---|---|---|
-| `width` | `int` | Target width in pixels |
-| `height` | `int` | Target height in pixels |
-| `format` | `string` | Output format (`avif`, `webp`, `jpg`, etc.) |
-| `quality` | `int` | Output quality (1–100) |
-| `fit` | `string` | Fit mode (`contain`, `cover`, `crop`, `fill`) |
-| `blur` | `int` | Blur radius |
-| `dpr` | `int` | Device pixel ratio |
-| `loader` | `string` | Override default loader |
-| `transformer` | `string` | Override default transformer |
-| `context` | `array` | Extra context for the loader |
+| Parameter     | Type     | Description                                   |
+| ------------- | -------- | --------------------------------------------- |
+| `width`       | `int`    | Target width in pixels                        |
+| `height`      | `int`    | Target height in pixels                       |
+| `format`      | `string` | Output format (`avif`, `webp`, `jpg`, etc.)   |
+| `quality`     | `int`    | Output quality (1–100)                        |
+| `fit`         | `string` | Fit mode (`contain`, `cover`, `crop`, `fill`) |
+| `blur`        | `int`    | Blur radius                                   |
+| `dpr`         | `int`    | Device pixel ratio                            |
+| `loader`      | `string` | Override default loader                       |
+| `transformer` | `string` | Override default transformer                  |
+| `context`     | `array`  | Extra context for the loader                  |
 
 ### ImageHelper Service
 
@@ -534,9 +566,9 @@ picasso:
     placeholders:
         blur:
             type: transformer
-            size: 10       # tiny image width/height in px
-            blur: 5        # blur radius
-            quality: 30    # JPEG quality (1–100)
+            size: 10 # tiny image width/height in px
+            blur: 5 # blur radius
+            quality: 30 # JPEG quality (1–100)
 ```
 
 ### BlurHash Placeholder
@@ -555,10 +587,10 @@ picasso:
     placeholders:
         blurhash:
             type: blurhash
-            components_x: 4    # horizontal components (1–9, higher = more detail)
-            components_y: 3    # vertical components (1–9, higher = more detail)
-            size: 32           # decoded placeholder image size in px
-            driver: gd         # gd | imagick
+            components_x: 4 # horizontal components (1–9, higher = more detail)
+            components_y: 3 # vertical components (1–9, higher = more detail)
+            size: 32 # decoded placeholder image size in px
+            driver: gd # gd | imagick
 ```
 
 ### Custom Placeholder Service
@@ -626,7 +658,9 @@ placeholder for optimal Largest Contentful Paint (LCP) performance:
 />
 ```
 
-> **Note:** Placeholders are automatically disabled when `priority` is `true`, since priority images should load immediately without showing a placeholder first.
+> **Note:** Placeholders are automatically disabled when `priority` is
+> `true`, since priority images should load immediately without showing
+> a placeholder first.
 
 ## Loaders
 
@@ -662,7 +696,7 @@ picasso:
     loaders:
         my_s3:
             type: flysystem
-            storage: 'default.storage'  # your Flysystem service ID
+            storage: 'default.storage' # your Flysystem service ID
 ```
 
 ```twig
@@ -680,7 +714,7 @@ composer require vich/uploader-bundle
 ```yaml
 picasso:
     loaders:
-        vich: ~   # type inferred from key name
+        vich: ~ # type inferred from key name
 ```
 
 ```twig
@@ -706,7 +740,7 @@ composer require symfony/http-client
 ```yaml
 picasso:
     loaders:
-        url: ~   # type inferred from key name
+        url: ~ # type inferred from key name
 ```
 
 ```twig
@@ -759,10 +793,10 @@ picasso:
         glide:
             sign_key: '%env(PICASSO_SIGN_KEY)%'
             cache: '%kernel.project_dir%/var/glide-cache'
-            driver: gd              # gd | imagick
-            max_image_size: ~       # optional: max pixel count (width x height)
+            driver: gd # gd | imagick
+            max_image_size: ~ # optional: max pixel count (width x height)
             public_cache:
-                enabled: false      # serve from public dir for better performance
+                enabled: false # serve from public dir for better performance
 ```
 
 > **Important:** When using Glide, you must [import the bundle routes](#routes) so that the image controller can serve transformed images.
@@ -776,7 +810,7 @@ picasso:
     transformers:
         imgix:
             base_url: 'https://my-source.imgix.net'
-            sign_key: '%env(IMGIX_SIGN_KEY)%'  # optional
+            sign_key: '%env(IMGIX_SIGN_KEY)%' # optional
 ```
 
 ### Custom Transformer
@@ -813,7 +847,7 @@ picasso:
 
 The bundle registers a route for on-demand image transformation (used by Glide and other local transformers):
 
-```
+```text
 GET /image/{transformer}/{loader}/{path}
 ```
 
@@ -825,7 +859,9 @@ picasso:
     resource: '@PicassoBundle/config/routes.php'
 ```
 
-> **Note:** Routes are only required when using a local transformer like Glide. CDN-based transformers (Imgix) generate external URLs and do not need this route.
+> **Note:** Routes are only required when using a local transformer
+> like Glide. CDN-based transformers (Imgix) generate external URLs
+> and do not need this route.
 
 ## How It Works
 
@@ -838,6 +874,7 @@ When you use `<Picasso:Image>`, the component:
 5. **Renders** a `<picture>` element with `<source>` tags per format and a fallback `<img>`
 
 The generated HTML follows modern best practices:
+
 - `<source>` elements for modern formats (AVIF, WebP) with automatic MIME type detection
 - Full `srcset` with width descriptors for responsive loading
 - `sizes` attribute for accurate viewport-based selection
