@@ -13,14 +13,16 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Placeholder;
 
-use InvalidArgumentException;
-
 use function is_string;
 
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
+use Silarhi\PicassoBundle\Exception\TransformerNotFoundException;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
 
+/**
+ * @phpstan-import-type TransformerContext from \Silarhi\PicassoBundle\Transformer\ImageTransformerInterface
+ */
 final readonly class TransformerPlaceholder implements PlaceholderInterface
 {
     public function __construct(
@@ -34,7 +36,7 @@ final readonly class TransformerPlaceholder implements PlaceholderInterface
     public function generate(Image $image, ImageTransformation $transformation, array $context = []): string
     {
         if (!is_string($context['transformer'] ?? null)) {
-            throw new InvalidArgumentException('The "transformer" key is required in context for TransformerPlaceholder.');
+            throw new TransformerNotFoundException('The "transformer" key is required in context for TransformerPlaceholder.');
         }
 
         $transformer = $this->transformerRegistry->get($context['transformer']);

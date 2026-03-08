@@ -103,6 +103,8 @@ All bundle exceptions implement `PicassoExceptionInterface` (extends `Throwable`
 | `ImageNotFoundException`       | `RuntimeException`         | Source image could not be found or signature is invalid    |
 | `EncryptionException`          | `RuntimeException`         | URL encryption/decryption failure                         |
 | `InvalidMetadataException`     | `LogicException`           | Image metadata is malformed or invalid                    |
+| `InvalidConfigurationException`| `LogicException`           | Invalid bundle configuration (missing type, missing package) |
+| `ImageProcessingException`     | `RuntimeException`         | Image processing failure (stream read errors, encoding)   |
 
 ## Coding Conventions
 
@@ -129,6 +131,7 @@ The project uses PHPStan custom type aliases to avoid duplicating complex type a
 |-----------------------|-------------------------------------------------------------------|-------------------------------|-----------------------|
 | `ImageGuessedMetadata` | `array{width: int\|null, height: int\|null, mimeType: string\|null}` | `MetadataGuesserInterface`    | `MetadataGuesser`     |
 | `ImageDimensions`      | `array{0: int, 1: int}`                                          | `VichMappingHelperInterface`  | `VichMappingHelper`   |
+| `TransformerContext`   | `array<string, mixed>`                                            | `ImageTransformerInterface`   | `GlideTransformer`, `ImgixTransformer`, `PlaceholderInterface`, `TransformerPlaceholder`, `BlurHashPlaceholder`, `SrcsetGenerator` |
 
 **Guidelines for adding new custom types:**
 - Use `@phpstan-type` on the canonical interface when the type is part of a contract (interface + implementations).

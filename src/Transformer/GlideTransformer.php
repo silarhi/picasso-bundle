@@ -33,6 +33,9 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
+/**
+ * @phpstan-import-type TransformerContext from ImageTransformerInterface
+ */
 final readonly class GlideTransformer implements LocalTransformerInterface
 {
     public function __construct(
@@ -92,7 +95,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
         try {
             SignatureFactory::create($this->signKey)->validateRequest($path, $params);
         } catch (SignatureException $e) {
-            throw new ImageNotFoundException('Invalid image signature.', previous: $e);
+            throw new ImageNotFoundException('Invalid image signature.', $e->getCode(), previous: $e);
         }
 
         if ($this->isPublicCacheEnabled()) {
@@ -123,7 +126,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
                 unset($params['_metadata']);
                 $metadata = json_decode($this->urlEncryption->decrypt($encryptedMetadata), true, flags: \JSON_THROW_ON_ERROR);
             } catch (EncryptionException|JsonException $e) {
-                throw new ImageNotFoundException('Invalid metadata parameter.', previous: $e);
+                throw new ImageNotFoundException('Invalid metadata parameter.', $e->getCode(), previous: $e);
             }
         } else {
             $metadata = [];
@@ -157,7 +160,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
 
             return $response;
         } catch (FileNotFoundException|InvalidArgumentException $e) {
-            throw new ImageNotFoundException('Image not found.', previous: $e);
+            throw new ImageNotFoundException('Image not found.', $e->getCode(), previous: $e);
         }
     }
 

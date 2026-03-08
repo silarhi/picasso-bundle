@@ -15,6 +15,7 @@ namespace Silarhi\PicassoBundle\Twig\Component;
 
 use function is_string;
 
+use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Dto\ImageSource;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
@@ -23,6 +24,7 @@ use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
 use Silarhi\PicassoBundle\Service\PlaceholderRegistry;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
+use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 use Symfony\Component\Stopwatch\Stopwatch;
 use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
 use Symfony\UX\TwigComponent\Attribute\PostMount;
@@ -134,7 +136,31 @@ class ImageComponent
         $needsMetadata = null === $this->sourceWidth || null === $this->sourceHeight;
         $image = $this->pipeline->load($reference, $this->loader, $needsMetadata);
 
-        // Resolve dimensions: explicit props > loader metadata > stream detection > display dims
+        $sourceWidth = $this->resolveDimensions($image, $loaderName);
+
+        // URL-based images bypass transformation (no local serving)
+        if (null !== $image->url) {
+            $this->fallbackSrc = $image->url;
+
+            return;
+        }
+
+        // Resolve transformer
+        $transformerName = $this->pipeline->resolveTransformerName($this->transformer);
+        $imageTransformer = $this->transformerRegistry->get($transformerName);
+        $transformerContext = ['loader' => $loaderName, 'transformer' => $transformerName];
+
+        $this->generatePlaceholder($image, $transformerContext);
+        $this->generateSources($imageTransformer, $image, $transformerContext, $sourceWidth);
+    }
+
+    /**
+     * Resolve source and display dimensions from explicit props, loader metadata, or stream detection.
+     *
+     * @return int|null The resolved source width (used to prevent upscaling in srcset)
+     */
+    private function resolveDimensions(Image $image, string $loaderName): ?int
+    {
         $w = $this->sourceWidth ?? $image->width;
         $h = $this->sourceHeight ?? $image->height;
 
@@ -162,45 +188,47 @@ class ImageComponent
             $this->height = $h;
         }
 
-        // URL-based images bypass transformation (no local serving)
-        if (null !== $image->url) {
-            $this->fallbackSrc = $image->url;
+        return $w;
+    }
+
+    /**
+     * @param array<string, string> $transformerContext
+     */
+    private function generatePlaceholder(Image $image, array $transformerContext): void
+    {
+        if ($this->priority) {
+            return;
+        }
+
+        if (null !== $this->placeholderData) {
+            $this->placeholderUri = $this->placeholderData;
 
             return;
         }
 
-        // Resolve transformer
-        $transformerName = $this->pipeline->resolveTransformerName($this->transformer);
-        $imageTransformer = $this->transformerRegistry->get($transformerName);
-        $transformerContext = ['loader' => $loaderName, 'transformer' => $transformerName];
-
-        // Resolve fit from prop or config default
-        $fit = $this->fit ?? $this->defaultFit;
-
-        // Generate placeholder (priority disables it)
-        if (!$this->priority) {
-            if (null !== $this->placeholderData) {
-                $this->placeholderUri = $this->placeholderData;
-            } else {
-                $placeholderName = $this->resolvePlaceholderName();
-                if (null !== $placeholderName
-                    && $this->placeholderRegistry->has($placeholderName)
-                    && null !== $this->width && null !== $this->height
-                ) {
-                    $this->placeholderUri = $this->placeholderRegistry
-                        ->get($placeholderName)
-                        ->generate($image, new ImageTransformation(
-                            width: $this->width,
-                            height: $this->height,
-                            quality: $this->quality ?? $this->defaultQuality,
-                            fit: $this->fit ?? $this->defaultFit,
-                        ), $transformerContext);
-                }
-            }
+        $placeholderName = $this->resolvePlaceholderName();
+        if (null !== $placeholderName
+            && $this->placeholderRegistry->has($placeholderName)
+            && null !== $this->width && null !== $this->height
+        ) {
+            $this->placeholderUri = $this->placeholderRegistry
+                ->get($placeholderName)
+                ->generate($image, new ImageTransformation(
+                    width: $this->width,
+                    height: $this->height,
+                    quality: $this->quality ?? $this->defaultQuality,
+                    fit: $this->fit ?? $this->defaultFit,
+                ), $transformerContext);
         }
+    }
 
-        // Generate sources for each format
+    /**
+     * @param array<string, string> $transformerContext
+     */
+    private function generateSources(ImageTransformerInterface $imageTransformer, Image $image, array $transformerContext, ?int $sourceWidth): void
+    {
         $quality = $this->quality ?? $this->defaultQuality;
+        $fit = $this->fit ?? $this->defaultFit;
         $formats = $this->formats;
         $fallbackFormat = end($formats) ?: 'jpg';
 
@@ -215,7 +243,7 @@ class ImageComponent
                 quality: $quality,
                 fit: $fit,
                 context: $transformerContext,
-                sourceWidth: $w,
+                sourceWidth: $sourceWidth,
             );
 
             $srcsetString = $this->srcsetGenerator->buildSrcsetString($entries);

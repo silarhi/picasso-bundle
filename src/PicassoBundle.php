@@ -20,7 +20,6 @@ use function in_array;
 use function is_bool;
 use function is_string;
 
-use LogicException;
 use Silarhi\PicassoBundle\Attribute\AsImageLoader;
 use Silarhi\PicassoBundle\Attribute\AsImageTransformer;
 use Silarhi\PicassoBundle\Attribute\AsPlaceholder;
@@ -297,7 +296,7 @@ final class PicassoBundle extends AbstractBundle
             $type = $loaderConfig['type'] ?? (in_array($name, $knownTypes, true) ? $name : null);
 
             if (null === $type) {
-                throw new LogicException(sprintf('Loader "%s" must specify a "type" (filesystem, flysystem, or vich).', $name));
+                throw new Exception\InvalidConfigurationException(sprintf('Loader "%s" must specify a "type" (filesystem, flysystem, or vich).', $name));
             }
 
             switch ($type) {
@@ -349,13 +348,7 @@ final class PicassoBundle extends AbstractBundle
         }
 
         // Alias default loader (auto-detect when exactly one is enabled)
-        $defaultLoader = $config['default_loader'];
-        if (null === $defaultLoader) {
-            $enabledLoaders = array_keys(array_filter($config['loaders'], static fn (array $v): bool => $v['enabled']));
-            if (1 === count($enabledLoaders)) {
-                $defaultLoader = $enabledLoaders[0];
-            }
-        }
+        $defaultLoader = $this->autoDetectDefault($config['default_loader'], $config['loaders']);
 
         if (null !== $defaultLoader) {
             $services->alias('picasso.default_loader', 'picasso.loader.' . $defaultLoader);
@@ -389,7 +382,7 @@ final class PicassoBundle extends AbstractBundle
             $type = $transformerConfig['type'] ?? (in_array($name, $knownTransformerTypes, true) ? $name : null);
 
             if (null === $type) {
-                throw new LogicException(sprintf('Transformer "%s" must specify a "type" (glide, imgix, or service).', $name));
+                throw new Exception\InvalidConfigurationException(sprintf('Transformer "%s" must specify a "type" (glide, imgix, or service).', $name));
             }
 
             switch ($type) {
@@ -435,13 +428,7 @@ final class PicassoBundle extends AbstractBundle
         }
 
         // Alias default transformer (auto-detect when exactly one is enabled)
-        $defaultTransformer = $config['default_transformer'];
-        if (null === $defaultTransformer) {
-            $enabledTransformers = array_keys(array_filter($config['transformers'], static fn (array $v): bool => $v['enabled']));
-            if (1 === count($enabledTransformers)) {
-                $defaultTransformer = $enabledTransformers[0];
-            }
-        }
+        $defaultTransformer = $this->autoDetectDefault($config['default_transformer'], $config['transformers']);
 
         if (null !== $defaultTransformer) {
             $services->alias('picasso.default_transformer', 'picasso.transformer.' . $defaultTransformer);
@@ -460,7 +447,7 @@ final class PicassoBundle extends AbstractBundle
             $type = $placeholderConfig['type'] ?? (in_array($name, $knownPlaceholderTypes, true) ? $name : null);
 
             if (null === $type) {
-                throw new LogicException(sprintf('Placeholder "%s" must specify a "type" (transformer, blurhash, or service).', $name));
+                throw new Exception\InvalidConfigurationException(sprintf('Placeholder "%s" must specify a "type" (transformer, blurhash, or service).', $name));
             }
 
             switch ($type) {
@@ -509,13 +496,7 @@ final class PicassoBundle extends AbstractBundle
         }
 
         // Alias default placeholder (auto-detect when exactly one is enabled)
-        $defaultPlaceholder = $config['default_placeholder'];
-        if (null === $defaultPlaceholder) {
-            $enabledPlaceholders = array_keys(array_filter($config['placeholders'], static fn (array $v): bool => $v['enabled']));
-            if (1 === count($enabledPlaceholders)) {
-                $defaultPlaceholder = $enabledPlaceholders[0];
-            }
-        }
+        $defaultPlaceholder = $this->autoDetectDefault($config['default_placeholder'], $config['placeholders']);
 
         if (null !== $defaultPlaceholder) {
             $services->alias('picasso.default_placeholder', 'picasso.placeholder.' . $defaultPlaceholder);
@@ -602,5 +583,21 @@ final class PicassoBundle extends AbstractBundle
                 ],
             ]);
         }
+    }
+
+    /**
+     * Auto-detect a default name when only one item is enabled.
+     *
+     * @param array<string, array{enabled: bool, ...}> $items
+     */
+    private function autoDetectDefault(?string $explicit, array $items): ?string
+    {
+        if (null !== $explicit) {
+            return $explicit;
+        }
+
+        $enabled = array_keys(array_filter($items, static fn (array $v): bool => $v['enabled']));
+
+        return 1 === count($enabled) ? $enabled[0] : null;
     }
 }

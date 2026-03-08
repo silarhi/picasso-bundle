@@ -18,6 +18,9 @@ use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Dto\SrcsetEntry;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 
+/**
+ * @phpstan-import-type TransformerContext from ImageTransformerInterface
+ */
 class SrcsetGenerator
 {
     /**
@@ -38,17 +41,18 @@ class SrcsetGenerator
      */
     public function getWidths(?string $sizes, ?int $width): array
     {
-        if (null !== $sizes) {
-            $widths = array_merge($this->deviceSizes, $this->imageSizes);
-            sort($widths);
-
-            return array_values(array_unique($widths));
-        }
-
-        if (null !== $width) {
+        if (null !== $width && null === $sizes) {
             return [$width, $width * 2];
         }
 
+        return $this->getAllWidths();
+    }
+
+    /**
+     * @return int[]
+     */
+    private function getAllWidths(): array
+    {
         $widths = array_merge($this->deviceSizes, $this->imageSizes);
         sort($widths);
 
@@ -58,7 +62,7 @@ class SrcsetGenerator
     /**
      * Generate srcset entries for a given image and format.
      *
-     * @param array<string, mixed> $context
+     * @param TransformerContext $context
      *
      * @return SrcsetEntry[]
      */
@@ -126,7 +130,7 @@ class SrcsetGenerator
     /**
      * Get the fallback src URL.
      *
-     * @param array<string, mixed> $context
+     * @param TransformerContext $context
      */
     public function getFallbackUrl(
         ImageTransformerInterface $transformer,

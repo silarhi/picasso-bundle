@@ -15,9 +15,9 @@ namespace Silarhi\PicassoBundle\Tests\Placeholder;
 
 use Imagine\Gd\Imagine;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
+use Silarhi\PicassoBundle\Exception\ImageProcessingException;
 use Silarhi\PicassoBundle\Placeholder\BlurHashPlaceholder;
 
 use function strlen;
@@ -75,7 +75,7 @@ class BlurHashPlaceholderTest extends TestCase
         $placeholder = new BlurHashPlaceholder($this->imagine, componentsX: 4, componentsY: 3, size: 32);
         $image = new Image(path: 'photo.jpg');
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(ImageProcessingException::class);
         $this->expectExceptionMessage('image stream is not available');
         $placeholder->generate($image, new ImageTransformation(width: 100, height: 100));
     }
@@ -147,7 +147,7 @@ class BlurHashPlaceholderTest extends TestCase
 
         // Without path, cache is not used, so null stream throws
         $noCacheImage = new Image();
-        $this->expectException(RuntimeException::class);
+        $this->expectException(ImageProcessingException::class);
         $placeholder->generate($noCacheImage, $transformation);
     }
 
