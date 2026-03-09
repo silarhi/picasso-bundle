@@ -23,18 +23,19 @@ final readonly class UrlEncryption
     private const IV_LENGTH = 12;
     private const TAG_LENGTH = 16;
 
-    public function __construct(
-        private string $key,
-    ) {
+    private string $derivedKey;
+
+    public function __construct(string $key)
+    {
+        $this->derivedKey = hash('sha256', $key, true);
     }
 
     public function encrypt(string $plaintext): string
     {
-        $derivedKey = hash('sha256', $this->key, true);
         $iv = random_bytes(self::IV_LENGTH);
         $tag = '';
 
-        $ciphertext = openssl_encrypt($plaintext, self::CIPHER, $derivedKey, \OPENSSL_RAW_DATA, $iv, $tag, '', self::TAG_LENGTH);
+        $ciphertext = openssl_encrypt($plaintext, self::CIPHER, $this->derivedKey, \OPENSSL_RAW_DATA, $iv, $tag, '', self::TAG_LENGTH);
 
         if (false === $ciphertext) {
             throw new EncryptionException('Encryption failed.');
@@ -45,7 +46,6 @@ final readonly class UrlEncryption
 
     public function decrypt(string $encoded): string
     {
-        $derivedKey = hash('sha256', $this->key, true);
         $data = base64_decode(strtr($encoded, '-_', '+/'), true);
 
         if (false === $data || strlen($data) < self::IV_LENGTH + self::TAG_LENGTH) {
@@ -56,7 +56,7 @@ final readonly class UrlEncryption
         $tag = substr($data, self::IV_LENGTH, self::TAG_LENGTH);
         $ciphertext = substr($data, self::IV_LENGTH + self::TAG_LENGTH);
 
-        $plaintext = openssl_decrypt($ciphertext, self::CIPHER, $derivedKey, \OPENSSL_RAW_DATA, $iv, $tag);
+        $plaintext = openssl_decrypt($ciphertext, self::CIPHER, $this->derivedKey, \OPENSSL_RAW_DATA, $iv, $tag);
 
         if (false === $plaintext) {
             throw new EncryptionException('Decryption failed: invalid key or tampered data.');
