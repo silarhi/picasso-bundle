@@ -54,6 +54,7 @@ use function sprintf;
 
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\DependencyInjection\ChildDefinition;
+use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 
@@ -74,7 +75,11 @@ final class PicassoBundle extends AbstractBundle
         $container->registerAttributeForAutoconfiguration(
             AsImageLoader::class,
             static function (ChildDefinition $definition, AsImageLoader $attribute): void {
-                $definition->addTag('picasso.loader', ['key' => $attribute->name]);
+                $tag = ['key' => $attribute->name];
+                if (null !== $attribute->defaultPlaceholder) {
+                    $tag['default_placeholder'] = $attribute->defaultPlaceholder;
+                }
+                $definition->addTag('picasso.loader', $tag);
             },
         );
 
@@ -91,6 +96,31 @@ final class PicassoBundle extends AbstractBundle
                 $definition->addTag('picasso.placeholder', ['key' => $attribute->name]);
             },
         );
+
+        // Merge per-loader default_placeholder from attribute-tagged loaders into LoaderRegistry
+        $container->addCompilerPass(new class implements CompilerPassInterface {
+            public function process(ContainerBuilder $container): void
+            {
+                if (!$container->hasDefinition('picasso.loader_registry')) {
+                    return;
+                }
+
+                $definition = $container->getDefinition('picasso.loader_registry');
+                /** @var array<string, string> $placeholders */
+                $placeholders = $definition->getArgument(1);
+
+                foreach ($container->findTaggedServiceIds('picasso.loader') as $tags) {
+                    /** @var array{key?: string, default_placeholder?: string} $tag */
+                    foreach ($tags as $tag) {
+                        if (isset($tag['key'], $tag['default_placeholder'])) {
+                            $placeholders[$tag['key']] ??= $tag['default_placeholder'];
+                        }
+                    }
+                }
+
+                $definition->replaceArgument(1, $placeholders);
+            }
+        });
     }
 
     public function configure(DefinitionConfigurator $definition): void
@@ -228,6 +258,10 @@ final class PicassoBundle extends AbstractBundle
                                 ->defaultNull()
                                 ->info('PSR-17 request factory service ID for url loaders.')
                             ->end()
+                            ->scalarNode('default_placeholder')
+                                ->defaultNull()
+                                ->info('Default placeholder name for this loader. Overrides the global default_placeholder.')
+                            ->end()
                         ->end()
                         ->validate()
                             ->ifTrue(static fn (array $v): bool => 'flysystem' === $v['type'] && (null === $v['storage'] || '' === $v['storage']))
@@ -288,7 +322,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_quality: int|null,
          *     default_fit: string,
          *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int|null, quality: int|null, fit: string|null, format: string|null, components_x: int, components_y: int, driver: string, service: string|null}>,
-         *     loaders: array<string, array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null, request_factory: string|null}>,
+         *     loaders: array<string, array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null}>,
          *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, public_cache: array{enabled: bool}}>
          * } $config
          */
@@ -312,6 +346,8 @@ final class PicassoBundle extends AbstractBundle
 
         $knownTypes = ['filesystem', 'flysystem', 'vich', 'url'];
         $vichHelperRegistered = false;
+        /** @var array<string, string> $loaderPlaceholders */
+        $loaderPlaceholders = [];
 
         foreach ($config['loaders'] as $name => $loaderConfig) {
             if (!$loaderConfig['enabled']) {
@@ -324,11 +360,17 @@ final class PicassoBundle extends AbstractBundle
                 throw new Exception\InvalidConfigurationException(sprintf('Loader "%s" must specify a "type" (filesystem, flysystem, or vich).', $name));
             }
 
+            $tag = ['key' => $name];
+            if (null !== $loaderConfig['default_placeholder']) {
+                $tag['default_placeholder'] = $loaderConfig['default_placeholder'];
+                $loaderPlaceholders[$name] = $loaderConfig['default_placeholder'];
+            }
+
             switch ($type) {
                 case 'filesystem':
                     $services->set('picasso.loader.' . $name, FilesystemLoader::class)
                         ->args([$loaderConfig['paths']])
-                        ->tag('picasso.loader', ['key' => $name]);
+                        ->tag('picasso.loader', $tag);
                     break;
 
                 case 'flysystem':
@@ -337,7 +379,7 @@ final class PicassoBundle extends AbstractBundle
                         ->args([
                             service($loaderConfig['storage']),
                         ])
-                        ->tag('picasso.loader', ['key' => $name]);
+                        ->tag('picasso.loader', $tag);
                     break;
 
                 case 'url':
@@ -347,7 +389,7 @@ final class PicassoBundle extends AbstractBundle
                             service($httpClientService),
                             service($loaderConfig['request_factory'] ?? $httpClientService),
                         ])
-                        ->tag('picasso.loader', ['key' => $name]);
+                        ->tag('picasso.loader', $tag);
                     break;
 
                 case 'vich':
@@ -366,7 +408,7 @@ final class PicassoBundle extends AbstractBundle
                                 service('.picasso.vich_mapping_helper'),
                                 service('.picasso.flysystem_registry'),
                             ])
-                            ->tag('picasso.loader', ['key' => $name]);
+                            ->tag('picasso.loader', $tag);
                     }
                     break;
             }
@@ -383,7 +425,7 @@ final class PicassoBundle extends AbstractBundle
         // --- Registries ---
 
         $services->set('picasso.loader_registry', LoaderRegistry::class)
-            ->args([tagged_locator('picasso.loader', 'key')]);
+            ->args([tagged_locator('picasso.loader', 'key'), $loaderPlaceholders]);
         $services->alias(LoaderRegistry::class, 'picasso.loader_registry');
 
         $services->set('picasso.transformer_registry', TransformerRegistry::class)
@@ -593,6 +635,7 @@ final class PicassoBundle extends AbstractBundle
                 service('picasso.transformer_registry'),
                 service('picasso.metadata_guesser'),
                 service('picasso.placeholder_registry'),
+                service('picasso.loader_registry'),
                 $config['formats'],
                 $config['default_quality'],
                 $config['default_fit'],

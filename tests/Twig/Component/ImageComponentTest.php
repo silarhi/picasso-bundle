@@ -22,6 +22,7 @@ use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Dto\SrcsetEntry;
 use Silarhi\PicassoBundle\Placeholder\PlaceholderInterface;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
+use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
 use Silarhi\PicassoBundle\Service\PlaceholderRegistry;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
@@ -37,6 +38,7 @@ class ImageComponentTest extends TestCase
     private MockObject&ImageTransformerInterface $glideTransformer;
     private MockObject&MetadataGuesserInterface $metadataGuesser;
     private PlaceholderRegistry $placeholderRegistry;
+    private LoaderRegistry $loaderRegistry;
     private MockObject&PlaceholderInterface $mockPlaceholder;
 
     protected function setUp(): void
@@ -56,12 +58,16 @@ class ImageComponentTest extends TestCase
         $placeholderLocator->method('get')->with('blur')->willReturn($this->mockPlaceholder);
         $this->placeholderRegistry = new PlaceholderRegistry($placeholderLocator);
 
+        $loaderLocator = $this->createMock(ContainerInterface::class);
+        $loaderLocator->method('has')->willReturn(false);
+        $this->loaderRegistry = new LoaderRegistry($loaderLocator);
+
         $this->pipeline = $this->createMock(ImagePipeline::class);
         $this->pipeline->method('resolveLoaderName')->willReturn('filesystem');
         $this->pipeline->method('resolveTransformerName')->willReturn('glide');
     }
 
-    private function createComponent(?string $defaultPlaceholder = null): ImageComponent
+    private function createComponent(?string $defaultPlaceholder = null, ?LoaderRegistry $loaderRegistry = null): ImageComponent
     {
         return new ImageComponent(
             srcsetGenerator: $this->srcsetGenerator,
@@ -69,6 +75,7 @@ class ImageComponentTest extends TestCase
             transformerRegistry: $this->transformerRegistry,
             metadataGuesser: $this->metadataGuesser,
             placeholderRegistry: $this->placeholderRegistry,
+            loaderRegistry: $loaderRegistry ?? $this->loaderRegistry,
             formats: ['avif', 'webp', 'jpg'],
             defaultQuality: 75,
             defaultFit: 'contain',
@@ -233,6 +240,56 @@ class ImageComponentTest extends TestCase
         self::assertNull($component->placeholderUri);
     }
 
+    public function testLoaderDefaultPlaceholderOverridesGlobalDefault(): void
+    {
+        $stream = fopen('php://memory', 'r+');
+        self::assertNotFalse($stream);
+        $this->pipeline->method('load')
+            ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
+        $this->metadataGuesser->method('guess')
+            ->willReturn(['width' => 1920, 'height' => 1080, 'mimeType' => 'image/jpeg']);
+        $this->configureSrcsetGenerator();
+
+        $this->mockPlaceholder->expects(self::once())
+            ->method('generate')
+            ->willReturn('data:image/png;base64,placeholder');
+
+        // Global default is null, but the loader 'filesystem' has default_placeholder 'blur'
+        $loaderLocator = $this->createMock(ContainerInterface::class);
+        $loaderLocator->method('has')->willReturn(false);
+        $loaderRegistry = new LoaderRegistry($loaderLocator, ['filesystem' => 'blur']);
+
+        $component = $this->createComponent(defaultPlaceholder: null, loaderRegistry: $loaderRegistry);
+        $component->src = 'photo.jpg';
+        $component->sizes = '100vw';
+        $component->computeImageData();
+
+        self::assertSame('data:image/png;base64,placeholder', $component->placeholderUri);
+    }
+
+    public function testGlobalDefaultPlaceholderUsedWhenLoaderHasNone(): void
+    {
+        $stream = fopen('php://memory', 'r+');
+        self::assertNotFalse($stream);
+        $this->pipeline->method('load')
+            ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
+        $this->metadataGuesser->method('guess')
+            ->willReturn(['width' => 1920, 'height' => 1080, 'mimeType' => 'image/jpeg']);
+        $this->configureSrcsetGenerator();
+
+        $this->mockPlaceholder->expects(self::once())
+            ->method('generate')
+            ->willReturn('data:image/png;base64,global');
+
+        // Loader has no default_placeholder, falls through to global 'blur'
+        $component = $this->createComponent(defaultPlaceholder: 'blur');
+        $component->src = 'photo.jpg';
+        $component->sizes = '100vw';
+        $component->computeImageData();
+
+        self::assertSame('data:image/png;base64,global', $component->placeholderUri);
+    }
+
     public function testComputeImageDataGeneratesSourcesAndFallback(): void
     {
         $this->pipeline->method('load')
@@ -292,6 +349,7 @@ class ImageComponentTest extends TestCase
             transformerRegistry: $this->transformerRegistry,
             metadataGuesser: $metadataGuesser,
             placeholderRegistry: $this->placeholderRegistry,
+            loaderRegistry: $this->loaderRegistry,
             formats: ['avif', 'webp', 'jpg'],
             defaultQuality: 75,
             defaultFit: 'contain',
@@ -453,6 +511,7 @@ class ImageComponentTest extends TestCase
             transformerRegistry: $this->transformerRegistry,
             metadataGuesser: $this->metadataGuesser,
             placeholderRegistry: $this->placeholderRegistry,
+            loaderRegistry: $this->loaderRegistry,
             formats: ['jpg'],
             defaultQuality: 75,
             defaultFit: 'cover',
@@ -543,6 +602,7 @@ class ImageComponentTest extends TestCase
             transformerRegistry: $this->transformerRegistry,
             metadataGuesser: $this->metadataGuesser,
             placeholderRegistry: $this->placeholderRegistry,
+            loaderRegistry: $this->loaderRegistry,
             formats: ['gif', 'tiff', 'bmp'],
             defaultQuality: 75,
             defaultFit: 'contain',

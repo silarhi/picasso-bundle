@@ -23,8 +23,12 @@ use function sprintf;
 
 final readonly class LoaderRegistry
 {
+    /**
+     * @param array<string, string> $defaultPlaceholders Loader name → default placeholder name
+     */
     public function __construct(
         private ContainerInterface $loaders,
+        private array $defaultPlaceholders = [],
     ) {
     }
 
@@ -43,5 +47,10 @@ final readonly class LoaderRegistry
     public function has(string $name): bool
     {
         return $this->loaders->has($name);
+    }
+
+    public function getDefaultPlaceholder(string $loaderName): ?string
+    {
+        return $this->defaultPlaceholders[$loaderName] ?? null;
     }
 }

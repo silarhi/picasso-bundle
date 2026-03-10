@@ -24,6 +24,7 @@ use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
 use Silarhi\PicassoBundle\Loader\FlysystemLoader;
 use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
 use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
+use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\PicassoBundle;
 use Silarhi\PicassoBundle\Placeholder\BlurHashPlaceholder;
 use Silarhi\PicassoBundle\Placeholder\PlaceholderInterface;
@@ -537,6 +538,54 @@ class BundleWiringTest extends TestCase
 
         self::assertTrue($container->has(PlaceholderInterface::class));
         self::assertInstanceOf(TransformerPlaceholder::class, $container->get(PlaceholderInterface::class));
+    }
+
+    // --- Per-loader default_placeholder ---
+
+    public function testLoaderDefaultPlaceholderIsAvailableInRegistry(): void
+    {
+        $container = $this->bootKernel([
+            'loaders' => [
+                'filesystem' => [
+                    'paths' => [dirname(__DIR__) . '/Fixtures'],
+                    'default_placeholder' => 'blur',
+                ],
+            ],
+            'transformers' => [
+                'glide' => [
+                    'sign_key' => 'test',
+                ],
+            ],
+            'placeholders' => [
+                'blur' => [
+                    'type' => 'transformer',
+                ],
+            ],
+        ]);
+
+        $registry = $container->get('picasso.loader_registry');
+        self::assertInstanceOf(LoaderRegistry::class, $registry);
+        self::assertSame('blur', $registry->getDefaultPlaceholder('filesystem'));
+    }
+
+    public function testLoaderWithoutDefaultPlaceholderReturnsNull(): void
+    {
+        $container = $this->bootKernel([
+            'loaders' => [
+                'filesystem' => [
+                    'paths' => [dirname(__DIR__) . '/Fixtures'],
+                ],
+            ],
+            'transformers' => [
+                'glide' => [
+                    'sign_key' => 'test',
+                ],
+            ],
+        ]);
+
+        $registry = $container->get('picasso.loader_registry');
+        self::assertInstanceOf(LoaderRegistry::class, $registry);
+        self::assertNull($registry->getDefaultPlaceholder('filesystem'));
     }
 
     // --- Invalid default references ---

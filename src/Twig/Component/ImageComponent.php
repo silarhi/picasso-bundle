@@ -20,6 +20,7 @@ use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Dto\ImageSource;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
+use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
 use Silarhi\PicassoBundle\Service\PlaceholderRegistry;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
@@ -110,6 +111,7 @@ class ImageComponent
         private readonly TransformerRegistry $transformerRegistry,
         private readonly MetadataGuesserInterface $metadataGuesser,
         private readonly PlaceholderRegistry $placeholderRegistry,
+        private readonly LoaderRegistry $loaderRegistry,
         private readonly array $formats,
         private readonly ?int $defaultQuality,
         private readonly string $defaultFit,
@@ -143,7 +145,7 @@ class ImageComponent
         $imageTransformer = $this->transformerRegistry->get($transformerName);
         $transformerContext = ['loader' => $loaderName, 'transformer' => $transformerName];
 
-        $this->generatePlaceholder($image, $transformerContext);
+        $this->generatePlaceholder($image, $loaderName, $transformerContext);
         $this->generateSources($imageTransformer, $image, $transformerContext, $sourceWidth);
     }
 
@@ -187,7 +189,7 @@ class ImageComponent
     /**
      * @param array<string, string> $transformerContext
      */
-    private function generatePlaceholder(Image $image, array $transformerContext): void
+    private function generatePlaceholder(Image $image, string $loaderName, array $transformerContext): void
     {
         if ($this->priority) {
             return;
@@ -199,7 +201,7 @@ class ImageComponent
             return;
         }
 
-        $placeholderName = $this->resolvePlaceholderName();
+        $placeholderName = $this->resolvePlaceholderName($loaderName);
         if (null !== $placeholderName) {
             $this->placeholderUri = $this->placeholderRegistry
                 ->get($placeholderName)
@@ -259,7 +261,7 @@ class ImageComponent
         }
     }
 
-    private function resolvePlaceholderName(): ?string
+    private function resolvePlaceholderName(string $loaderName): ?string
     {
         if (false === $this->placeholder) {
             return null;
@@ -269,8 +271,8 @@ class ImageComponent
             return $this->placeholder;
         }
 
-        // placeholder === true or null: use default
-        return $this->defaultPlaceholder;
+        // placeholder === true or null: use loader default, then global default
+        return $this->loaderRegistry->getDefaultPlaceholder($loaderName) ?? $this->defaultPlaceholder;
     }
 
     private function getMimeType(string $format): string
