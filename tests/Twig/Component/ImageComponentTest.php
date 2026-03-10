@@ -151,7 +151,7 @@ class ImageComponentTest extends TestCase
             ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
         $this->metadataGuesser->expects(self::once())
             ->method('guess')
-            ->with($stream)
+            ->with(self::isInstanceOf(\Closure::class))
             ->willReturn(['width' => 1024, 'height' => 768, 'mimeType' => 'image/jpeg']);
         $this->configureSrcsetGenerator();
 
@@ -515,20 +515,6 @@ class ImageComponentTest extends TestCase
 
         self::assertSame('lazy', $component->loading);
         self::assertNull($component->fetchPriority);
-    }
-
-    public function testUrlBasedImageBypassesTransformation(): void
-    {
-        $this->pipeline->method('load')
-            ->willReturn(new Image(path: 'photo.jpg', url: 'https://cdn.example.com/photo.jpg'));
-
-        $component = $this->createComponent();
-        $component->src = 'photo.jpg';
-        $component->sizes = '100vw';
-        $component->computeImageData();
-
-        self::assertSame('https://cdn.example.com/photo.jpg', $component->fallbackSrc);
-        self::assertSame([], $component->sources);
     }
 
     public function testGetMimeTypeForGifAndUnknownFormats(): void

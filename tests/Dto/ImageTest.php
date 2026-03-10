@@ -24,7 +24,6 @@ class ImageTest extends TestCase
         $image = new Image();
 
         self::assertNull($image->path);
-        self::assertNull($image->url);
         self::assertNull($image->stream);
         self::assertNull($image->width);
         self::assertNull($image->height);
@@ -39,14 +38,6 @@ class ImageTest extends TestCase
         self::assertSame('uploads/photo.jpg', $image->path);
         self::assertSame(1920, $image->width);
         self::assertSame(1080, $image->height);
-    }
-
-    public function testWithUrl(): void
-    {
-        $image = new Image(url: 'https://cdn.example.com/photo.jpg');
-
-        self::assertSame('https://cdn.example.com/photo.jpg', $image->url);
-        self::assertNull($image->path);
     }
 
     public function testWithMimeType(): void

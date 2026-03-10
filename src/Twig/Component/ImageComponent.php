@@ -138,13 +138,6 @@ class ImageComponent
 
         $sourceWidth = $this->resolveDimensions($image, $loaderName);
 
-        // URL-based images bypass transformation (no local serving)
-        if (null !== $image->url) {
-            $this->fallbackSrc = $image->url;
-
-            return;
-        }
-
         // Resolve transformer
         $transformerName = $this->pipeline->resolveTransformerName($this->transformer);
         $imageTransformer = $this->transformerRegistry->get($transformerName);
