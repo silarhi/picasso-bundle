@@ -19,7 +19,7 @@ final readonly class ImageTransformation
         public ?int $width = null,
         public ?int $height = null,
         public ?string $format = null,
-        public int $quality = 75,
+        public ?int $quality = 75,
         public string $fit = 'contain',
         public ?int $blur = null,
         public ?int $dpr = null,

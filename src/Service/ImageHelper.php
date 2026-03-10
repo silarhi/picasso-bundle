@@ -20,7 +20,7 @@ final readonly class ImageHelper
 {
     public function __construct(
         private ImagePipeline $pipeline,
-        private int $defaultQuality,
+        private ?int $defaultQuality,
         private string $defaultFit,
     ) {
     }

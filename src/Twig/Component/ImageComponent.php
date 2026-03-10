@@ -111,7 +111,7 @@ class ImageComponent
         private readonly MetadataGuesserInterface $metadataGuesser,
         private readonly PlaceholderRegistry $placeholderRegistry,
         private readonly array $formats,
-        private readonly int $defaultQuality,
+        private readonly ?int $defaultQuality,
         private readonly string $defaultFit,
         private readonly ?string $defaultPlaceholder = null,
         private readonly ?Stopwatch $stopwatch = null,

@@ -30,7 +30,7 @@ class SrcsetGenerator
     public function __construct(
         private readonly array $deviceSizes,
         private readonly array $imageSizes,
-        private readonly int $defaultQuality,
+        private readonly ?int $defaultQuality,
     ) {
     }
 

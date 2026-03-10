@@ -18,6 +18,7 @@ use function count;
 use function dirname;
 use function in_array;
 use function is_bool;
+use function is_int;
 use function is_string;
 
 use Silarhi\PicassoBundle\Attribute\AsImageLoader;
@@ -123,10 +124,12 @@ final class PicassoBundle extends AbstractBundle
                         ->end()
                     ->end()
                 ->end()
-                ->integerNode('default_quality')
+                ->scalarNode('default_quality')
                     ->defaultValue(75)
-                    ->min(1)
-                    ->max(100)
+                    ->validate()
+                        ->ifTrue(static fn (mixed $v): bool => null !== $v && (!is_int($v) || $v < 1 || $v > 100))
+                        ->thenInvalid('The "default_quality" must be null or an integer between 1 and 100.')
+                    ->end()
                 ->end()
                 ->scalarNode('default_fit')
                     ->defaultValue('contain')
@@ -156,8 +159,22 @@ final class PicassoBundle extends AbstractBundle
                                 ->info('Placeholder type. Inferred from name when it matches a known type.')
                             ->end()
                             ->integerNode('size')->defaultValue(10)->info('Tiny image size for transformer placeholders.')->end()
-                            ->integerNode('blur')->defaultValue(5)->info('Blur amount for transformer placeholders.')->end()
-                            ->integerNode('quality')->defaultValue(30)->min(1)->max(100)->info('Quality for transformer placeholders.')->end()
+                            ->scalarNode('blur')
+                                ->defaultValue(5)
+                                ->info('Blur amount for transformer placeholders. Null disables blur.')
+                                ->validate()
+                                    ->ifTrue(static fn (mixed $v): bool => null !== $v && !is_int($v))
+                                    ->thenInvalid('The "blur" option must be null or an integer.')
+                                ->end()
+                            ->end()
+                            ->scalarNode('quality')
+                                ->defaultValue(30)
+                                ->info('Quality for transformer placeholders. Null uses transformer default.')
+                                ->validate()
+                                    ->ifTrue(static fn (mixed $v): bool => null !== $v && (!is_int($v) || $v < 1 || $v > 100))
+                                    ->thenInvalid('The "quality" option must be null or an integer between 1 and 100.')
+                                ->end()
+                            ->end()
                             ->integerNode('components_x')->defaultValue(4)->min(1)->max(9)->info('Horizontal BlurHash components (1–9).')->end()
                             ->integerNode('components_y')->defaultValue(3)->min(1)->max(9)->info('Vertical BlurHash components (1–9).')->end()
                             ->scalarNode('driver')
@@ -260,9 +277,9 @@ final class PicassoBundle extends AbstractBundle
          *     device_sizes: list<int>,
          *     image_sizes: list<int>,
          *     formats: list<string>,
-         *     default_quality: int,
+         *     default_quality: int|null,
          *     default_fit: string,
-         *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int, quality: int, components_x: int, components_y: int, driver: string, service: string|null}>,
+         *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int|null, quality: int|null, components_x: int, components_y: int, driver: string, service: string|null}>,
          *     loaders: array<string, array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null, request_factory: string|null}>,
          *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, public_cache: array{enabled: bool}}>
          * } $config
