@@ -490,6 +490,9 @@ final class PicassoBundle extends AbstractBundle
                     break;
 
                 case 'blurhash':
+                    if (!interface_exists(\Imagine\Image\ImagineInterface::class)) {
+                        throw new Exception\InvalidConfigurationException(sprintf('Placeholder "%s" of type "blurhash" requires the "imagine/imagine" package. Install it with: composer require imagine/imagine', $name));
+                    }
                     $imagineClass = 'imagick' === $placeholderConfig['driver']
                         ? \Imagine\Imagick\Imagine::class
                         : \Imagine\Gd\Imagine::class;
