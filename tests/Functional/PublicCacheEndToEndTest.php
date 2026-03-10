@@ -73,7 +73,7 @@ class PublicCacheEndToEndTest extends KernelTestCase
         $srcUrl = $this->parseSrcFromImg($html);
         $response = $this->handleRequest($srcUrl);
 
-        self::assertSame(200, $response->getStatusCode(), 'Public cache fallback src serving failed');
+        self::assertSame(200, $response->getStatusCode(), 'Public cache fallback src serving failed: ' . $response->getContent());
         self::assertStringContainsString('image/', (string) $response->headers->get('Content-Type'));
     }
 
@@ -90,7 +90,7 @@ class PublicCacheEndToEndTest extends KernelTestCase
         $url = $this->parseFirstSrcsetUrl('/<img[^>]+srcset="([^"]+)"/', $html);
         $response = $this->handleRequest($url);
 
-        self::assertSame(200, $response->getStatusCode(), 'Public cache img srcset entry serving failed');
+        self::assertSame(200, $response->getStatusCode(), 'Public cache img srcset entry serving failed: ' . $response->getContent());
         self::assertStringContainsString('image/', (string) $response->headers->get('Content-Type'));
     }
 
@@ -107,7 +107,7 @@ class PublicCacheEndToEndTest extends KernelTestCase
         self::assertNotNull($tamperedUrl);
 
         $response = $this->handleRequest($tamperedUrl);
-        self::assertSame(404, $response->getStatusCode());
+        self::assertSame(404, $response->getStatusCode(), 'Tampered signature should return 404: ' . $response->getContent());
     }
 
     public function testPublicCacheNonExistentImageReturns404(): void
@@ -120,7 +120,7 @@ class PublicCacheEndToEndTest extends KernelTestCase
 
         $srcUrl = $this->parseSrcFromImg($html);
         $response = $this->handleRequest($srcUrl);
-        self::assertSame(404, $response->getStatusCode());
+        self::assertSame(404, $response->getStatusCode(), 'Non-existent image should return 404: ' . $response->getContent());
     }
 
     private function handleRequest(string $url): Response

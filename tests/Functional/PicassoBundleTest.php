@@ -211,7 +211,7 @@ class PicassoBundleTest extends TestCase
         $request = Request::create('/image/glide/filesystem/pixel.gif?w=100&s=invalid');
         $response = self::$kernel->handle($request);
 
-        self::assertSame(404, $response->getStatusCode());
+        self::assertSame(404, $response->getStatusCode(), 'Invalid signature should return 404: ' . $response->getContent());
     }
 
     public function testSrcsetGeneratorProducesWidths(): void
