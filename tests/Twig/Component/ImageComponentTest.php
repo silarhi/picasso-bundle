@@ -517,6 +517,62 @@ class ImageComponentTest extends TestCase
         self::assertNull($component->fetchPriority);
     }
 
+    public function testUrlBasedImageBypassesTransformation(): void
+    {
+        $this->pipeline->method('load')
+            ->willReturn(new Image(path: 'photo.jpg', url: 'https://cdn.example.com/photo.jpg'));
+
+        $component = $this->createComponent();
+        $component->src = 'photo.jpg';
+        $component->sizes = '100vw';
+        $component->computeImageData();
+
+        self::assertSame('https://cdn.example.com/photo.jpg', $component->fallbackSrc);
+        self::assertSame([], $component->sources);
+    }
+
+    public function testGetMimeTypeForGifAndUnknownFormats(): void
+    {
+        $this->pipeline->method('load')
+            ->willReturn(new Image(path: 'animation.gif'));
+
+        $this->srcsetGenerator->method('generateSrcset')
+            ->willReturnCallback(static fn (ImageTransformerInterface $t, Image $img, string $format): array => [
+                new SrcsetEntry("/img/{$img->path}?fm={$format}&w=640", '640w'),
+            ]);
+
+        $this->srcsetGenerator->method('buildSrcsetString')
+            ->willReturnCallback(static fn (array $entries): string => implode(', ', array_map(
+                static fn (mixed $e): string => ($e instanceof SrcsetEntry) ? $e->toString() : '',
+                $entries,
+            )));
+
+        $this->srcsetGenerator->method('getFallbackUrl')
+            ->willReturn('/img/animation.gif?fm=gif&w=640');
+
+        // Use formats that hit gif and default branches of getMimeType()
+        $component = new ImageComponent(
+            srcsetGenerator: $this->srcsetGenerator,
+            pipeline: $this->pipeline,
+            transformerRegistry: $this->transformerRegistry,
+            metadataGuesser: $this->metadataGuesser,
+            placeholderRegistry: $this->placeholderRegistry,
+            formats: ['gif', 'tiff', 'bmp'],
+            defaultQuality: 75,
+            defaultFit: 'contain',
+        );
+
+        $component->src = 'animation.gif';
+        $component->width = 640;
+        $component->sizes = '100vw';
+        $component->computeImageData();
+
+        // 'bmp' is the fallback (last format), so 'gif' and 'tiff' become <source> entries
+        self::assertCount(2, $component->sources);
+        self::assertSame('image/gif', $component->sources[0]->type);
+        self::assertSame('image/tiff', $component->sources[1]->type);
+    }
+
     private function configureSrcsetGenerator(): void
     {
         $this->srcsetGenerator->method('generateSrcset')->willReturn([
