@@ -549,6 +549,7 @@ final class PicassoBundle extends AbstractBundle
                 $config['device_sizes'],
                 $config['image_sizes'],
                 $config['default_quality'],
+                $config['default_fit'],
             ]);
         $services->alias(SrcsetGenerator::class, 'picasso.srcset_generator');
 

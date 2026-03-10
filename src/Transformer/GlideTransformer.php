@@ -268,7 +268,9 @@ final readonly class GlideTransformer implements LocalTransformerInterface
         if (null !== $transformation->quality) {
             $glide['q'] = $transformation->quality;
         }
-        $glide['fit'] = $transformation->fit;
+        if (null !== $transformation->fit) {
+            $glide['fit'] = $transformation->fit;
+        }
 
         if (null !== $transformation->blur) {
             $glide['blur'] = $transformation->blur;

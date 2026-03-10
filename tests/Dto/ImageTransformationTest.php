@@ -26,8 +26,8 @@ class ImageTransformationTest extends TestCase
         self::assertNull($t->width);
         self::assertNull($t->height);
         self::assertNull($t->format);
-        self::assertSame(75, $t->quality);
-        self::assertSame('contain', $t->fit);
+        self::assertNull($t->quality);
+        self::assertNull($t->fit);
         self::assertNull($t->blur);
         self::assertNull($t->dpr);
     }

@@ -40,8 +40,12 @@ class SrcsetGeneratorTest extends TestCase
                 if (null !== $t->format) {
                     $query['fm'] = $t->format;
                 }
-                $query['q'] = $t->quality;
-                $query['fit'] = $t->fit;
+                if (null !== $t->quality) {
+                    $query['q'] = $t->quality;
+                }
+                if (null !== $t->fit) {
+                    $query['fit'] = $t->fit;
+                }
 
                 return '/picasso/glide/filesystem/' . $image->path . '?' . http_build_query($query);
             });
@@ -50,6 +54,7 @@ class SrcsetGeneratorTest extends TestCase
             deviceSizes: [640, 750, 1080, 1920],
             imageSizes: [32, 64, 128, 256],
             defaultQuality: 75,
+            defaultFit: 'contain',
         );
     }
 
@@ -80,6 +85,7 @@ class SrcsetGeneratorTest extends TestCase
             deviceSizes: [640, 1080],
             imageSizes: [640, 128],
             defaultQuality: 75,
+            defaultFit: 'contain',
         );
 
         $widths = $generator->getWidths(sizes: '100vw', width: null);

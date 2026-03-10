@@ -31,6 +31,7 @@ class SrcsetGenerator
         private readonly array $deviceSizes,
         private readonly array $imageSizes,
         private readonly ?int $defaultQuality,
+        private readonly ?string $defaultFit,
     ) {
     }
 
@@ -74,11 +75,12 @@ class SrcsetGenerator
         ?int $height = null,
         ?string $sizes = null,
         ?int $quality = null,
-        string $fit = 'contain',
+        ?string $fit = null,
         array $context = [],
         ?int $sourceWidth = null,
     ): array {
         $quality ??= $this->defaultQuality;
+        $fit ??= $this->defaultFit;
         $widths = $this->getWidths($sizes, $width);
         $isFixed = null === $sizes && null !== $width;
 
@@ -139,10 +141,11 @@ class SrcsetGenerator
         ?int $width = null,
         ?int $height = null,
         ?int $quality = null,
-        string $fit = 'contain',
+        ?string $fit = null,
         array $context = [],
     ): string {
         $quality ??= $this->defaultQuality;
+        $fit ??= $this->defaultFit;
 
         return $transformer->url($image, new ImageTransformation(
             width: $width,
