@@ -20,6 +20,7 @@ use League\FlysystemBundle\FlysystemBundle;
 use LogicException;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
+use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
 use Silarhi\PicassoBundle\Loader\FlysystemLoader;
 use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
 use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
@@ -536,6 +537,143 @@ class BundleWiringTest extends TestCase
 
         self::assertTrue($container->has(PlaceholderInterface::class));
         self::assertInstanceOf(TransformerPlaceholder::class, $container->get(PlaceholderInterface::class));
+    }
+
+    // --- Invalid default references ---
+
+    public function testDefaultLoaderReferencingNonexistentLoaderThrows(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('The default loader "nonexistent" does not exist.');
+
+        $this->bootKernel([
+            'default_loader' => 'nonexistent',
+            'loaders' => [
+                'filesystem' => [
+                    'paths' => [dirname(__DIR__) . '/Fixtures'],
+                ],
+            ],
+            'transformers' => [
+                'glide' => [
+                    'sign_key' => 'test',
+                ],
+            ],
+        ]);
+    }
+
+    public function testDefaultTransformerReferencingNonexistentTransformerThrows(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('The default transformer "nonexistent" does not exist.');
+
+        $this->bootKernel([
+            'default_transformer' => 'nonexistent',
+            'loaders' => [
+                'filesystem' => [
+                    'paths' => [dirname(__DIR__) . '/Fixtures'],
+                ],
+            ],
+            'transformers' => [
+                'glide' => [
+                    'sign_key' => 'test',
+                ],
+            ],
+        ]);
+    }
+
+    public function testDefaultPlaceholderReferencingNonexistentPlaceholderThrows(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('The default placeholder "nonexistent" does not exist.');
+
+        $this->bootKernel([
+            'default_placeholder' => 'nonexistent',
+            'loaders' => [
+                'filesystem' => [
+                    'paths' => [dirname(__DIR__) . '/Fixtures'],
+                ],
+            ],
+            'transformers' => [
+                'glide' => [
+                    'sign_key' => 'test',
+                ],
+            ],
+            'placeholders' => [
+                'blur' => [
+                    'type' => 'transformer',
+                ],
+            ],
+        ]);
+    }
+
+    public function testDefaultLoaderReferencingDisabledLoaderThrows(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('The default loader "disabled_fs" is disabled.');
+
+        $this->bootKernel([
+            'default_loader' => 'disabled_fs',
+            'loaders' => [
+                'disabled_fs' => [
+                    'type' => 'filesystem',
+                    'enabled' => false,
+                    'paths' => [dirname(__DIR__) . '/Fixtures'],
+                ],
+            ],
+            'transformers' => [
+                'glide' => [
+                    'sign_key' => 'test',
+                ],
+            ],
+        ]);
+    }
+
+    public function testDefaultTransformerReferencingDisabledTransformerThrows(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('The default transformer "disabled_glide" is disabled.');
+
+        $this->bootKernel([
+            'default_transformer' => 'disabled_glide',
+            'loaders' => [
+                'filesystem' => [
+                    'paths' => [dirname(__DIR__) . '/Fixtures'],
+                ],
+            ],
+            'transformers' => [
+                'disabled_glide' => [
+                    'type' => 'glide',
+                    'enabled' => false,
+                    'sign_key' => 'test',
+                ],
+            ],
+        ]);
+    }
+
+    public function testDefaultPlaceholderReferencingDisabledPlaceholderThrows(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('The default placeholder "disabled_blur" is disabled.');
+
+        $this->bootKernel([
+            'default_placeholder' => 'disabled_blur',
+            'loaders' => [
+                'filesystem' => [
+                    'paths' => [dirname(__DIR__) . '/Fixtures'],
+                ],
+            ],
+            'transformers' => [
+                'glide' => [
+                    'sign_key' => 'test',
+                ],
+            ],
+            'placeholders' => [
+                'disabled_blur' => [
+                    'type' => 'transformer',
+                    'enabled' => false,
+                ],
+            ],
+        ]);
     }
 
     /**

@@ -373,7 +373,7 @@ final class PicassoBundle extends AbstractBundle
         }
 
         // Alias default loader (auto-detect when exactly one is enabled)
-        $defaultLoader = $this->autoDetectDefault($config['default_loader'], $config['loaders']);
+        $defaultLoader = $this->autoDetectDefault($config['default_loader'], $config['loaders'], 'loader');
 
         if (null !== $defaultLoader) {
             $services->alias('picasso.default_loader', 'picasso.loader.' . $defaultLoader);
@@ -453,7 +453,7 @@ final class PicassoBundle extends AbstractBundle
         }
 
         // Alias default transformer (auto-detect when exactly one is enabled)
-        $defaultTransformer = $this->autoDetectDefault($config['default_transformer'], $config['transformers']);
+        $defaultTransformer = $this->autoDetectDefault($config['default_transformer'], $config['transformers'], 'transformer');
 
         if (null !== $defaultTransformer) {
             $services->alias('picasso.default_transformer', 'picasso.transformer.' . $defaultTransformer);
@@ -523,7 +523,7 @@ final class PicassoBundle extends AbstractBundle
         }
 
         // Alias default placeholder (auto-detect when exactly one is enabled)
-        $defaultPlaceholder = $this->autoDetectDefault($config['default_placeholder'], $config['placeholders']);
+        $defaultPlaceholder = $this->autoDetectDefault($config['default_placeholder'], $config['placeholders'], 'placeholder');
 
         if (null !== $defaultPlaceholder) {
             $services->alias('picasso.default_placeholder', 'picasso.placeholder.' . $defaultPlaceholder);
@@ -618,9 +618,17 @@ final class PicassoBundle extends AbstractBundle
      *
      * @param array<string, array{enabled: bool, ...}> $items
      */
-    private function autoDetectDefault(?string $explicit, array $items): ?string
+    private function autoDetectDefault(?string $explicit, array $items, string $label): ?string
     {
         if (null !== $explicit) {
+            if (!isset($items[$explicit])) {
+                throw new Exception\InvalidConfigurationException(sprintf('The default %s "%s" does not exist. Available: %s.', $label, $explicit, implode(', ', array_keys($items)) ?: 'none'));
+            }
+
+            if (!$items[$explicit]['enabled']) {
+                throw new Exception\InvalidConfigurationException(sprintf('The default %s "%s" is disabled.', $label, $explicit));
+            }
+
             return $explicit;
         }
 
