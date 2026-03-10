@@ -207,10 +207,7 @@ class ImageComponent
         }
 
         $placeholderName = $this->resolvePlaceholderName();
-        if (null !== $placeholderName
-            && $this->placeholderRegistry->has($placeholderName)
-            && null !== $this->width && null !== $this->height
-        ) {
+        if (null !== $placeholderName) {
             $this->placeholderUri = $this->placeholderRegistry
                 ->get($placeholderName)
                 ->generate($image, new ImageTransformation(
