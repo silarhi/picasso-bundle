@@ -24,11 +24,11 @@ use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
 use Silarhi\PicassoBundle\Loader\FlysystemLoader;
 use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
 use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
-use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\PicassoBundle;
 use Silarhi\PicassoBundle\Placeholder\BlurHashPlaceholder;
 use Silarhi\PicassoBundle\Placeholder\PlaceholderInterface;
 use Silarhi\PicassoBundle\Placeholder\TransformerPlaceholder;
+use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Tests\Functional\Stub\StubServicePlaceholder;
 use Silarhi\PicassoBundle\Tests\Functional\Stub\StubServiceTransformer;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
@@ -586,6 +586,49 @@ class BundleWiringTest extends TestCase
         $registry = $container->get('picasso.loader_registry');
         self::assertInstanceOf(LoaderRegistry::class, $registry);
         self::assertNull($registry->getDefaultPlaceholder('filesystem'));
+    }
+
+    // --- Per-loader default_transformer ---
+
+    public function testLoaderDefaultTransformerIsAvailableInRegistry(): void
+    {
+        $container = $this->bootKernel([
+            'loaders' => [
+                'filesystem' => [
+                    'paths' => [dirname(__DIR__) . '/Fixtures'],
+                    'default_transformer' => 'glide',
+                ],
+            ],
+            'transformers' => [
+                'glide' => [
+                    'sign_key' => 'test',
+                ],
+            ],
+        ]);
+
+        $registry = $container->get('picasso.loader_registry');
+        self::assertInstanceOf(LoaderRegistry::class, $registry);
+        self::assertSame('glide', $registry->getDefaultTransformer('filesystem'));
+    }
+
+    public function testLoaderWithoutDefaultTransformerReturnsNull(): void
+    {
+        $container = $this->bootKernel([
+            'loaders' => [
+                'filesystem' => [
+                    'paths' => [dirname(__DIR__) . '/Fixtures'],
+                ],
+            ],
+            'transformers' => [
+                'glide' => [
+                    'sign_key' => 'test',
+                ],
+            ],
+        ]);
+
+        $registry = $container->get('picasso.loader_registry');
+        self::assertInstanceOf(LoaderRegistry::class, $registry);
+        self::assertNull($registry->getDefaultTransformer('filesystem'));
     }
 
     // --- Invalid default references ---

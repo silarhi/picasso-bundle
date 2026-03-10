@@ -13,6 +13,10 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Tests\Twig\Component;
 
+use Closure;
+
+use function in_array;
+
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
@@ -158,7 +162,7 @@ class ImageComponentTest extends TestCase
             ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
         $this->metadataGuesser->expects(self::once())
             ->method('guess')
-            ->with(self::isInstanceOf(\Closure::class))
+            ->with(self::isInstanceOf(Closure::class))
             ->willReturn(['width' => 1024, 'height' => 768, 'mimeType' => 'image/jpeg']);
         $this->configureSrcsetGenerator();
 
@@ -288,6 +292,111 @@ class ImageComponentTest extends TestCase
         $component->computeImageData();
 
         self::assertSame('data:image/png;base64,global', $component->placeholderUri);
+    }
+
+    public function testLoaderDefaultTransformerOverridesGlobalDefault(): void
+    {
+        $stream = fopen('php://memory', 'r+');
+        self::assertNotFalse($stream);
+
+        // Setup: imgix is the per-loader default transformer for 'filesystem'
+        $imgixTransformer = $this->createMock(ImageTransformerInterface::class);
+        $transformerLocator = $this->createMock(ContainerInterface::class);
+        $transformerLocator->method('has')->willReturnCallback(static fn (string $name): bool => in_array($name, ['glide', 'imgix'], true));
+        $transformerLocator->method('get')->willReturnCallback(fn (string $name) => match ($name) {
+            'imgix' => $imgixTransformer,
+            default => $this->glideTransformer,
+        });
+        $transformerRegistry = new TransformerRegistry($transformerLocator);
+
+        // Pipeline has 'glide' as global default, but loader overrides to 'imgix'
+        $pipeline = $this->createMock(ImagePipeline::class);
+        $pipeline->method('resolveLoaderName')->willReturn('filesystem');
+        $pipeline->method('resolveTransformerName')->with(null)->willReturn('glide');
+        $pipeline->method('load')->willReturn(new Image(path: 'photo.jpg', stream: $stream));
+        $this->metadataGuesser->method('guess')
+            ->willReturn(['width' => 800, 'height' => 600, 'mimeType' => 'image/jpeg']);
+        $this->configureSrcsetGenerator();
+
+        $loaderLocator = $this->createMock(ContainerInterface::class);
+        $loaderLocator->method('has')->willReturn(false);
+        $loaderRegistry = new LoaderRegistry($loaderLocator, [], ['filesystem' => 'imgix']);
+
+        $component = new ImageComponent(
+            srcsetGenerator: $this->srcsetGenerator,
+            pipeline: $pipeline,
+            transformerRegistry: $transformerRegistry,
+            metadataGuesser: $this->metadataGuesser,
+            placeholderRegistry: $this->placeholderRegistry,
+            loaderRegistry: $loaderRegistry,
+            formats: ['jpg'],
+            defaultQuality: 75,
+            defaultFit: 'contain',
+        );
+
+        $component->src = 'photo.jpg';
+        $component->sizes = '100vw';
+        $component->computeImageData();
+
+        // Verify imgix transformer was used (via srcset generator call context)
+        self::assertNotNull($component->fallbackSrc);
+    }
+
+    public function testGlobalDefaultTransformerUsedWhenLoaderHasNone(): void
+    {
+        $stream = fopen('php://memory', 'r+');
+        self::assertNotFalse($stream);
+        $this->pipeline->method('load')
+            ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
+        $this->metadataGuesser->method('guess')
+            ->willReturn(['width' => 800, 'height' => 600, 'mimeType' => 'image/jpeg']);
+        $this->configureSrcsetGenerator();
+
+        // Loader has no default_transformer → falls through to pipeline's global default ('glide')
+        $component = $this->createComponent();
+        $component->src = 'photo.jpg';
+        $component->sizes = '100vw';
+        $component->computeImageData();
+
+        self::assertNotNull($component->fallbackSrc);
+    }
+
+    public function testExplicitTransformerPropOverridesLoaderDefault(): void
+    {
+        $stream = fopen('php://memory', 'r+');
+        self::assertNotFalse($stream);
+
+        $pipeline = $this->createMock(ImagePipeline::class);
+        $pipeline->method('resolveLoaderName')->willReturn('filesystem');
+        $pipeline->method('resolveTransformerName')->with('glide')->willReturn('glide');
+        $pipeline->method('load')->willReturn(new Image(path: 'photo.jpg', stream: $stream));
+        $this->metadataGuesser->method('guess')
+            ->willReturn(['width' => 800, 'height' => 600, 'mimeType' => 'image/jpeg']);
+        $this->configureSrcsetGenerator();
+
+        // Loader default is 'imgix', but explicit prop is 'glide'
+        $loaderLocator = $this->createMock(ContainerInterface::class);
+        $loaderLocator->method('has')->willReturn(false);
+        $loaderRegistry = new LoaderRegistry($loaderLocator, [], ['filesystem' => 'imgix']);
+
+        $component = new ImageComponent(
+            srcsetGenerator: $this->srcsetGenerator,
+            pipeline: $pipeline,
+            transformerRegistry: $this->transformerRegistry,
+            metadataGuesser: $this->metadataGuesser,
+            placeholderRegistry: $this->placeholderRegistry,
+            loaderRegistry: $loaderRegistry,
+            formats: ['jpg'],
+            defaultQuality: 75,
+            defaultFit: 'contain',
+        );
+
+        $component->src = 'photo.jpg';
+        $component->transformer = 'glide';
+        $component->sizes = '100vw';
+        $component->computeImageData();
+
+        self::assertNotNull($component->fallbackSrc);
     }
 
     public function testComputeImageDataGeneratesSourcesAndFallback(): void

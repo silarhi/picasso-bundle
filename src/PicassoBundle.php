@@ -79,6 +79,9 @@ final class PicassoBundle extends AbstractBundle
                 if (null !== $attribute->defaultPlaceholder) {
                     $tag['default_placeholder'] = $attribute->defaultPlaceholder;
                 }
+                if (null !== $attribute->defaultTransformer) {
+                    $tag['default_transformer'] = $attribute->defaultTransformer;
+                }
                 $definition->addTag('picasso.loader', $tag);
             },
         );
@@ -97,7 +100,7 @@ final class PicassoBundle extends AbstractBundle
             },
         );
 
-        // Merge per-loader default_placeholder from attribute-tagged loaders into LoaderRegistry
+        // Merge per-loader defaults from attribute-tagged loaders into LoaderRegistry
         $container->addCompilerPass(new class implements CompilerPassInterface {
             public function process(ContainerBuilder $container): void
             {
@@ -108,17 +111,23 @@ final class PicassoBundle extends AbstractBundle
                 $definition = $container->getDefinition('picasso.loader_registry');
                 /** @var array<string, string> $placeholders */
                 $placeholders = $definition->getArgument(1);
+                /** @var array<string, string> $transformers */
+                $transformers = $definition->getArgument(2);
 
                 foreach ($container->findTaggedServiceIds('picasso.loader') as $tags) {
-                    /** @var array{key?: string, default_placeholder?: string} $tag */
+                    /** @var array{key?: string, default_placeholder?: string, default_transformer?: string} $tag */
                     foreach ($tags as $tag) {
                         if (isset($tag['key'], $tag['default_placeholder'])) {
                             $placeholders[$tag['key']] ??= $tag['default_placeholder'];
+                        }
+                        if (isset($tag['key'], $tag['default_transformer'])) {
+                            $transformers[$tag['key']] ??= $tag['default_transformer'];
                         }
                     }
                 }
 
                 $definition->replaceArgument(1, $placeholders);
+                $definition->replaceArgument(2, $transformers);
             }
         });
     }
@@ -262,6 +271,10 @@ final class PicassoBundle extends AbstractBundle
                                 ->defaultNull()
                                 ->info('Default placeholder name for this loader. Overrides the global default_placeholder.')
                             ->end()
+                            ->scalarNode('default_transformer')
+                                ->defaultNull()
+                                ->info('Default transformer name for this loader. Overrides the global default_transformer.')
+                            ->end()
                         ->end()
                         ->validate()
                             ->ifTrue(static fn (array $v): bool => 'flysystem' === $v['type'] && (null === $v['storage'] || '' === $v['storage']))
@@ -322,7 +335,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_quality: int|null,
          *     default_fit: string,
          *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int|null, quality: int|null, fit: string|null, format: string|null, components_x: int, components_y: int, driver: string, service: string|null}>,
-         *     loaders: array<string, array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null}>,
+         *     loaders: array<string, array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null}>,
          *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, public_cache: array{enabled: bool}}>
          * } $config
          */
@@ -348,6 +361,8 @@ final class PicassoBundle extends AbstractBundle
         $vichHelperRegistered = false;
         /** @var array<string, string> $loaderPlaceholders */
         $loaderPlaceholders = [];
+        /** @var array<string, string> $loaderTransformers */
+        $loaderTransformers = [];
 
         foreach ($config['loaders'] as $name => $loaderConfig) {
             if (!$loaderConfig['enabled']) {
@@ -364,6 +379,10 @@ final class PicassoBundle extends AbstractBundle
             if (null !== $loaderConfig['default_placeholder']) {
                 $tag['default_placeholder'] = $loaderConfig['default_placeholder'];
                 $loaderPlaceholders[$name] = $loaderConfig['default_placeholder'];
+            }
+            if (null !== $loaderConfig['default_transformer']) {
+                $tag['default_transformer'] = $loaderConfig['default_transformer'];
+                $loaderTransformers[$name] = $loaderConfig['default_transformer'];
             }
 
             switch ($type) {
@@ -425,7 +444,7 @@ final class PicassoBundle extends AbstractBundle
         // --- Registries ---
 
         $services->set('picasso.loader_registry', LoaderRegistry::class)
-            ->args([tagged_locator('picasso.loader', 'key'), $loaderPlaceholders]);
+            ->args([tagged_locator('picasso.loader', 'key'), $loaderPlaceholders, $loaderTransformers]);
         $services->alias(LoaderRegistry::class, 'picasso.loader_registry');
 
         $services->set('picasso.transformer_registry', TransformerRegistry::class)

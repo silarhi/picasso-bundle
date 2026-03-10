@@ -140,8 +140,8 @@ class ImageComponent
 
         $sourceWidth = $this->resolveDimensions($image, $loaderName);
 
-        // Resolve transformer
-        $transformerName = $this->pipeline->resolveTransformerName($this->transformer);
+        // Resolve transformer: explicit prop → loader default → global default
+        $transformerName = $this->resolveTransformerName($loaderName);
         $imageTransformer = $this->transformerRegistry->get($transformerName);
         $transformerContext = ['loader' => $loaderName, 'transformer' => $transformerName];
 
@@ -259,6 +259,16 @@ class ImageComponent
                 );
             }
         }
+    }
+
+    private function resolveTransformerName(string $loaderName): string
+    {
+        if (null !== $this->transformer) {
+            return $this->pipeline->resolveTransformerName($this->transformer);
+        }
+
+        return $this->loaderRegistry->getDefaultTransformer($loaderName)
+            ?? $this->pipeline->resolveTransformerName(null);
     }
 
     private function resolvePlaceholderName(string $loaderName): ?string

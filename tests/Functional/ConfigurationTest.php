@@ -23,7 +23,7 @@ use Symfony\Component\Config\FileLocator;
 
 /**
  * @phpstan-type PlaceholderConfig array{enabled: bool, type: string|null, size: int, blur: int, quality: int, components_x: int, components_y: int, service: string|null}
- * @phpstan-type LoaderConfig array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null}
+ * @phpstan-type LoaderConfig array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null}
  * @phpstan-type PublicCacheConfig array{enabled: bool}
  * @phpstan-type TransformerConfig array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, public_cache: PublicCacheConfig}
  * @phpstan-type PicassoConfig array{
@@ -452,6 +452,35 @@ class ConfigurationTest extends TestCase
         ]);
 
         self::assertNull($config['loaders']['my_fs']['default_placeholder']);
+    }
+
+    public function testLoaderDefaultTransformerConfig(): void
+    {
+        $config = $this->processConfig([
+            'loaders' => [
+                'my_fs' => [
+                    'type' => 'filesystem',
+                    'paths' => ['/var/images'],
+                    'default_transformer' => 'glide',
+                ],
+            ],
+        ]);
+
+        self::assertSame('glide', $config['loaders']['my_fs']['default_transformer']);
+    }
+
+    public function testLoaderDefaultTransformerDefaultsToNull(): void
+    {
+        $config = $this->processConfig([
+            'loaders' => [
+                'my_fs' => [
+                    'type' => 'filesystem',
+                    'paths' => ['/var/images'],
+                ],
+            ],
+        ]);
+
+        self::assertNull($config['loaders']['my_fs']['default_transformer']);
     }
 
     public function testFlysystemLoaderConfig(): void

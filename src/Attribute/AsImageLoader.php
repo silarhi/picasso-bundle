@@ -21,6 +21,7 @@ final readonly class AsImageLoader
     public function __construct(
         public string $name,
         public ?string $defaultPlaceholder = null,
+        public ?string $defaultTransformer = null,
     ) {
     }
 }
