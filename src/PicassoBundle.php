@@ -175,6 +175,14 @@ final class PicassoBundle extends AbstractBundle
                                     ->thenInvalid('The "quality" option must be null or an integer between 1 and 100.')
                                 ->end()
                             ->end()
+                            ->scalarNode('fit')
+                                ->defaultValue('crop')
+                                ->info('Fit mode for transformer placeholders. Null uses transformer default.')
+                            ->end()
+                            ->scalarNode('format')
+                                ->defaultValue('jpg')
+                                ->info('Image format for transformer placeholders. Null uses transformer default.')
+                            ->end()
                             ->integerNode('components_x')->defaultValue(4)->min(1)->max(9)->info('Horizontal BlurHash components (1–9).')->end()
                             ->integerNode('components_y')->defaultValue(3)->min(1)->max(9)->info('Vertical BlurHash components (1–9).')->end()
                             ->scalarNode('driver')
@@ -279,7 +287,7 @@ final class PicassoBundle extends AbstractBundle
          *     formats: list<string>,
          *     default_quality: int|null,
          *     default_fit: string,
-         *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int|null, quality: int|null, components_x: int, components_y: int, driver: string, service: string|null}>,
+         *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int|null, quality: int|null, fit: string|null, format: string|null, components_x: int, components_y: int, driver: string, service: string|null}>,
          *     loaders: array<string, array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null, request_factory: string|null}>,
          *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, public_cache: array{enabled: bool}}>
          * } $config
@@ -475,6 +483,8 @@ final class PicassoBundle extends AbstractBundle
                             $placeholderConfig['size'],
                             $placeholderConfig['blur'],
                             $placeholderConfig['quality'],
+                            $placeholderConfig['fit'],
+                            $placeholderConfig['format'],
                         ])
                         ->tag('picasso.placeholder', ['key' => $name]);
                     break;
