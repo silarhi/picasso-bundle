@@ -166,12 +166,12 @@ class ImageComponent
 
         if ((null === $w || null === $h) && null !== $image->stream) {
             $this->stopwatch?->start('picasso.metadata_guess', 'picasso');
-            $stream = $image->resolveStream();
-            if (null !== $stream) {
-                $guessed = $this->metadataGuesser->guess($stream, $loaderName . ':' . $image->path);
-                $w ??= $guessed['width'];
-                $h ??= $guessed['height'];
-            }
+            $guessed = $this->metadataGuesser->guess(
+                $image->resolveStream(...),
+                $loaderName . ':' . $image->path,
+            );
+            $w ??= $guessed['width'];
+            $h ??= $guessed['height'];
             $this->stopwatch?->stop('picasso.metadata_guess');
         }
 

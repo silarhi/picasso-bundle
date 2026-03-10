@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Service;
 
+use Closure;
 use Psr\Cache\CacheItemPoolInterface;
 
 /**
@@ -31,11 +32,14 @@ final readonly class MetadataGuesser implements MetadataGuesserInterface
      * Guess image dimensions and MIME type from a stream.
      * Reads only the first bytes needed for header detection.
      *
-     * @param resource $stream
+     * When the stream is a Closure, it is only invoked on cache miss,
+     * avoiding unnecessary I/O for cached metadata.
+     *
+     * @param resource|(Closure(): (resource|null)) $stream
      *
      * @return ImageGuessedMetadata
      */
-    public function guess($stream, ?string $identifier = null): array
+    public function guess(mixed $stream, ?string $identifier = null): array
     {
         if ($this->cache instanceof CacheItemPoolInterface && null !== $identifier) {
             $cacheKey = CacheKeyGenerator::generate('metadata', [$identifier]);
@@ -48,14 +52,24 @@ final readonly class MetadataGuesser implements MetadataGuesserInterface
                 return $cached;
             }
 
-            $result = $this->doGuess($stream);
+            $resolved = $stream instanceof Closure ? $stream() : $stream;
+            if (null === $resolved) {
+                return ['width' => null, 'height' => null, 'mimeType' => null];
+            }
+
+            $result = $this->doGuess($resolved);
             $item->set($result);
             $this->cache->save($item);
 
             return $result;
         }
 
-        return $this->doGuess($stream);
+        $resolved = $stream instanceof Closure ? $stream() : $stream;
+        if (null === $resolved) {
+            return ['width' => null, 'height' => null, 'mimeType' => null];
+        }
+
+        return $this->doGuess($resolved);
     }
 
     /**
