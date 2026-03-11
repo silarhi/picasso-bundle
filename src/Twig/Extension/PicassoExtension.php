@@ -13,14 +13,14 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Twig\Extension;
 
-use Silarhi\PicassoBundle\Service\ImageHelper;
+use Silarhi\PicassoBundle\Service\ImageHelperInterface;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFunction;
 
 final class PicassoExtension extends AbstractExtension
 {
     public function __construct(
-        private readonly ImageHelper $imageHelper,
+        private readonly ImageHelperInterface $imageHelper,
     ) {
     }
 
