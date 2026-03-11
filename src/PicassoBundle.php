@@ -36,6 +36,7 @@ use Silarhi\PicassoBundle\Placeholder\BlurHashPlaceholder;
 use Silarhi\PicassoBundle\Placeholder\PlaceholderInterface;
 use Silarhi\PicassoBundle\Placeholder\TransformerPlaceholder;
 use Silarhi\PicassoBundle\Service\ImageHelper;
+use Silarhi\PicassoBundle\Service\ImageHelperInterface;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Service\MetadataGuesser;
@@ -635,10 +636,19 @@ final class PicassoBundle extends AbstractBundle
         $services->set('picasso.image_helper', ImageHelper::class)
             ->args([
                 service('picasso.pipeline'),
+                service('picasso.srcset_generator'),
+                service('picasso.transformer_registry'),
+                service('picasso.metadata_guesser'),
+                service('picasso.placeholder_registry'),
+                service('picasso.loader_registry'),
+                $config['formats'],
                 $config['default_quality'],
                 $config['default_fit'],
+                $defaultPlaceholder,
+                service('debug.stopwatch')->nullOnInvalid(),
             ]);
         $services->alias(ImageHelper::class, 'picasso.image_helper');
+        $services->alias(ImageHelperInterface::class, 'picasso.image_helper');
 
         // --- Twig Extension ---
 
@@ -652,17 +662,7 @@ final class PicassoBundle extends AbstractBundle
 
         $services->set('.picasso.image_component', ImageComponent::class)
             ->args([
-                service('picasso.srcset_generator'),
-                service('picasso.pipeline'),
-                service('picasso.transformer_registry'),
-                service('picasso.metadata_guesser'),
-                service('picasso.placeholder_registry'),
-                service('picasso.loader_registry'),
-                $config['formats'],
-                $config['default_quality'],
-                $config['default_fit'],
-                $defaultPlaceholder,
-                service('debug.stopwatch')->nullOnInvalid(),
+                service('picasso.image_helper'),
             ])
             ->tag('twig.component', [
                 'key' => 'Picasso:Image',

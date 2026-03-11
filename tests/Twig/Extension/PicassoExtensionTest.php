@@ -14,17 +14,14 @@ declare(strict_types=1);
 namespace Silarhi\PicassoBundle\Tests\Twig\Extension;
 
 use PHPUnit\Framework\TestCase;
-use Silarhi\PicassoBundle\Dto\ImageReference;
-use Silarhi\PicassoBundle\Dto\ImageTransformation;
-use Silarhi\PicassoBundle\Service\ImageHelper;
-use Silarhi\PicassoBundle\Service\ImagePipeline;
+use Silarhi\PicassoBundle\Service\ImageHelperInterface;
 use Silarhi\PicassoBundle\Twig\Extension\PicassoExtension;
 
 class PicassoExtensionTest extends TestCase
 {
     public function testRegistersTwigFunction(): void
     {
-        $helper = new ImageHelper($this->createMock(ImagePipeline::class), 75, 'contain');
+        $helper = $this->createMock(ImageHelperInterface::class);
         $extension = new PicassoExtension($helper);
 
         $functions = $extension->getFunctions();
@@ -35,7 +32,7 @@ class PicassoExtensionTest extends TestCase
 
     public function testFunctionIsCallable(): void
     {
-        $helper = new ImageHelper($this->createMock(ImagePipeline::class), 75, 'contain');
+        $helper = $this->createMock(ImageHelperInterface::class);
         $extension = new PicassoExtension($helper);
 
         $functions = $extension->getFunctions();
@@ -46,18 +43,12 @@ class PicassoExtensionTest extends TestCase
 
     public function testFunctionDelegatesToImageHelper(): void
     {
-        $pipeline = $this->createMock(ImagePipeline::class);
-        $pipeline->expects(self::once())
-            ->method('url')
-            ->with(
-                self::callback(static fn (ImageReference $ref): bool => '/images/photo.jpg' === $ref->path),
-                self::isInstanceOf(ImageTransformation::class),
-                null,
-                null,
-            )
+        $helper = $this->createMock(ImageHelperInterface::class);
+        $helper->expects(self::once())
+            ->method('imageUrl')
+            ->with('/images/photo.jpg')
             ->willReturn('/transformed/photo.jpg');
 
-        $helper = new ImageHelper($pipeline, 75, 'contain');
         $extension = new PicassoExtension($helper);
 
         $functions = $extension->getFunctions();

@@ -13,20 +13,8 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Twig\Component;
 
-use function is_string;
-
-use Silarhi\PicassoBundle\Dto\Image;
-use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Dto\ImageSource;
-use Silarhi\PicassoBundle\Dto\ImageTransformation;
-use Silarhi\PicassoBundle\Service\ImagePipeline;
-use Silarhi\PicassoBundle\Service\LoaderRegistry;
-use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
-use Silarhi\PicassoBundle\Service\PlaceholderRegistry;
-use Silarhi\PicassoBundle\Service\SrcsetGenerator;
-use Silarhi\PicassoBundle\Service\TransformerRegistry;
-use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
-use Symfony\Component\Stopwatch\Stopwatch;
+use Silarhi\PicassoBundle\Service\ImageHelperInterface;
 use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
 use Symfony\UX\TwigComponent\Attribute\PostMount;
 
@@ -102,202 +90,41 @@ class ImageComponent
     /** @internal */
     public ?string $fallbackSrcset = null;
 
-    /**
-     * @param string[] $formats
-     */
     public function __construct(
-        private readonly SrcsetGenerator $srcsetGenerator,
-        private readonly ImagePipeline $pipeline,
-        private readonly TransformerRegistry $transformerRegistry,
-        private readonly MetadataGuesserInterface $metadataGuesser,
-        private readonly PlaceholderRegistry $placeholderRegistry,
-        private readonly LoaderRegistry $loaderRegistry,
-        private readonly array $formats,
-        private readonly ?int $defaultQuality,
-        private readonly string $defaultFit,
-        private readonly ?string $defaultPlaceholder = null,
-        private readonly ?Stopwatch $stopwatch = null,
+        private readonly ImageHelperInterface $imageHelper,
     ) {
     }
 
     #[PostMount]
     public function computeImageData(): void
     {
-        $this->loading ??= $this->priority ? 'eager' : 'lazy';
-        $this->fetchPriority ??= $this->priority ? 'high' : null;
+        $data = $this->imageHelper->imageData(
+            src: $this->src,
+            width: $this->width,
+            height: $this->height,
+            sizes: $this->sizes,
+            loader: $this->loader,
+            transformer: $this->transformer,
+            quality: $this->quality,
+            fit: $this->fit,
+            placeholder: $this->placeholder,
+            placeholderData: $this->placeholderData,
+            priority: $this->priority,
+            loading: $this->loading,
+            fetchPriority: $this->fetchPriority,
+            unoptimized: $this->unoptimized,
+            sourceWidth: $this->sourceWidth,
+            sourceHeight: $this->sourceHeight,
+            context: $this->context,
+        );
 
-        if ($this->unoptimized) {
-            $this->fallbackSrc = $this->src;
-
-            return;
-        }
-
-        $loaderName = $this->pipeline->resolveLoaderName($this->loader);
-
-        $reference = new ImageReference($this->src, $this->context);
-        $hasAllDisplayDims = null !== $this->width && null !== $this->height;
-        $hasAllSourceDims = null !== $this->sourceWidth && null !== $this->sourceHeight;
-        $needsMetadata = !$hasAllDisplayDims && !$hasAllSourceDims;
-        $image = $this->pipeline->load($reference, $this->loader, $needsMetadata);
-
-        $sourceWidth = $this->resolveDimensions($image, $loaderName);
-
-        // Resolve transformer: explicit prop → loader default → global default
-        $transformerName = $this->resolveTransformerName($loaderName);
-        $imageTransformer = $this->transformerRegistry->get($transformerName);
-        $transformerContext = ['loader' => $loaderName, 'transformer' => $transformerName];
-
-        $this->generatePlaceholder($image, $loaderName, $transformerContext);
-        $this->generateSources($imageTransformer, $image, $transformerContext, $sourceWidth);
-    }
-
-    /**
-     * Resolve source and display dimensions from explicit props, loader metadata, or stream detection.
-     *
-     * @return int|null The resolved source width (used to prevent upscaling in srcset)
-     */
-    private function resolveDimensions(Image $image, string $loaderName): ?int
-    {
-        $w = $this->sourceWidth ?? $image->width;
-        $h = $this->sourceHeight ?? $image->height;
-
-        if (null === $this->width || null === $this->height) {
-            if ((null === $w || null === $h) && null !== $image->stream) {
-                $this->stopwatch?->start('picasso.metadata_guess', 'picasso');
-                $guessed = $this->metadataGuesser->guess(
-                    $image->resolveStream(...),
-                    $loaderName . ':' . $image->path,
-                );
-                $this->stopwatch?->stop('picasso.metadata_guess');
-                $w ??= $guessed['width'];
-                $h ??= $guessed['height'];
-            }
-
-            // Preserve aspect ratio when only one display dimension is provided
-            $ratio = (null !== $w && null !== $h && $w > 0) ? $h / $w : null;
-            $this->width ??= null !== $ratio && null !== $this->height ? (int) round($this->height / $ratio) : $w;
-            $this->height ??= null !== $ratio && null !== $this->width ? (int) round($this->width * $ratio) : $h;
-        }
-
-        // Prevent upscaling beyond source dimensions
-        if (null !== $w && null !== $this->width && $this->width > $w) {
-            $this->width = $w;
-        }
-        if (null !== $h && null !== $this->height && $this->height > $h) {
-            $this->height = $h;
-        }
-
-        return $w;
-    }
-
-    /**
-     * @param array<string, string> $transformerContext
-     */
-    private function generatePlaceholder(Image $image, string $loaderName, array $transformerContext): void
-    {
-        if ($this->priority) {
-            return;
-        }
-
-        if (null !== $this->placeholderData) {
-            $this->placeholderUri = $this->placeholderData;
-
-            return;
-        }
-
-        $placeholderName = $this->resolvePlaceholderName($loaderName);
-        if (null !== $placeholderName) {
-            $this->placeholderUri = $this->placeholderRegistry
-                ->get($placeholderName)
-                ->generate($image, new ImageTransformation(
-                    width: $this->width,
-                    height: $this->height,
-                    quality: $this->quality ?? $this->defaultQuality,
-                    fit: $this->fit ?? $this->defaultFit,
-                ), $transformerContext);
-        }
-    }
-
-    /**
-     * @param array<string, string> $transformerContext
-     */
-    private function generateSources(ImageTransformerInterface $imageTransformer, Image $image, array $transformerContext, ?int $sourceWidth): void
-    {
-        $quality = $this->quality ?? $this->defaultQuality;
-        $fit = $this->fit ?? $this->defaultFit;
-        $formats = $this->formats;
-        $fallbackFormat = end($formats) ?: 'jpg';
-
-        foreach ($this->formats as $format) {
-            $entries = $this->srcsetGenerator->generateSrcset(
-                transformer: $imageTransformer,
-                image: $image,
-                format: $format,
-                width: $this->width,
-                height: $this->height,
-                sizes: $this->sizes,
-                quality: $quality,
-                fit: $fit,
-                context: $transformerContext,
-                sourceWidth: $sourceWidth,
-            );
-
-            $srcsetString = $this->srcsetGenerator->buildSrcsetString($entries);
-
-            if ($format === $fallbackFormat) {
-                $this->fallbackSrcset = $srcsetString;
-                $this->fallbackSrc = $this->srcsetGenerator->getFallbackUrl(
-                    transformer: $imageTransformer,
-                    image: $image,
-                    format: $format,
-                    width: $this->width,
-                    height: $this->height,
-                    quality: $quality,
-                    fit: $fit,
-                    context: $transformerContext,
-                );
-            } else {
-                $this->sources[] = new ImageSource(
-                    type: $this->getMimeType($format),
-                    srcset: $srcsetString,
-                );
-            }
-        }
-    }
-
-    private function resolveTransformerName(string $loaderName): string
-    {
-        if (null !== $this->transformer) {
-            return $this->pipeline->resolveTransformerName($this->transformer);
-        }
-
-        return $this->loaderRegistry->getDefaultTransformer($loaderName)
-            ?? $this->pipeline->resolveTransformerName(null);
-    }
-
-    private function resolvePlaceholderName(string $loaderName): ?string
-    {
-        if (false === $this->placeholder) {
-            return null;
-        }
-
-        if (is_string($this->placeholder)) {
-            return $this->placeholder;
-        }
-
-        // placeholder === true or null: use loader default, then global default
-        return $this->loaderRegistry->getDefaultPlaceholder($loaderName) ?? $this->defaultPlaceholder;
-    }
-
-    private function getMimeType(string $format): string
-    {
-        return match ($format) {
-            'avif' => 'image/avif',
-            'webp' => 'image/webp',
-            'jpg', 'jpeg', 'pjpg' => 'image/jpeg',
-            'png' => 'image/png',
-            'gif' => 'image/gif',
-            default => 'image/' . $format,
-        };
+        $this->placeholderUri = $data->placeholderUri;
+        $this->sources = $data->sources;
+        $this->fallbackSrc = $data->fallbackSrc;
+        $this->fallbackSrcset = $data->fallbackSrcset;
+        $this->width = $data->width;
+        $this->height = $data->height;
+        $this->loading = $data->loading;
+        $this->fetchPriority = $data->fetchPriority;
     }
 }
