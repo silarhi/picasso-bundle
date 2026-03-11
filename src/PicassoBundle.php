@@ -568,7 +568,10 @@ final class PicassoBundle extends AbstractBundle
                     ];
                     if (null !== $cacheServiceId) {
                         $blurhashArgs[] = service($cacheServiceId);
+                    } else {
+                        $blurhashArgs[] = null;
                     }
+                    $blurhashArgs[] = service('debug.stopwatch')->nullOnInvalid();
 
                     $services->set('picasso.placeholder.' . $name, BlurHashPlaceholder::class)
                         ->args($blurhashArgs)
