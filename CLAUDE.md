@@ -19,15 +19,15 @@ PicassoBundle is a Symfony bundle that provides responsive image components, ins
 src/
 ├── Attribute/          # AsImageLoader, AsImageTransformer, AsPlaceholder attributes
 ├── Controller/         # ImageController (serves transformed images)
-├── Dto/                # Image, ImageReference, ImageSource, ImageTransformation, SrcsetEntry
+├── Dto/                # Image, ImageReference, ImageRenderData, ImageSource, ImageTransformation, SrcsetEntry
 ├── Exception/          # Domain exceptions (PicassoExceptionInterface and implementations)
 ├── Loader/             # FilesystemLoader, FlysystemLoader, FlysystemRegistry, UrlLoader,
 │                       #   VichUploaderLoader, VichMappingHelper + interfaces
 │                       #   (ImageLoaderInterface, ServableLoaderInterface, VichMappingHelperInterface)
 ├── Placeholder/        # TransformerPlaceholder, BlurHashPlaceholder + PlaceholderInterface
-├── Service/            # ImageHelper, ImagePipeline, LoaderRegistry, TransformerRegistry,
-│                       #   PlaceholderRegistry, SrcsetGenerator, MetadataGuesser,
-│                       #   MetadataGuesserInterface, UrlEncryption
+├── Service/            # CacheKeyGenerator, ImageHelper, ImageHelperInterface, ImagePipeline,
+│                       #   LoaderRegistry, TransformerRegistry, PlaceholderRegistry,
+│                       #   SrcsetGenerator, MetadataGuesser, MetadataGuesserInterface, UrlEncryption
 ├── Transformer/        # GlideTransformer, ImgixTransformer + interfaces
 │                       #   (ImageTransformerInterface, LocalTransformerInterface)
 ├── Twig/
@@ -105,6 +105,7 @@ All bundle exceptions implement `PicassoExceptionInterface` (extends `Throwable`
 | `InvalidMetadataException`     | `LogicException`           | Image metadata is malformed or invalid                    |
 | `InvalidConfigurationException`| `LogicException`           | Invalid bundle configuration (missing type, missing package) |
 | `ImageProcessingException`     | `RuntimeException`         | Image processing failure (stream read errors, encoding)   |
+| `PlaceholderNotFoundException` | `InvalidArgumentException` | Requested placeholder name is unknown or missing from context |
 
 ## Coding Conventions
 
