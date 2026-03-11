@@ -135,7 +135,9 @@ class ImageComponent
         $loaderName = $this->pipeline->resolveLoaderName($this->loader);
 
         $reference = new ImageReference($this->src, $this->context);
-        $needsMetadata = null === $this->sourceWidth || null === $this->sourceHeight;
+        $hasAllDisplayDims = null !== $this->width && null !== $this->height;
+        $hasAllSourceDims = null !== $this->sourceWidth && null !== $this->sourceHeight;
+        $needsMetadata = !$hasAllDisplayDims && !$hasAllSourceDims;
         $image = $this->pipeline->load($reference, $this->loader, $needsMetadata);
 
         $sourceWidth = $this->resolveDimensions($image, $loaderName);
@@ -159,21 +161,23 @@ class ImageComponent
         $w = $this->sourceWidth ?? $image->width;
         $h = $this->sourceHeight ?? $image->height;
 
-        if ((null === $w || null === $h) && null !== $image->stream) {
-            $this->stopwatch?->start('picasso.metadata_guess', 'picasso');
-            $guessed = $this->metadataGuesser->guess(
-                $image->resolveStream(...),
-                $loaderName . ':' . $image->path,
-            );
-            $w ??= $guessed['width'];
-            $h ??= $guessed['height'];
-            $this->stopwatch?->stop('picasso.metadata_guess');
-        }
+        if (null === $this->width || null === $this->height) {
+            if ((null === $w || null === $h) && null !== $image->stream) {
+                $this->stopwatch?->start('picasso.metadata_guess', 'picasso');
+                $guessed = $this->metadataGuesser->guess(
+                    $image->resolveStream(...),
+                    $loaderName . ':' . $image->path,
+                );
+                $this->stopwatch?->stop('picasso.metadata_guess');
+                $w ??= $guessed['width'];
+                $h ??= $guessed['height'];
+            }
 
-        // Preserve aspect ratio when only one display dimension is provided
-        $ratio = (null !== $w && null !== $h && $w > 0) ? $h / $w : null;
-        $this->width ??= null !== $ratio && null !== $this->height ? (int) round($this->height / $ratio) : $w;
-        $this->height ??= null !== $ratio && null !== $this->width ? (int) round($this->width * $ratio) : $h;
+            // Preserve aspect ratio when only one display dimension is provided
+            $ratio = (null !== $w && null !== $h && $w > 0) ? $h / $w : null;
+            $this->width ??= null !== $ratio && null !== $this->height ? (int) round($this->height / $ratio) : $w;
+            $this->height ??= null !== $ratio && null !== $this->width ? (int) round($this->width * $ratio) : $h;
+        }
 
         // Prevent upscaling beyond source dimensions
         if (null !== $w && null !== $this->width && $this->width > $w) {

@@ -728,6 +728,48 @@ class ImageComponentTest extends TestCase
         self::assertSame('image/tiff', $component->sources[1]->type);
     }
 
+    public function testSkipsStreamResolutionWhenBothDisplayDimensionsProvided(): void
+    {
+        $this->pipeline->expects(self::once())
+            ->method('load')
+            ->with(self::anything(), self::anything(), false)
+            ->willReturn(new Image(path: 'photo.jpg'));
+        $this->metadataGuesser->expects(self::never())->method('guess');
+        $this->configureSrcsetGenerator();
+
+        $component = $this->createComponent();
+        $component->src = 'photo.jpg';
+        $component->width = 400;
+        $component->height = 300;
+        $component->sizes = '100vw';
+        $component->computeImageData();
+
+        self::assertSame(400, $component->width);
+        self::assertSame(300, $component->height);
+    }
+
+    public function testUpscalingPreventionWorksWithExplicitSourceAndDisplayDimensions(): void
+    {
+        $this->pipeline->expects(self::once())
+            ->method('load')
+            ->with(self::anything(), self::anything(), false)
+            ->willReturn(new Image(path: 'photo.jpg'));
+        $this->metadataGuesser->expects(self::never())->method('guess');
+        $this->configureSrcsetGenerator();
+
+        $component = $this->createComponent();
+        $component->src = 'photo.jpg';
+        $component->width = 800;
+        $component->height = 600;
+        $component->sourceWidth = 640;
+        $component->sourceHeight = 480;
+        $component->sizes = '100vw';
+        $component->computeImageData();
+
+        self::assertSame(640, $component->width);
+        self::assertSame(480, $component->height);
+    }
+
     private function configureSrcsetGenerator(): void
     {
         $this->srcsetGenerator->method('generateSrcset')->willReturn([

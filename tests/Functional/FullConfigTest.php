@@ -397,11 +397,13 @@ class FullConfigTest extends KernelTestCase
 
     public function testUpscalingPreventedWithCustomSizes(): void
     {
-        // photo.jpg is 100x50 — requesting 200x100 should be capped
+        // photo.jpg is 100x50 — with explicit sourceWidth/sourceHeight, display dims are capped
         $component = $this->mountTwigComponent('Picasso:Image', [
             'src' => 'photo.jpg',
             'width' => 200,
             'height' => 100,
+            'sourceWidth' => 100,
+            'sourceHeight' => 50,
             'sizes' => '100vw',
         ]);
         assert($component instanceof ImageComponent);
@@ -425,11 +427,13 @@ class FullConfigTest extends KernelTestCase
 
     public function testSmallImageDoesNotUpscale(): void
     {
-        // pixel.gif is 1x1
+        // pixel.gif is 1x1 — with explicit sourceWidth/sourceHeight, display dims are capped
         $component = $this->mountTwigComponent('Picasso:Image', [
             'src' => 'pixel.gif',
             'width' => 100,
             'height' => 100,
+            'sourceWidth' => 1,
+            'sourceHeight' => 1,
             'sizes' => '100vw',
         ]);
         assert($component instanceof ImageComponent);
