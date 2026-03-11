@@ -68,7 +68,7 @@ class UrlLoaderTest extends TestCase
         $loader = new UrlLoader($httpClient, $requestFactory);
         $image = $loader->load(new ImageReference('https://example.com/photo.jpg'));
 
-        self::assertSame('https://example.com/photo.jpg', $image->url);
+        self::assertSame('https://example.com/photo.jpg', $image->path);
         self::assertInstanceOf(Closure::class, $image->stream);
     }
 
@@ -80,7 +80,7 @@ class UrlLoaderTest extends TestCase
         $loader = new UrlLoader($httpClient, $requestFactory);
         $image = $loader->load(new ImageReference('https://example.com/photo.jpg'), withMetadata: true);
 
-        self::assertSame('https://example.com/photo.jpg', $image->url);
+        self::assertSame('https://example.com/photo.jpg', $image->path);
         self::assertInstanceOf(Closure::class, $image->stream);
         self::assertNull($image->width);
         self::assertNull($image->height);

@@ -28,6 +28,7 @@ use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Exception\ImageProcessingException;
 use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
 use Silarhi\PicassoBundle\Service\CacheKeyGenerator;
+use Symfony\Component\Stopwatch\Stopwatch;
 
 /**
  * @phpstan-import-type TransformerContext from \Silarhi\PicassoBundle\Transformer\ImageTransformerInterface
@@ -47,6 +48,7 @@ final readonly class BlurHashPlaceholder implements PlaceholderInterface
         private int $componentsY = 3,
         private int $size = 32,
         private ?CacheItemPoolInterface $cache = null,
+        private ?Stopwatch $stopwatch = null,
     ) {
         $this->palette = new RGB();
     }
@@ -57,6 +59,20 @@ final readonly class BlurHashPlaceholder implements PlaceholderInterface
             throw new InvalidConfigurationException('The "kornrunner/blurhash" package is required for the BlurHash placeholder. Install it with: composer require kornrunner/blurhash');
         }
 
+        $this->stopwatch?->start('picasso.blurhash', 'picasso');
+
+        try {
+            return $this->doGenerateWithCache($image, $transformation, $context);
+        } finally {
+            $this->stopwatch?->stop('picasso.blurhash');
+        }
+    }
+
+    /**
+     * @param TransformerContext $context
+     */
+    private function doGenerateWithCache(Image $image, ImageTransformation $transformation, array $context): string
+    {
         if ($this->cache instanceof CacheItemPoolInterface && null !== $image->path) {
             // Loader name is optional for BlurHash — used only for cache key specificity
             $loader = isset($context['loader']) && is_string($context['loader']) ? $context['loader'] : '';
@@ -90,7 +106,10 @@ final readonly class BlurHashPlaceholder implements PlaceholderInterface
 
     private function doGenerate(Image $image, ImageTransformation $transformation): string
     {
+        $this->stopwatch?->start('picasso.blurhash.stream', 'picasso');
         $stream = $image->resolveStream();
+        $this->stopwatch?->stop('picasso.blurhash.stream');
+
         if (null === $stream) {
             throw new ImageProcessingException('Cannot generate BlurHash: image stream is not available.');
         }

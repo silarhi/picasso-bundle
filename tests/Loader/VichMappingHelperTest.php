@@ -209,4 +209,18 @@ class VichMappingHelperTest extends TestCase
 
         self::assertNull($this->helper->readDimensions($entity, 'imageFile'));
     }
+
+    public function testReadMimeTypeReturnsNullForUnknownField(): void
+    {
+        $entity = new ProductEntity();
+
+        self::assertNull($this->helper->readMimeType($entity, 'nonExistentField'));
+    }
+
+    public function testReadDimensionsReturnsNullForUnknownField(): void
+    {
+        $entity = new ProductEntity();
+
+        self::assertNull($this->helper->readDimensions($entity, 'nonExistentField'));
+    }
 }

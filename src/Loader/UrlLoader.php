@@ -34,13 +34,19 @@ final readonly class UrlLoader implements ImageLoaderInterface
         }
 
         return new Image(
-            url: $url,
-            stream: function () use ($url) {
-                $request = $this->requestFactory->createRequest('GET', $url);
-                $response = $this->httpClient->sendRequest($request);
-
-                return $response->getBody()->detach();
-            },
+            path: $url,
+            stream: fn () => $this->getRequestStream($url),
         );
+    }
+
+    /**
+     * @return resource|null
+     */
+    private function getRequestStream(string $url)
+    {
+        $request = $this->requestFactory->createRequest('GET', $url);
+        $response = $this->httpClient->sendRequest($request);
+
+        return $response->getBody()->detach();
     }
 }

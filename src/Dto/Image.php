@@ -23,7 +23,6 @@ final readonly class Image
      */
     public function __construct(
         public ?string $path = null,
-        public ?string $url = null,
         /** @var (Closure(): (resource|null))|resource|null */
         public mixed $stream = null,
         public ?int $width = null,

@@ -46,7 +46,7 @@ class TransformerPlaceholderTest extends TestCase
         $locator->method('get')->with('glide')->willReturn($transformer);
         $registry = new TransformerRegistry($locator);
 
-        $placeholder = new TransformerPlaceholder($registry, size: 10, blur: 5, quality: 30);
+        $placeholder = new TransformerPlaceholder($registry, size: 10, blur: 5, quality: 30, fit: 'crop', format: 'jpg');
         $result = $placeholder->generate(
             new Image(path: 'photo.jpg'),
             new ImageTransformation(width: 1920, height: 1080),
@@ -76,7 +76,7 @@ class TransformerPlaceholderTest extends TestCase
         $locator->method('get')->with('glide')->willReturn($transformer);
         $registry = new TransformerRegistry($locator);
 
-        $placeholder = new TransformerPlaceholder($registry, size: 20, blur: 15, quality: 50);
+        $placeholder = new TransformerPlaceholder($registry, size: 20, blur: 15, quality: 50, fit: 'crop', format: 'jpg');
         $result = $placeholder->generate(
             new Image(path: 'photo.jpg'),
             new ImageTransformation(width: 800, height: 400),
@@ -91,7 +91,7 @@ class TransformerPlaceholderTest extends TestCase
         $locator = $this->createMock(ContainerInterface::class);
         $registry = new TransformerRegistry($locator);
 
-        $placeholder = new TransformerPlaceholder($registry, size: 10, blur: 5, quality: 30);
+        $placeholder = new TransformerPlaceholder($registry, size: 10, blur: 5, quality: 30, fit: 'crop', format: 'jpg');
 
         $this->expectException(TransformerNotFoundException::class);
         $placeholder->generate(new Image(path: 'photo.jpg'), new ImageTransformation(width: 100, height: 100));

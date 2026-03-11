@@ -30,7 +30,8 @@ class MetadataGuesserTest extends TestCase
 
     public function testGuessGifImage(): void
     {
-        $gif = base64_decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
+        $gif = file_get_contents(dirname(__DIR__) . '/Fixtures/pixel.gif');
+        self::assertNotFalse($gif);
         $stream = $this->createStream($gif);
 
         $result = $this->guesser->guess($stream);
@@ -42,7 +43,8 @@ class MetadataGuesserTest extends TestCase
 
     public function testGuessPngImage(): void
     {
-        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAIAAAADCAYAAACo2gZnAAAADklEQVQI12P4z8BQDwAEgAF/QualzQAAAABJRU5ErkJggg==');
+        $png = file_get_contents(dirname(__DIR__) . '/Fixtures/2x3.png');
+        self::assertNotFalse($png);
         $stream = $this->createStream($png);
 
         $result = $this->guesser->guess($stream);
@@ -89,7 +91,8 @@ class MetadataGuesserTest extends TestCase
 
     public function testGuessReadsFromOffset(): void
     {
-        $gif = base64_decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
+        $gif = file_get_contents(dirname(__DIR__) . '/Fixtures/pixel.gif');
+        self::assertNotFalse($gif);
         $stream = $this->createStream($gif);
 
         // Advance the stream position
@@ -107,7 +110,8 @@ class MetadataGuesserTest extends TestCase
         $cache = new ArrayAdapter();
         $guesser = new MetadataGuesser($cache);
 
-        $gif = base64_decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
+        $gif = file_get_contents(dirname(__DIR__) . '/Fixtures/pixel.gif');
+        self::assertNotFalse($gif);
         $stream = $this->createStream($gif);
 
         // First call: populates cache
@@ -129,7 +133,8 @@ class MetadataGuesserTest extends TestCase
         $cache = new ArrayAdapter();
         $guesser = new MetadataGuesser($cache);
 
-        $gif = base64_decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
+        $gif = file_get_contents(dirname(__DIR__) . '/Fixtures/pixel.gif');
+        self::assertNotFalse($gif);
         $stream = $this->createStream($gif);
 
         $result = $guesser->guess($stream);
@@ -139,6 +144,62 @@ class MetadataGuesserTest extends TestCase
         $emptyStream = $this->createStream('');
         $result2 = $guesser->guess($emptyStream);
         self::assertNull($result2['width']);
+    }
+
+    public function testGuessWithClosureResolvesLazily(): void
+    {
+        $gif = file_get_contents(dirname(__DIR__) . '/Fixtures/pixel.gif');
+        self::assertNotFalse($gif);
+
+        $invoked = false;
+        $closure = function () use ($gif, &$invoked) {
+            $invoked = true;
+
+            return $this->createStream($gif);
+        };
+
+        $result = $this->guesser->guess($closure);
+
+        self::assertTrue($invoked);
+        self::assertSame(1, $result['width']);
+        self::assertSame(1, $result['height']);
+        self::assertSame('image/gif', $result['mimeType']);
+    }
+
+    public function testGuessWithClosureNotInvokedOnCacheHit(): void
+    {
+        $cache = new ArrayAdapter();
+        $guesser = new MetadataGuesser($cache);
+
+        $gif = file_get_contents(dirname(__DIR__) . '/Fixtures/pixel.gif');
+        self::assertNotFalse($gif);
+
+        // First call: populates cache with a real stream
+        $guesser->guess($this->createStream($gif), 'lazy-test.gif');
+
+        // Second call: closure should NOT be invoked
+        $invoked = false;
+        $closure = function () use (&$invoked) {
+            $invoked = true;
+
+            return $this->createStream('');
+        };
+
+        $cached = $guesser->guess($closure, 'lazy-test.gif');
+
+        self::assertFalse($invoked, 'Closure should not be invoked on cache hit');
+        self::assertSame(1, $cached['width']);
+        self::assertSame(1, $cached['height']);
+        self::assertSame('image/gif', $cached['mimeType']);
+    }
+
+    public function testGuessWithClosureReturningNullReturnsNulls(): void
+    {
+        $result = $this->guesser->guess(static fn () => null);
+
+        self::assertNull($result['width']);
+        self::assertNull($result['height']);
+        self::assertNull($result['mimeType']);
     }
 
     /**

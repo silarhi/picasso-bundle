@@ -15,114 +15,56 @@ namespace Silarhi\PicassoBundle\Tests\Functional;
 
 use function dirname;
 
-use Silarhi\PicassoBundle\PicassoBundle;
 use Silarhi\PicassoBundle\Tests\Functional\Stub\StubAttributeLoader;
 use Silarhi\PicassoBundle\Tests\Functional\Stub\StubAttributePlaceholder;
 use Silarhi\PicassoBundle\Tests\Functional\Stub\StubAttributeTransformer;
-use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
-use Symfony\Bundle\TwigBundle\TwigBundle;
-use Symfony\Component\Config\Loader\LoaderInterface;
-use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
-use Symfony\Component\HttpKernel\Kernel;
-use Symfony\UX\TwigComponent\TwigComponentBundle;
 
-class MultiConfigKernel extends Kernel
+class MultiConfigKernel extends AbstractPicassoKernel
 {
-    public function registerBundles(): iterable
+    protected function configureContainer(ContainerBuilder $container): void
     {
-        return [
-            new FrameworkBundle(),
-            new TwigBundle(),
-            new TwigComponentBundle(),
-            new PicassoBundle(),
-        ];
-    }
-
-    public function registerContainerConfiguration(LoaderInterface $loader): void
-    {
-        $loader->load(static function (ContainerBuilder $container): void {
-            $container->loadFromExtension('framework', [
-                'test' => true,
-                'secret' => 'multi-config-secret',
-                'router' => [
-                    'resource' => '%kernel.project_dir%/config/routes.php',
+        // Multiple loaders of the same type, attribute-registered stubs, etc.
+        $container->loadFromExtension('picasso', [
+            'default_loader' => 'primary',
+            'default_transformer' => 'glide',
+            'default_placeholder' => 'blur',
+            'placeholders' => [
+                'blur' => [
+                    'type' => 'transformer',
                 ],
-                'http_method_override' => false,
-                'handle_all_throwables' => true,
-                'php_errors' => ['log' => true],
-            ]);
-
-            $container->loadFromExtension('twig', [
-                'default_path' => '%kernel.project_dir%/templates',
-            ]);
-
-            // Multiple loaders of the same type, attribute-registered stubs, etc.
-            $container->loadFromExtension('picasso', [
-                'default_loader' => 'primary',
-                'default_transformer' => 'glide',
-                'default_placeholder' => 'blur',
-                'placeholders' => [
-                    'blur' => [
-                        'type' => 'transformer',
-                    ],
+            ],
+            'loaders' => [
+                'primary' => [
+                    'type' => 'filesystem',
+                    'paths' => [dirname(__DIR__) . '/Fixtures'],
                 ],
-                'loaders' => [
-                    'primary' => [
-                        'type' => 'filesystem',
-                        'paths' => [dirname(__DIR__) . '/Fixtures'],
-                    ],
-                    'secondary' => [
-                        'type' => 'filesystem',
-                        'paths' => [dirname(__DIR__) . '/Fixtures'],
-                    ],
-                    'disabled_loader' => [
-                        'type' => 'filesystem',
-                        'enabled' => false,
-                        'paths' => ['/nonexistent'],
-                    ],
+                'secondary' => [
+                    'type' => 'filesystem',
+                    'paths' => [dirname(__DIR__) . '/Fixtures'],
                 ],
-                'transformers' => [
-                    'glide' => [
-                        'sign_key' => 'multi-test-key',
-                        'cache' => '%kernel.cache_dir%/glide',
-                    ],
+                'disabled_loader' => [
+                    'type' => 'filesystem',
+                    'enabled' => false,
+                    'paths' => ['/nonexistent'],
                 ],
-            ]);
+            ],
+            'transformers' => [
+                'glide' => [
+                    'sign_key' => 'multi-test-key',
+                    'cache' => '%kernel.cache_dir%/glide',
+                ],
+            ],
+        ]);
 
-            // Register attribute-based stubs as services
-            $container->register(StubAttributeLoader::class, StubAttributeLoader::class)->setAutoconfigured(true);
-            $container->register(StubAttributeTransformer::class, StubAttributeTransformer::class)->setAutoconfigured(true);
-            $container->register(StubAttributePlaceholder::class, StubAttributePlaceholder::class)->setAutoconfigured(true);
-        });
-    }
-
-    protected function build(ContainerBuilder $container): void
-    {
-        $container->addCompilerPass(new class implements CompilerPassInterface {
-            public function process(ContainerBuilder $container): void
-            {
-                foreach ($container->getDefinitions() as $id => $definition) {
-                    if (str_starts_with($id, 'picasso.') || str_starts_with($id, '.picasso.')) {
-                        $definition->setPublic(true);
-                    }
-                }
-            }
-        });
-    }
-
-    public function getProjectDir(): string
-    {
-        return dirname(__DIR__, 2);
+        // Register attribute-based stubs as services
+        $container->register(StubAttributeLoader::class, StubAttributeLoader::class)->setAutoconfigured(true);
+        $container->register(StubAttributeTransformer::class, StubAttributeTransformer::class)->setAutoconfigured(true);
+        $container->register(StubAttributePlaceholder::class, StubAttributePlaceholder::class)->setAutoconfigured(true);
     }
 
     public function getCacheDir(): string
     {
         return sys_get_temp_dir() . '/picasso_test/cache/multi';
-    }
-
-    public function getLogDir(): string
-    {
-        return sys_get_temp_dir() . '/picasso_test/log';
     }
 }

@@ -61,8 +61,12 @@ final readonly class ImgixTransformer implements ImageTransformerInterface
             $imgix['fm'] = $transformation->format;
         }
 
-        $imgix['q'] = $transformation->quality;
-        $imgix['fit'] = $this->mapFit($transformation->fit);
+        if (null !== $transformation->quality) {
+            $imgix['q'] = $transformation->quality;
+        }
+        if (null !== $transformation->fit) {
+            $imgix['fit'] = $this->mapFit($transformation->fit);
+        }
 
         if (null !== $transformation->blur) {
             $imgix['blur'] = $transformation->blur;

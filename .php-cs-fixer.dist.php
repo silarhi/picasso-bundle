@@ -47,6 +47,7 @@ return $config
         'ordered_imports' => ['sort_algorithm' => 'alpha'],
         'global_namespace_import' => ['import_functions' => true],
         'declare_strict_types' => true,
+        'static_lambda' => false,
     ])
     ->setRiskyAllowed(true)
     ->setCacheFile(__DIR__ . '/var/tools/.php-cs-fixer.cache')

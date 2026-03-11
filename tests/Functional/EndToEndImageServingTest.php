@@ -60,7 +60,7 @@ class EndToEndImageServingTest extends KernelTestCase
 
         $response = $this->handleRequest($srcUrl);
 
-        self::assertSame(200, $response->getStatusCode(), 'Fallback src serving failed');
+        self::assertSame(200, $response->getStatusCode(), 'Fallback src serving failed: ' . $response->getContent());
         self::assertStringContainsString('image/', (string) $response->headers->get('Content-Type'));
     }
 
@@ -77,7 +77,7 @@ class EndToEndImageServingTest extends KernelTestCase
 
         $response = $this->handleRequest($url);
 
-        self::assertSame(200, $response->getStatusCode(), 'Srcset entry serving failed');
+        self::assertSame(200, $response->getStatusCode(), 'Srcset entry serving failed: ' . $response->getContent());
         self::assertStringContainsString('image/', (string) $response->headers->get('Content-Type'));
     }
 
@@ -94,7 +94,7 @@ class EndToEndImageServingTest extends KernelTestCase
 
         $response = $this->handleRequest($url);
 
-        self::assertSame(200, $response->getStatusCode(), 'Source srcset entry serving failed');
+        self::assertSame(200, $response->getStatusCode(), 'Source srcset entry serving failed: ' . $response->getContent());
         self::assertStringContainsString('image/', (string) $response->headers->get('Content-Type'));
     }
 
@@ -111,7 +111,7 @@ class EndToEndImageServingTest extends KernelTestCase
 
         $srcUrl = $this->parseSrcFromImg($html);
         $response = $this->handleRequest($srcUrl);
-        self::assertSame(200, $response->getStatusCode(), 'Blur variant fallback src failed');
+        self::assertSame(200, $response->getStatusCode(), 'Blur variant fallback src failed: ' . $response->getContent());
     }
 
     public function testRenderWithPriorityAndServe(): void
@@ -128,7 +128,7 @@ class EndToEndImageServingTest extends KernelTestCase
 
         $srcUrl = $this->parseSrcFromImg($html);
         $response = $this->handleRequest($srcUrl);
-        self::assertSame(200, $response->getStatusCode(), 'Priority image serving failed');
+        self::assertSame(200, $response->getStatusCode(), 'Priority image serving failed: ' . $response->getContent());
         self::assertStringContainsString('image/', (string) $response->headers->get('Content-Type'));
     }
 
@@ -145,7 +145,7 @@ class EndToEndImageServingTest extends KernelTestCase
         self::assertStringContainsString('/image/local_glide/secondary_fs/', $srcUrl);
 
         $response = $this->handleRequest($srcUrl);
-        self::assertSame(200, $response->getStatusCode(), 'Secondary loader image serving failed');
+        self::assertSame(200, $response->getStatusCode(), 'Secondary loader image serving failed: ' . $response->getContent());
         self::assertStringContainsString('image/', (string) $response->headers->get('Content-Type'));
     }
 
@@ -162,7 +162,7 @@ class EndToEndImageServingTest extends KernelTestCase
         self::assertStringContainsString('/image/local_glide/main/photo.jpg', $srcUrl);
 
         $response = $this->handleRequest($srcUrl);
-        self::assertSame(200, $response->getStatusCode());
+        self::assertSame(200, $response->getStatusCode(), 'Registered transformer/loader URL serving failed: ' . $response->getContent());
     }
 
     public function testGeneratedUrlUsesOverriddenLoaderName(): void
@@ -179,7 +179,7 @@ class EndToEndImageServingTest extends KernelTestCase
         self::assertStringContainsString('/image/local_glide/third_fs/pixel.gif', $srcUrl);
 
         $response = $this->handleRequest($srcUrl);
-        self::assertSame(200, $response->getStatusCode());
+        self::assertSame(200, $response->getStatusCode(), 'Overridden loader URL serving failed: ' . $response->getContent());
     }
 
     public function testTamperedSignatureReturns404(): void
@@ -195,7 +195,7 @@ class EndToEndImageServingTest extends KernelTestCase
         self::assertNotNull($tamperedUrl);
 
         $response = $this->handleRequest($tamperedUrl);
-        self::assertSame(404, $response->getStatusCode());
+        self::assertSame(404, $response->getStatusCode(), 'Tampered signature should return 404: ' . $response->getContent());
     }
 
     public function testMultipleSrcsetEntriesAllServable(): void
@@ -222,7 +222,7 @@ class EndToEndImageServingTest extends KernelTestCase
             }
 
             $response = $this->handleRequest($url);
-            self::assertSame(200, $response->getStatusCode(), 'Srcset entry failed: ' . $url);
+            self::assertSame(200, $response->getStatusCode(), 'Srcset entry failed: ' . $url . ' — ' . $response->getContent());
             ++$tested;
             if ($tested >= 3) {
                 break;

@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Transformer;
 
-use Closure;
 use InvalidArgumentException;
 use JsonException;
 use League\Flysystem\Filesystem;
@@ -110,8 +109,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
     public function serve(ServableLoaderInterface $loader, string $path, Request $request, array $context = []): Response
     {
         $params = $request->query->all();
-        $cacheFilename = null;
-        $cachePrefix = null;
+        $cachePathCallable = null;
 
         try {
             $this->signature->validateRequest($path, $params);
@@ -132,12 +130,10 @@ final readonly class GlideTransformer implements LocalTransformerInterface
             ['params' => $cachedParams] = self::parseParamsFilename($cacheFilename);
             $params = [...$params, ...$cachedParams];
 
-            // Include transformer/loader in cache path so it mirrors the URL structure
-            /** @var string $transformerName */
-            $transformerName = $context['transformer'] ?? '';
-            /** @var string $loaderName */
-            $loaderName = $context['loader'] ?? '';
-            $cachePrefix = $transformerName . '/' . $loaderName;
+            $transformer = $this;
+            $cachePathCallable = function (string $path) use ($transformer, $cacheFilename, $context): string {
+                return $transformer->computeCachePath($path, $cacheFilename, $context);
+            };
         }
 
         if (isset($params['_metadata'])) {
@@ -164,14 +160,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
 
         $this->server->setSource($sourceFilesystem);
         $this->server->setResponseFactory(new SymfonyResponseFactory($request));
-
-        if (null !== $cacheFilename) {
-            $this->server->setCachePathCallable(Closure::fromCallable(
-                static fn (string $path, array $params): string => ($cachePrefix ? $cachePrefix . '/' : '') . $path . '/' . $cacheFilename,
-            ));
-        } else {
-            $this->server->setCachePathCallable(null);
-        }
+        $this->server->setCachePathCallable($cachePathCallable);
 
         try {
             /** @var Response $response */
@@ -181,6 +170,21 @@ final readonly class GlideTransformer implements LocalTransformerInterface
         } catch (FileNotFoundException|InvalidArgumentException $e) {
             throw new ImageNotFoundException('Image not found.', $e->getCode(), previous: $e);
         }
+    }
+
+    /**
+     * @param array<string, string> $context
+     */
+    public function computeCachePath(string $path, string $cacheFilename, array $context): string
+    {
+        // Include transformer/loader in cache path so it mirrors the URL structure
+        /** @var string $transformerName */
+        $transformerName = $context['transformer'] ?? throw new TransformerNotFoundException('The "transformer" key is required in the context array.');
+        /** @var string $loaderName */
+        $loaderName = $context['loader'] ?? throw new LoaderNotFoundException('The "loader" key is required in the context array.');
+        $cachePrefix = $transformerName . '/' . $loaderName;
+
+        return $cachePrefix . '/' . $path . '/' . $cacheFilename;
     }
 
     public function isPublicCacheEnabled(): bool
@@ -265,8 +269,12 @@ final readonly class GlideTransformer implements LocalTransformerInterface
             $glide['fm'] = $transformation->format;
         }
 
-        $glide['q'] = $transformation->quality;
-        $glide['fit'] = $transformation->fit;
+        if (null !== $transformation->quality) {
+            $glide['q'] = $transformation->quality;
+        }
+        if (null !== $transformation->fit) {
+            $glide['fit'] = $transformation->fit;
+        }
 
         if (null !== $transformation->blur) {
             $glide['blur'] = $transformation->blur;

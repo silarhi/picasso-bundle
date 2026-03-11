@@ -28,8 +28,10 @@ final readonly class TransformerPlaceholder implements PlaceholderInterface
     public function __construct(
         private TransformerRegistry $transformerRegistry,
         private int $size,
-        private int $blur,
-        private int $quality,
+        private ?int $blur,
+        private ?int $quality,
+        private ?string $fit,
+        private ?string $format,
     ) {
     }
 
@@ -54,9 +56,9 @@ final readonly class TransformerPlaceholder implements PlaceholderInterface
         return $transformer->url($image, new ImageTransformation(
             width: $tinyWidth,
             height: $tinyHeight,
-            format: 'jpg',
+            format: $this->format,
             quality: $this->quality,
-            fit: 'crop',
+            fit: $this->fit,
             blur: $this->blur,
         ), $context);
     }

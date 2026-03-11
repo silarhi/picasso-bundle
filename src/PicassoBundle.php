@@ -18,6 +18,7 @@ use function count;
 use function dirname;
 use function in_array;
 use function is_bool;
+use function is_int;
 use function is_string;
 
 use Silarhi\PicassoBundle\Attribute\AsImageLoader;
@@ -53,6 +54,7 @@ use function sprintf;
 
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\DependencyInjection\ChildDefinition;
+use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 
@@ -73,7 +75,14 @@ final class PicassoBundle extends AbstractBundle
         $container->registerAttributeForAutoconfiguration(
             AsImageLoader::class,
             static function (ChildDefinition $definition, AsImageLoader $attribute): void {
-                $definition->addTag('picasso.loader', ['key' => $attribute->name]);
+                $tag = ['key' => $attribute->name];
+                if (null !== $attribute->defaultPlaceholder) {
+                    $tag['default_placeholder'] = $attribute->defaultPlaceholder;
+                }
+                if (null !== $attribute->defaultTransformer) {
+                    $tag['default_transformer'] = $attribute->defaultTransformer;
+                }
+                $definition->addTag('picasso.loader', $tag);
             },
         );
 
@@ -90,6 +99,37 @@ final class PicassoBundle extends AbstractBundle
                 $definition->addTag('picasso.placeholder', ['key' => $attribute->name]);
             },
         );
+
+        // Merge per-loader defaults from attribute-tagged loaders into LoaderRegistry
+        $container->addCompilerPass(new class implements CompilerPassInterface {
+            public function process(ContainerBuilder $container): void
+            {
+                if (!$container->hasDefinition('picasso.loader_registry')) {
+                    return;
+                }
+
+                $definition = $container->getDefinition('picasso.loader_registry');
+                /** @var array<string, string> $placeholders */
+                $placeholders = $definition->getArgument(1);
+                /** @var array<string, string> $transformers */
+                $transformers = $definition->getArgument(2);
+
+                foreach ($container->findTaggedServiceIds('picasso.loader') as $tags) {
+                    /** @var array{key?: string, default_placeholder?: string, default_transformer?: string} $tag */
+                    foreach ($tags as $tag) {
+                        if (isset($tag['key'], $tag['default_placeholder'])) {
+                            $placeholders[$tag['key']] ??= $tag['default_placeholder'];
+                        }
+                        if (isset($tag['key'], $tag['default_transformer'])) {
+                            $transformers[$tag['key']] ??= $tag['default_transformer'];
+                        }
+                    }
+                }
+
+                $definition->replaceArgument(1, $placeholders);
+                $definition->replaceArgument(2, $transformers);
+            }
+        });
     }
 
     public function configure(DefinitionConfigurator $definition): void
@@ -123,10 +163,12 @@ final class PicassoBundle extends AbstractBundle
                         ->end()
                     ->end()
                 ->end()
-                ->integerNode('default_quality')
+                ->scalarNode('default_quality')
                     ->defaultValue(75)
-                    ->min(1)
-                    ->max(100)
+                    ->validate()
+                        ->ifTrue(static fn (mixed $v): bool => null !== $v && (!is_int($v) || $v < 1 || $v > 100))
+                        ->thenInvalid('The "default_quality" must be null or an integer between 1 and 100.')
+                    ->end()
                 ->end()
                 ->scalarNode('default_fit')
                     ->defaultValue('contain')
@@ -156,8 +198,30 @@ final class PicassoBundle extends AbstractBundle
                                 ->info('Placeholder type. Inferred from name when it matches a known type.')
                             ->end()
                             ->integerNode('size')->defaultValue(10)->info('Tiny image size for transformer placeholders.')->end()
-                            ->integerNode('blur')->defaultValue(5)->info('Blur amount for transformer placeholders.')->end()
-                            ->integerNode('quality')->defaultValue(30)->min(1)->max(100)->info('Quality for transformer placeholders.')->end()
+                            ->scalarNode('blur')
+                                ->defaultValue(5)
+                                ->info('Blur amount for transformer placeholders. Null disables blur.')
+                                ->validate()
+                                    ->ifTrue(static fn (mixed $v): bool => null !== $v && !is_int($v))
+                                    ->thenInvalid('The "blur" option must be null or an integer.')
+                                ->end()
+                            ->end()
+                            ->scalarNode('quality')
+                                ->defaultValue(30)
+                                ->info('Quality for transformer placeholders. Null uses transformer default.')
+                                ->validate()
+                                    ->ifTrue(static fn (mixed $v): bool => null !== $v && (!is_int($v) || $v < 1 || $v > 100))
+                                    ->thenInvalid('The "quality" option must be null or an integer between 1 and 100.')
+                                ->end()
+                            ->end()
+                            ->scalarNode('fit')
+                                ->defaultValue('crop')
+                                ->info('Fit mode for transformer placeholders. Null uses transformer default.')
+                            ->end()
+                            ->scalarNode('format')
+                                ->defaultValue('jpg')
+                                ->info('Image format for transformer placeholders. Null uses transformer default.')
+                            ->end()
                             ->integerNode('components_x')->defaultValue(4)->min(1)->max(9)->info('Horizontal BlurHash components (1–9).')->end()
                             ->integerNode('components_y')->defaultValue(3)->min(1)->max(9)->info('Vertical BlurHash components (1–9).')->end()
                             ->scalarNode('driver')
@@ -202,6 +266,14 @@ final class PicassoBundle extends AbstractBundle
                             ->scalarNode('request_factory')
                                 ->defaultNull()
                                 ->info('PSR-17 request factory service ID for url loaders.')
+                            ->end()
+                            ->scalarNode('default_placeholder')
+                                ->defaultNull()
+                                ->info('Default placeholder name for this loader. Overrides the global default_placeholder.')
+                            ->end()
+                            ->scalarNode('default_transformer')
+                                ->defaultNull()
+                                ->info('Default transformer name for this loader. Overrides the global default_transformer.')
                             ->end()
                         ->end()
                         ->validate()
@@ -260,10 +332,10 @@ final class PicassoBundle extends AbstractBundle
          *     device_sizes: list<int>,
          *     image_sizes: list<int>,
          *     formats: list<string>,
-         *     default_quality: int,
+         *     default_quality: int|null,
          *     default_fit: string,
-         *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int, quality: int, components_x: int, components_y: int, driver: string, service: string|null}>,
-         *     loaders: array<string, array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null, request_factory: string|null}>,
+         *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int|null, quality: int|null, fit: string|null, format: string|null, components_x: int, components_y: int, driver: string, service: string|null}>,
+         *     loaders: array<string, array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null}>,
          *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, public_cache: array{enabled: bool}}>
          * } $config
          */
@@ -287,6 +359,10 @@ final class PicassoBundle extends AbstractBundle
 
         $knownTypes = ['filesystem', 'flysystem', 'vich', 'url'];
         $vichHelperRegistered = false;
+        /** @var array<string, string> $loaderPlaceholders */
+        $loaderPlaceholders = [];
+        /** @var array<string, string> $loaderTransformers */
+        $loaderTransformers = [];
 
         foreach ($config['loaders'] as $name => $loaderConfig) {
             if (!$loaderConfig['enabled']) {
@@ -299,11 +375,21 @@ final class PicassoBundle extends AbstractBundle
                 throw new Exception\InvalidConfigurationException(sprintf('Loader "%s" must specify a "type" (filesystem, flysystem, or vich).', $name));
             }
 
+            $tag = ['key' => $name];
+            if (null !== $loaderConfig['default_placeholder']) {
+                $tag['default_placeholder'] = $loaderConfig['default_placeholder'];
+                $loaderPlaceholders[$name] = $loaderConfig['default_placeholder'];
+            }
+            if (null !== $loaderConfig['default_transformer']) {
+                $tag['default_transformer'] = $loaderConfig['default_transformer'];
+                $loaderTransformers[$name] = $loaderConfig['default_transformer'];
+            }
+
             switch ($type) {
                 case 'filesystem':
                     $services->set('picasso.loader.' . $name, FilesystemLoader::class)
                         ->args([$loaderConfig['paths']])
-                        ->tag('picasso.loader', ['key' => $name]);
+                        ->tag('picasso.loader', $tag);
                     break;
 
                 case 'flysystem':
@@ -312,7 +398,7 @@ final class PicassoBundle extends AbstractBundle
                         ->args([
                             service($loaderConfig['storage']),
                         ])
-                        ->tag('picasso.loader', ['key' => $name]);
+                        ->tag('picasso.loader', $tag);
                     break;
 
                 case 'url':
@@ -322,7 +408,7 @@ final class PicassoBundle extends AbstractBundle
                             service($httpClientService),
                             service($loaderConfig['request_factory'] ?? $httpClientService),
                         ])
-                        ->tag('picasso.loader', ['key' => $name]);
+                        ->tag('picasso.loader', $tag);
                     break;
 
                 case 'vich':
@@ -341,14 +427,14 @@ final class PicassoBundle extends AbstractBundle
                                 service('.picasso.vich_mapping_helper'),
                                 service('.picasso.flysystem_registry'),
                             ])
-                            ->tag('picasso.loader', ['key' => $name]);
+                            ->tag('picasso.loader', $tag);
                     }
                     break;
             }
         }
 
         // Alias default loader (auto-detect when exactly one is enabled)
-        $defaultLoader = $this->autoDetectDefault($config['default_loader'], $config['loaders']);
+        $defaultLoader = $this->autoDetectDefault($config['default_loader'], $config['loaders'], 'loader');
 
         if (null !== $defaultLoader) {
             $services->alias('picasso.default_loader', 'picasso.loader.' . $defaultLoader);
@@ -358,7 +444,7 @@ final class PicassoBundle extends AbstractBundle
         // --- Registries ---
 
         $services->set('picasso.loader_registry', LoaderRegistry::class)
-            ->args([tagged_locator('picasso.loader', 'key')]);
+            ->args([tagged_locator('picasso.loader', 'key'), $loaderPlaceholders, $loaderTransformers]);
         $services->alias(LoaderRegistry::class, 'picasso.loader_registry');
 
         $services->set('picasso.transformer_registry', TransformerRegistry::class)
@@ -428,7 +514,7 @@ final class PicassoBundle extends AbstractBundle
         }
 
         // Alias default transformer (auto-detect when exactly one is enabled)
-        $defaultTransformer = $this->autoDetectDefault($config['default_transformer'], $config['transformers']);
+        $defaultTransformer = $this->autoDetectDefault($config['default_transformer'], $config['transformers'], 'transformer');
 
         if (null !== $defaultTransformer) {
             $services->alias('picasso.default_transformer', 'picasso.transformer.' . $defaultTransformer);
@@ -458,11 +544,16 @@ final class PicassoBundle extends AbstractBundle
                             $placeholderConfig['size'],
                             $placeholderConfig['blur'],
                             $placeholderConfig['quality'],
+                            $placeholderConfig['fit'],
+                            $placeholderConfig['format'],
                         ])
                         ->tag('picasso.placeholder', ['key' => $name]);
                     break;
 
                 case 'blurhash':
+                    if (!interface_exists(\Imagine\Image\ImagineInterface::class)) {
+                        throw new Exception\InvalidConfigurationException(sprintf('Placeholder "%s" of type "blurhash" requires the "imagine/imagine" package. Install it with: composer require imagine/imagine', $name));
+                    }
                     $imagineClass = 'imagick' === $placeholderConfig['driver']
                         ? \Imagine\Imagick\Imagine::class
                         : \Imagine\Gd\Imagine::class;
@@ -477,7 +568,10 @@ final class PicassoBundle extends AbstractBundle
                     ];
                     if (null !== $cacheServiceId) {
                         $blurhashArgs[] = service($cacheServiceId);
+                    } else {
+                        $blurhashArgs[] = null;
                     }
+                    $blurhashArgs[] = service('debug.stopwatch')->nullOnInvalid();
 
                     $services->set('picasso.placeholder.' . $name, BlurHashPlaceholder::class)
                         ->args($blurhashArgs)
@@ -496,7 +590,7 @@ final class PicassoBundle extends AbstractBundle
         }
 
         // Alias default placeholder (auto-detect when exactly one is enabled)
-        $defaultPlaceholder = $this->autoDetectDefault($config['default_placeholder'], $config['placeholders']);
+        $defaultPlaceholder = $this->autoDetectDefault($config['default_placeholder'], $config['placeholders'], 'placeholder');
 
         if (null !== $defaultPlaceholder) {
             $services->alias('picasso.default_placeholder', 'picasso.placeholder.' . $defaultPlaceholder);
@@ -532,6 +626,7 @@ final class PicassoBundle extends AbstractBundle
                 $config['device_sizes'],
                 $config['image_sizes'],
                 $config['default_quality'],
+                $config['default_fit'],
             ]);
         $services->alias(SrcsetGenerator::class, 'picasso.srcset_generator');
 
@@ -562,6 +657,7 @@ final class PicassoBundle extends AbstractBundle
                 service('picasso.transformer_registry'),
                 service('picasso.metadata_guesser'),
                 service('picasso.placeholder_registry'),
+                service('picasso.loader_registry'),
                 $config['formats'],
                 $config['default_quality'],
                 $config['default_fit'],
@@ -590,9 +686,17 @@ final class PicassoBundle extends AbstractBundle
      *
      * @param array<string, array{enabled: bool, ...}> $items
      */
-    private function autoDetectDefault(?string $explicit, array $items): ?string
+    private function autoDetectDefault(?string $explicit, array $items, string $label): ?string
     {
         if (null !== $explicit) {
+            if (!isset($items[$explicit])) {
+                throw new Exception\InvalidConfigurationException(sprintf('The default %s "%s" does not exist. Available: %s.', $label, $explicit, implode(', ', array_keys($items)) ?: 'none'));
+            }
+
+            if (!$items[$explicit]['enabled']) {
+                throw new Exception\InvalidConfigurationException(sprintf('The default %s "%s" is disabled.', $label, $explicit));
+            }
+
             return $explicit;
         }
 

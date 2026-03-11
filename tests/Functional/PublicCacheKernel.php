@@ -15,22 +15,10 @@ namespace Silarhi\PicassoBundle\Tests\Functional;
 
 use function dirname;
 
-use Silarhi\PicassoBundle\PicassoBundle;
-use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
-use Symfony\Bundle\TwigBundle\TwigBundle;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
-class PicassoTestKernel extends AbstractPicassoKernel
+class PublicCacheKernel extends AbstractPicassoKernel
 {
-    public function registerBundles(): iterable
-    {
-        return [
-            new FrameworkBundle(),
-            new TwigBundle(),
-            new PicassoBundle(),
-        ];
-    }
-
     protected function configureContainer(ContainerBuilder $container): void
     {
         $container->loadFromExtension('picasso', [
@@ -41,10 +29,18 @@ class PicassoTestKernel extends AbstractPicassoKernel
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'integration-test-key',
+                    'sign_key' => 'public-cache-key',
                     'cache' => '%kernel.cache_dir%/glide',
+                    'public_cache' => [
+                        'enabled' => true,
+                    ],
                 ],
             ],
         ]);
+    }
+
+    public function getCacheDir(): string
+    {
+        return sys_get_temp_dir() . '/picasso_test/cache/public_cache';
     }
 }

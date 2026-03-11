@@ -20,6 +20,7 @@ use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Dto\ImageSource;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
+use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
 use Silarhi\PicassoBundle\Service\PlaceholderRegistry;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
@@ -110,8 +111,9 @@ class ImageComponent
         private readonly TransformerRegistry $transformerRegistry,
         private readonly MetadataGuesserInterface $metadataGuesser,
         private readonly PlaceholderRegistry $placeholderRegistry,
+        private readonly LoaderRegistry $loaderRegistry,
         private readonly array $formats,
-        private readonly int $defaultQuality,
+        private readonly ?int $defaultQuality,
         private readonly string $defaultFit,
         private readonly ?string $defaultPlaceholder = null,
         private readonly ?Stopwatch $stopwatch = null,
@@ -133,24 +135,19 @@ class ImageComponent
         $loaderName = $this->pipeline->resolveLoaderName($this->loader);
 
         $reference = new ImageReference($this->src, $this->context);
-        $needsMetadata = null === $this->sourceWidth || null === $this->sourceHeight;
+        $hasAllDisplayDims = null !== $this->width && null !== $this->height;
+        $hasAllSourceDims = null !== $this->sourceWidth && null !== $this->sourceHeight;
+        $needsMetadata = !$hasAllDisplayDims && !$hasAllSourceDims;
         $image = $this->pipeline->load($reference, $this->loader, $needsMetadata);
 
         $sourceWidth = $this->resolveDimensions($image, $loaderName);
 
-        // URL-based images bypass transformation (no local serving)
-        if (null !== $image->url) {
-            $this->fallbackSrc = $image->url;
-
-            return;
-        }
-
-        // Resolve transformer
-        $transformerName = $this->pipeline->resolveTransformerName($this->transformer);
+        // Resolve transformer: explicit prop → loader default → global default
+        $transformerName = $this->resolveTransformerName($loaderName);
         $imageTransformer = $this->transformerRegistry->get($transformerName);
         $transformerContext = ['loader' => $loaderName, 'transformer' => $transformerName];
 
-        $this->generatePlaceholder($image, $transformerContext);
+        $this->generatePlaceholder($image, $loaderName, $transformerContext);
         $this->generateSources($imageTransformer, $image, $transformerContext, $sourceWidth);
     }
 
@@ -164,21 +161,23 @@ class ImageComponent
         $w = $this->sourceWidth ?? $image->width;
         $h = $this->sourceHeight ?? $image->height;
 
-        if ((null === $w || null === $h) && null !== $image->stream) {
-            $this->stopwatch?->start('picasso.metadata_guess', 'picasso');
-            $stream = $image->resolveStream();
-            if (null !== $stream) {
-                $guessed = $this->metadataGuesser->guess($stream, $loaderName . ':' . $image->path);
+        if (null === $this->width || null === $this->height) {
+            if ((null === $w || null === $h) && null !== $image->stream) {
+                $this->stopwatch?->start('picasso.metadata_guess', 'picasso');
+                $guessed = $this->metadataGuesser->guess(
+                    $image->resolveStream(...),
+                    $loaderName . ':' . $image->path,
+                );
+                $this->stopwatch?->stop('picasso.metadata_guess');
                 $w ??= $guessed['width'];
                 $h ??= $guessed['height'];
             }
-            $this->stopwatch?->stop('picasso.metadata_guess');
-        }
 
-        // Preserve aspect ratio when only one display dimension is provided
-        $ratio = (null !== $w && null !== $h && $w > 0) ? $h / $w : null;
-        $this->width ??= null !== $ratio && null !== $this->height ? (int) round($this->height / $ratio) : $w;
-        $this->height ??= null !== $ratio && null !== $this->width ? (int) round($this->width * $ratio) : $h;
+            // Preserve aspect ratio when only one display dimension is provided
+            $ratio = (null !== $w && null !== $h && $w > 0) ? $h / $w : null;
+            $this->width ??= null !== $ratio && null !== $this->height ? (int) round($this->height / $ratio) : $w;
+            $this->height ??= null !== $ratio && null !== $this->width ? (int) round($this->width * $ratio) : $h;
+        }
 
         // Prevent upscaling beyond source dimensions
         if (null !== $w && null !== $this->width && $this->width > $w) {
@@ -194,7 +193,7 @@ class ImageComponent
     /**
      * @param array<string, string> $transformerContext
      */
-    private function generatePlaceholder(Image $image, array $transformerContext): void
+    private function generatePlaceholder(Image $image, string $loaderName, array $transformerContext): void
     {
         if ($this->priority) {
             return;
@@ -206,11 +205,8 @@ class ImageComponent
             return;
         }
 
-        $placeholderName = $this->resolvePlaceholderName();
-        if (null !== $placeholderName
-            && $this->placeholderRegistry->has($placeholderName)
-            && null !== $this->width && null !== $this->height
-        ) {
+        $placeholderName = $this->resolvePlaceholderName($loaderName);
+        if (null !== $placeholderName) {
             $this->placeholderUri = $this->placeholderRegistry
                 ->get($placeholderName)
                 ->generate($image, new ImageTransformation(
@@ -269,7 +265,17 @@ class ImageComponent
         }
     }
 
-    private function resolvePlaceholderName(): ?string
+    private function resolveTransformerName(string $loaderName): string
+    {
+        if (null !== $this->transformer) {
+            return $this->pipeline->resolveTransformerName($this->transformer);
+        }
+
+        return $this->loaderRegistry->getDefaultTransformer($loaderName)
+            ?? $this->pipeline->resolveTransformerName(null);
+    }
+
+    private function resolvePlaceholderName(string $loaderName): ?string
     {
         if (false === $this->placeholder) {
             return null;
@@ -279,8 +285,8 @@ class ImageComponent
             return $this->placeholder;
         }
 
-        // placeholder === true or null: use default
-        return $this->defaultPlaceholder;
+        // placeholder === true or null: use loader default, then global default
+        return $this->loaderRegistry->getDefaultPlaceholder($loaderName) ?? $this->defaultPlaceholder;
     }
 
     private function getMimeType(string $format): string
