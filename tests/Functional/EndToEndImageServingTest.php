@@ -207,8 +207,8 @@ class EndToEndImageServingTest extends KernelTestCase
         $html = $rendered->toString();
 
         // Parse all srcset entries from <img> tag
-        preg_match('/<img[^>]+srcset="([^"]+)"/', $html, $matches);
-        self::assertNotEmpty($matches[1], 'Could not find img srcset');
+        $found = preg_match('/<img[^>]+srcset="([^"]+)"/', $html, $matches);
+        self::assertSame(1, $found, 'Could not find img srcset');
 
         $srcsetValue = html_entity_decode($matches[1], \ENT_QUOTES | \ENT_HTML5);
         $entries = explode(',', $srcsetValue);
@@ -242,16 +242,16 @@ class EndToEndImageServingTest extends KernelTestCase
 
     private function parseSrcFromImg(string $html): string
     {
-        preg_match('/<img[^>]+src="([^"]+)"/', $html, $matches);
-        self::assertNotEmpty($matches[1], 'Could not find src attribute in rendered HTML');
+        $found = preg_match('/<img[^>]+src="([^"]+)"/', $html, $matches);
+        self::assertSame(1, $found, 'Could not find src attribute in rendered HTML');
 
         return html_entity_decode($matches[1], \ENT_QUOTES | \ENT_HTML5);
     }
 
     private function parseFirstSrcsetUrl(string $pattern, string $html): string
     {
-        preg_match($pattern, $html, $matches);
-        self::assertNotEmpty($matches[1], 'Could not find srcset in rendered HTML');
+        $found = preg_match($pattern, $html, $matches);
+        self::assertSame(1, $found, 'Could not find srcset in rendered HTML');
 
         $srcsetValue = html_entity_decode($matches[1], \ENT_QUOTES | \ENT_HTML5);
         $entries = explode(',', $srcsetValue);
