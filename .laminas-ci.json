@@ -3,6 +3,11 @@
         "gd",
         "pcov"
     ],
+    "exclude": [
+        {
+            "name": "README Linting"
+        }
+    ],
     "ignore_php_platform_requirements": {
         "8.4": true,
         "8.5": true
