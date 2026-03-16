@@ -181,7 +181,7 @@ final readonly class ImageHelper implements ImageHelperInterface
         ?int $height,
         ?int $sourceWidth,
         ?int $sourceHeight,
-        bool $resolveMetadata = false,
+        bool $resolveMetadata,
     ): array {
         $w = $sourceWidth ?? $image->width;
         $h = $sourceHeight ?? $image->height;
