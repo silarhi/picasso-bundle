@@ -140,6 +140,29 @@ The project uses PHPStan custom type aliases to avoid duplicating complex type a
 - Use `typeAliases` in `phpstan.neon` when the type is shared between unrelated classes (no common interface).
 - Only extract a type alias when the same structured type (array shapes, complex unions) appears in 2+ files. Simple generic types like `array<string, mixed>` do not need aliases.
 
+## API Documentation
+
+**Always update documentation when adding or modifying public API.** This includes any change to interfaces, public methods, configuration options, DTOs, attributes, Twig functions/components, or controller routes.
+
+When making API changes, update the following:
+
+1. **`README.md`** — Update usage examples, configuration reference, and feature descriptions to reflect the new or changed API.
+2. **`CLAUDE.md`** — Update the relevant sections:
+   - **Repository Structure** — Add new files/directories or update descriptions.
+   - **Architecture Notes** — Document new or changed services, interfaces, and their roles.
+   - **Domain Exceptions** table — Add entries for any new exception classes.
+   - **PHPStan Custom Types** tables — Add entries for new type aliases.
+   - **Common Patterns** — Update or add patterns for new extension points.
+3. **PHPDoc blocks** — Ensure all public and protected methods on interfaces and services have accurate `@param`, `@return`, and `@throws` annotations.
+4. **Bundle configuration** — When adding or changing config options in `PicassoBundle::configure()`, document the new options in both `README.md` and the Architecture Notes.
+
+**Checklist for API changes:**
+- [ ] `README.md` reflects the current public API and configuration
+- [ ] `CLAUDE.md` sections are up to date (structure, architecture, exceptions, types, patterns)
+- [ ] PHPDoc annotations are accurate on all affected interfaces and classes
+- [ ] New extension points (loaders, transformers, placeholders) have a corresponding entry in Common Patterns
+- [ ] New exceptions are added to the Domain Exceptions table and implement `PicassoExceptionInterface`
+
 ## Common Patterns
 
 - **Adding a new loader**: Create a class implementing `ImageLoaderInterface` (or `ServableLoaderInterface` if it provides filesystem access), add `#[AsImageLoader('name')]`, and it auto-registers.
