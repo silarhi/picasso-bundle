@@ -5,7 +5,7 @@
     ],
     "exclude": [
         {
-            "name": "Markdown Linting"
+            "name": "README Linting"
         }
     ],
     "ignore_php_platform_requirements": {
