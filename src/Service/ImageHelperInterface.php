@@ -61,6 +61,7 @@ interface ImageHelperInterface
         bool $unoptimized = false,
         ?int $sourceWidth = null,
         ?int $sourceHeight = null,
+        ?bool $resolveMetadata = null,
         array $context = [],
         array $attributes = [],
     ): ImageRenderData;

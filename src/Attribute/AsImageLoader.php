@@ -22,6 +22,7 @@ final readonly class AsImageLoader
         public string $name,
         public ?string $defaultPlaceholder = null,
         public ?string $defaultTransformer = null,
+        public ?bool $resolveMetadata = null,
     ) {
     }
 }

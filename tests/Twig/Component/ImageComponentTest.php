@@ -91,6 +91,7 @@ class ImageComponentTest extends TestCase
                 false,                 // unoptimized
                 null,                  // sourceWidth
                 null,                  // sourceHeight
+                null,                  // resolveMetadata
                 [],                    // context
             )
             ->willReturn($renderData);
@@ -144,6 +145,7 @@ class ImageComponentTest extends TestCase
                 true,                             // unoptimized
                 400,                              // sourceWidth
                 100,                              // sourceHeight
+                true,                             // resolveMetadata
                 ['entity' => 'User'],             // context
             )
             ->willReturn($renderData);
@@ -165,6 +167,7 @@ class ImageComponentTest extends TestCase
         $component->unoptimized = true;
         $component->sourceWidth = 400;
         $component->sourceHeight = 100;
+        $component->resolveMetadata = true;
         $component->context = ['entity' => 'User'];
         $component->computeImageData();
 

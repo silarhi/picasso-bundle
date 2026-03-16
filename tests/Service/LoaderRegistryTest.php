@@ -64,4 +64,21 @@ class LoaderRegistryTest extends TestCase
         $this->expectExceptionMessage('Loader "unknown" not found.');
         $registry->get('unknown');
     }
+
+    public function testGetResolveMetadataReturnsConfiguredValue(): void
+    {
+        $container = $this->createMock(ContainerInterface::class);
+        $registry = new LoaderRegistry($container, [], [], ['filesystem' => true, 'url' => false]);
+
+        self::assertTrue($registry->getResolveMetadata('filesystem'));
+        self::assertFalse($registry->getResolveMetadata('url'));
+    }
+
+    public function testGetResolveMetadataReturnsNullWhenNotConfigured(): void
+    {
+        $container = $this->createMock(ContainerInterface::class);
+        $registry = new LoaderRegistry($container);
+
+        self::assertNull($registry->getResolveMetadata('filesystem'));
+    }
 }

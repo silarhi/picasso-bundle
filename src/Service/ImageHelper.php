@@ -39,6 +39,7 @@ final readonly class ImageHelper implements ImageHelperInterface
         private ?int $defaultQuality,
         private string $defaultFit,
         private ?string $defaultPlaceholder = null,
+        private bool $defaultResolveMetadata = false,
         private ?Stopwatch $stopwatch = null,
     ) {
     }
@@ -99,6 +100,7 @@ final readonly class ImageHelper implements ImageHelperInterface
         bool $unoptimized = false,
         ?int $sourceWidth = null,
         ?int $sourceHeight = null,
+        ?bool $resolveMetadata = null,
         array $context = [],
         array $attributes = [],
     ): ImageRenderData {
@@ -123,14 +125,18 @@ final readonly class ImageHelper implements ImageHelperInterface
 
         $loaderName = $this->pipeline->resolveLoaderName($loader);
 
+        $effectiveResolveMetadata = $resolveMetadata
+            ?? $this->loaderRegistry->getResolveMetadata($loaderName)
+            ?? $this->defaultResolveMetadata;
+
         $reference = new ImageReference($src, $context);
         $hasAllDisplayDims = null !== $width && null !== $height;
         $hasAllSourceDims = null !== $sourceWidth && null !== $sourceHeight;
-        $needsMetadata = !$hasAllDisplayDims && !$hasAllSourceDims;
+        $needsMetadata = $effectiveResolveMetadata && !$hasAllDisplayDims && !$hasAllSourceDims;
         $image = $this->pipeline->load($reference, $loader, $needsMetadata);
 
         [$width, $height, $resolvedSourceWidth] = $this->resolveDimensions(
-            $image, $loaderName, $width, $height, $sourceWidth, $sourceHeight,
+            $image, $loaderName, $width, $height, $sourceWidth, $sourceHeight, $effectiveResolveMetadata,
         );
 
         $transformerName = $this->resolveTransformerName($transformer, $loaderName);
@@ -175,12 +181,13 @@ final readonly class ImageHelper implements ImageHelperInterface
         ?int $height,
         ?int $sourceWidth,
         ?int $sourceHeight,
+        bool $resolveMetadata = false,
     ): array {
         $w = $sourceWidth ?? $image->width;
         $h = $sourceHeight ?? $image->height;
 
         if (null === $width || null === $height) {
-            if ((null === $w || null === $h) && null !== $image->stream) {
+            if ($resolveMetadata && (null === $w || null === $h) && null !== $image->stream) {
                 $this->stopwatch?->start('picasso.metadata_guess', 'picasso');
                 $guessed = $this->metadataGuesser->guess(
                     $image->resolveStream(...),

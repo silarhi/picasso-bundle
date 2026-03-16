@@ -83,6 +83,9 @@ final class PicassoBundle extends AbstractBundle
                 if (null !== $attribute->defaultTransformer) {
                     $tag['default_transformer'] = $attribute->defaultTransformer;
                 }
+                if (null !== $attribute->resolveMetadata) {
+                    $tag['resolve_metadata'] = $attribute->resolveMetadata;
+                }
                 $definition->addTag('picasso.loader', $tag);
             },
         );
@@ -114,9 +117,11 @@ final class PicassoBundle extends AbstractBundle
                 $placeholders = $definition->getArgument(1);
                 /** @var array<string, string> $transformers */
                 $transformers = $definition->getArgument(2);
+                /** @var array<string, bool> $resolveMetadataMap */
+                $resolveMetadataMap = $definition->getArgument(3);
 
                 foreach ($container->findTaggedServiceIds('picasso.loader') as $tags) {
-                    /** @var array{key?: string, default_placeholder?: string, default_transformer?: string} $tag */
+                    /** @var array{key?: string, default_placeholder?: string, default_transformer?: string, resolve_metadata?: bool} $tag */
                     foreach ($tags as $tag) {
                         if (isset($tag['key'], $tag['default_placeholder'])) {
                             $placeholders[$tag['key']] ??= $tag['default_placeholder'];
@@ -124,11 +129,15 @@ final class PicassoBundle extends AbstractBundle
                         if (isset($tag['key'], $tag['default_transformer'])) {
                             $transformers[$tag['key']] ??= $tag['default_transformer'];
                         }
+                        if (isset($tag['key'], $tag['resolve_metadata'])) {
+                            $resolveMetadataMap[$tag['key']] ??= $tag['resolve_metadata'];
+                        }
                     }
                 }
 
                 $definition->replaceArgument(1, $placeholders);
                 $definition->replaceArgument(2, $transformers);
+                $definition->replaceArgument(3, $resolveMetadataMap);
             }
         });
     }
@@ -182,6 +191,10 @@ final class PicassoBundle extends AbstractBundle
                         ->ifTrue(static fn (mixed $v): bool => !is_bool($v) && !is_string($v))
                         ->thenInvalid('The "cache" option must be true, false, or a cache pool service ID string.')
                     ->end()
+                ->end()
+                ->booleanNode('resolve_metadata')
+                    ->defaultFalse()
+                    ->info('Whether to resolve image metadata (dimensions) from the source by default. Filesystem loaders default to true.')
                 ->end()
                 ->scalarNode('default_placeholder')
                     ->defaultNull()
@@ -276,6 +289,14 @@ final class PicassoBundle extends AbstractBundle
                                 ->defaultNull()
                                 ->info('Default transformer name for this loader. Overrides the global default_transformer.')
                             ->end()
+                            ->scalarNode('resolve_metadata')
+                                ->defaultNull()
+                                ->info('Whether to resolve image metadata for this loader. Null inherits from global. Filesystem loaders default to true.')
+                                ->validate()
+                                    ->ifTrue(static fn (mixed $v): bool => null !== $v && !is_bool($v))
+                                    ->thenInvalid('The "resolve_metadata" option must be null or a boolean.')
+                                ->end()
+                            ->end()
                         ->end()
                         ->validate()
                             ->ifTrue(static fn (array $v): bool => 'flysystem' === $v['type'] && (null === $v['storage'] || '' === $v['storage']))
@@ -329,6 +350,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_loader: string|null,
          *     default_transformer: string|null,
          *     default_placeholder: string|null,
+         *     resolve_metadata: bool,
          *     cache: bool|string,
          *     device_sizes: list<int>,
          *     image_sizes: list<int>,
@@ -336,7 +358,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_quality: int|null,
          *     default_fit: string,
          *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int|null, quality: int|null, fit: string|null, format: string|null, components_x: int, components_y: int, driver: string, service: string|null}>,
-         *     loaders: array<string, array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null}>,
+         *     loaders: array<string, array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null, resolve_metadata: bool|null}>,
          *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, public_cache: array{enabled: bool}}>
          * } $config
          */
@@ -364,6 +386,8 @@ final class PicassoBundle extends AbstractBundle
         $loaderPlaceholders = [];
         /** @var array<string, string> $loaderTransformers */
         $loaderTransformers = [];
+        /** @var array<string, bool> $loaderResolveMetadata */
+        $loaderResolveMetadata = [];
 
         foreach ($config['loaders'] as $name => $loaderConfig) {
             if (!$loaderConfig['enabled']) {
@@ -384,6 +408,13 @@ final class PicassoBundle extends AbstractBundle
             if (null !== $loaderConfig['default_transformer']) {
                 $tag['default_transformer'] = $loaderConfig['default_transformer'];
                 $loaderTransformers[$name] = $loaderConfig['default_transformer'];
+            }
+
+            // Auto-set resolve_metadata to true for filesystem loaders when not explicitly configured
+            $resolveMetadata = $loaderConfig['resolve_metadata'] ?? ('filesystem' === $type ? true : null);
+            if (null !== $resolveMetadata) {
+                $tag['resolve_metadata'] = $resolveMetadata;
+                $loaderResolveMetadata[$name] = $resolveMetadata;
             }
 
             switch ($type) {
@@ -445,7 +476,7 @@ final class PicassoBundle extends AbstractBundle
         // --- Registries ---
 
         $services->set('picasso.loader_registry', LoaderRegistry::class)
-            ->args([tagged_locator('picasso.loader', 'key'), $loaderPlaceholders, $loaderTransformers]);
+            ->args([tagged_locator('picasso.loader', 'key'), $loaderPlaceholders, $loaderTransformers, $loaderResolveMetadata]);
         $services->alias(LoaderRegistry::class, 'picasso.loader_registry');
 
         $services->set('picasso.transformer_registry', TransformerRegistry::class)
@@ -645,6 +676,7 @@ final class PicassoBundle extends AbstractBundle
                 $config['default_quality'],
                 $config['default_fit'],
                 $defaultPlaceholder,
+                $config['resolve_metadata'],
                 service('debug.stopwatch')->nullOnInvalid(),
             ]);
         $services->alias(ImageHelper::class, 'picasso.image_helper');

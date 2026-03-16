@@ -631,6 +631,67 @@ class BundleWiringTest extends TestCase
         self::assertNull($registry->getDefaultTransformer('filesystem'));
     }
 
+    // --- Per-loader resolve_metadata ---
+
+    public function testFilesystemLoaderDefaultsResolveMetadataToTrue(): void
+    {
+        $container = $this->bootKernel([
+            'loaders' => [
+                'filesystem' => [
+                    'paths' => [dirname(__DIR__) . '/Fixtures'],
+                ],
+            ],
+            'transformers' => [
+                'glide' => [
+                    'sign_key' => 'test',
+                ],
+            ],
+        ]);
+
+        $registry = $container->get('picasso.loader_registry');
+        self::assertInstanceOf(LoaderRegistry::class, $registry);
+        self::assertTrue($registry->getResolveMetadata('filesystem'));
+    }
+
+    public function testExplicitResolveMetadataPerLoader(): void
+    {
+        $container = $this->bootKernel([
+            'loaders' => [
+                'filesystem' => [
+                    'paths' => [dirname(__DIR__) . '/Fixtures'],
+                    'resolve_metadata' => false,
+                ],
+            ],
+            'transformers' => [
+                'glide' => [
+                    'sign_key' => 'test',
+                ],
+            ],
+        ]);
+
+        $registry = $container->get('picasso.loader_registry');
+        self::assertInstanceOf(LoaderRegistry::class, $registry);
+        self::assertFalse($registry->getResolveMetadata('filesystem'));
+    }
+
+    public function testUrlLoaderResolveMetadataDefaultsToNull(): void
+    {
+        $container = $this->bootKernel([
+            'loaders' => [
+                'url' => [],
+            ],
+            'transformers' => [
+                'glide' => [
+                    'sign_key' => 'test',
+                ],
+            ],
+        ], withPsrHttpClient: true);
+
+        $registry = $container->get('picasso.loader_registry');
+        self::assertInstanceOf(LoaderRegistry::class, $registry);
+        self::assertNull($registry->getResolveMetadata('url'));
+    }
+
     // --- Invalid default references ---
 
     public function testDefaultLoaderReferencingNonexistentLoaderThrows(): void
