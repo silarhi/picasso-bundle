@@ -8,8 +8,7 @@
             src="{{ this.fallbackSrc }}"
             {% if this.fallbackSrcset %}srcset="{{ this.fallbackSrcset }}"{% endif %}
             {% if this.sizes %}sizes="{{ this.sizes }}"{% endif %}
-            {% if this.width %}width="{{ this.width }}"{% endif %}
-            {% if this.height %}height="{{ this.height }}"{% endif %}
+            {% if this.width and this.height %}width="{{ this.width }}" height="{{ this.height }}"{% endif %}
             loading="{{ this.loading }}"
             {% if this.fetchPriority %}fetchpriority="{{ this.fetchPriority }}"{% endif %}
             {% if fullStyle %}style="{{ fullStyle }}"{% endif %}
@@ -30,8 +29,7 @@
                 src="{{ this.fallbackSrc }}"
                 srcset="{{ this.fallbackSrcset }}"
                 {% if this.sizes %}sizes="{{ this.sizes }}"{% endif %}
-                {% if this.width %}width="{{ this.width }}"{% endif %}
-                {% if this.height %}height="{{ this.height }}"{% endif %}
+                {% if this.width and this.height %}width="{{ this.width }}" height="{{ this.height }}"{% endif %}
                 loading="{{ this.loading }}"
                 {% if this.fetchPriority %}fetchpriority="{{ this.fetchPriority }}"{% endif %}
                 {% if fullStyle %}style="{{ fullStyle }}"{% endif %}

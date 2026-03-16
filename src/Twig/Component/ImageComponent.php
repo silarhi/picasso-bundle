@@ -72,6 +72,9 @@ class ImageComponent
     /** Serve the image as-is, without optimization. */
     public bool $unoptimized = false;
 
+    /** Whether to resolve image metadata (dimensions) from the source. Null inherits from loader/global config. */
+    public ?bool $resolveMetadata = null;
+
     // --- Computed state (set in PostMount, used by template) ---
 
     /** @internal */
@@ -115,6 +118,7 @@ class ImageComponent
             unoptimized: $this->unoptimized,
             sourceWidth: $this->sourceWidth,
             sourceHeight: $this->sourceHeight,
+            resolveMetadata: $this->resolveMetadata,
             context: $this->context,
         );
 

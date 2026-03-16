@@ -65,7 +65,7 @@ class ImageHelperTest extends TestCase
 
         $loaderLocator = $this->createMock(ContainerInterface::class);
         $loaderLocator->method('has')->willReturn(false);
-        $this->loaderRegistry = new LoaderRegistry($loaderLocator);
+        $this->loaderRegistry = new LoaderRegistry($loaderLocator, [], [], ['filesystem' => true]);
 
         $this->pipeline = $this->createMock(ImagePipeline::class);
         $this->pipeline->method('resolveLoaderName')->willReturn('filesystem');
@@ -340,7 +340,7 @@ class ImageHelperTest extends TestCase
 
         $loaderLocator = $this->createMock(ContainerInterface::class);
         $loaderLocator->method('has')->willReturn(false);
-        $loaderRegistry = new LoaderRegistry($loaderLocator, ['filesystem' => 'blur']);
+        $loaderRegistry = new LoaderRegistry($loaderLocator, ['filesystem' => 'blur'], [], ['filesystem' => true]);
 
         $helper = $this->createHelper(defaultPlaceholder: null, loaderRegistry: $loaderRegistry);
         $data = $helper->imageData(src: 'photo.jpg', sizes: '100vw');
@@ -392,7 +392,7 @@ class ImageHelperTest extends TestCase
 
         $loaderLocator = $this->createMock(ContainerInterface::class);
         $loaderLocator->method('has')->willReturn(false);
-        $loaderRegistry = new LoaderRegistry($loaderLocator, [], ['filesystem' => 'imgix']);
+        $loaderRegistry = new LoaderRegistry($loaderLocator, [], ['filesystem' => 'imgix'], ['filesystem' => true]);
 
         $helper = new ImageHelper(
             pipeline: $pipeline,
@@ -442,7 +442,7 @@ class ImageHelperTest extends TestCase
 
         $loaderLocator = $this->createMock(ContainerInterface::class);
         $loaderLocator->method('has')->willReturn(false);
-        $loaderRegistry = new LoaderRegistry($loaderLocator, [], ['filesystem' => 'imgix']);
+        $loaderRegistry = new LoaderRegistry($loaderLocator, [], ['filesystem' => 'imgix'], ['filesystem' => true]);
 
         $helper = new ImageHelper(
             pipeline: $pipeline,
@@ -787,6 +787,98 @@ class ImageHelperTest extends TestCase
         $data = $helper->imageData(src: 'photo.jpg', width: 400, height: 300, sizes: '(max-width: 768px) 100vw, 50vw');
 
         self::assertSame('(max-width: 768px) 100vw, 50vw', $data->sizes);
+    }
+
+    public function testResolveMetadataFalseSkipsGuesser(): void
+    {
+        $stream = fopen('php://memory', 'r+');
+        self::assertNotFalse($stream);
+        $this->pipeline->method('load')
+            ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
+        $this->metadataGuesser->expects(self::never())->method('guess');
+        $this->configureSrcsetGenerator();
+
+        $helper = $this->createHelper();
+        $data = $helper->imageData(src: 'photo.jpg', resolveMetadata: false, sizes: '100vw');
+
+        self::assertNull($data->width);
+        self::assertNull($data->height);
+    }
+
+    public function testResolveMetadataTrueEnablesGuesser(): void
+    {
+        $stream = fopen('php://memory', 'r+');
+        self::assertNotFalse($stream);
+        $this->pipeline->method('load')
+            ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
+        $this->metadataGuesser->expects(self::once())
+            ->method('guess')
+            ->willReturn(['width' => 1024, 'height' => 768, 'mimeType' => 'image/jpeg']);
+        $this->configureSrcsetGenerator();
+
+        $loaderLocator = $this->createMock(ContainerInterface::class);
+        $loaderLocator->method('has')->willReturn(false);
+        $loaderRegistry = new LoaderRegistry($loaderLocator);
+
+        $helper = $this->createHelper(loaderRegistry: $loaderRegistry);
+        $data = $helper->imageData(src: 'photo.jpg', resolveMetadata: true, sizes: '100vw');
+
+        self::assertSame(1024, $data->width);
+        self::assertSame(768, $data->height);
+    }
+
+    public function testResolveMetadataPerLoaderOverridesGlobal(): void
+    {
+        $stream = fopen('php://memory', 'r+');
+        self::assertNotFalse($stream);
+        $this->pipeline->method('load')
+            ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
+        $this->metadataGuesser->expects(self::once())
+            ->method('guess')
+            ->willReturn(['width' => 1024, 'height' => 768, 'mimeType' => 'image/jpeg']);
+        $this->configureSrcsetGenerator();
+
+        $helper = $this->createHelper();
+        $data = $helper->imageData(src: 'photo.jpg', sizes: '100vw');
+
+        self::assertSame(1024, $data->width);
+        self::assertSame(768, $data->height);
+    }
+
+    public function testResolveMetadataGlobalDefaultFalseSkipsGuesser(): void
+    {
+        $stream = fopen('php://memory', 'r+');
+        self::assertNotFalse($stream);
+        $this->pipeline->method('load')
+            ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
+        $this->metadataGuesser->expects(self::never())->method('guess');
+        $this->configureSrcsetGenerator();
+
+        $loaderLocator = $this->createMock(ContainerInterface::class);
+        $loaderLocator->method('has')->willReturn(false);
+        $loaderRegistry = new LoaderRegistry($loaderLocator);
+
+        $helper = $this->createHelper(loaderRegistry: $loaderRegistry);
+        $data = $helper->imageData(src: 'photo.jpg', sizes: '100vw');
+
+        self::assertNull($data->width);
+        self::assertNull($data->height);
+    }
+
+    public function testResolveMetadataRuntimeOverridesPerLoader(): void
+    {
+        $stream = fopen('php://memory', 'r+');
+        self::assertNotFalse($stream);
+        $this->pipeline->method('load')
+            ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
+        $this->metadataGuesser->expects(self::never())->method('guess');
+        $this->configureSrcsetGenerator();
+
+        $helper = $this->createHelper();
+        $data = $helper->imageData(src: 'photo.jpg', resolveMetadata: false, sizes: '100vw');
+
+        self::assertNull($data->width);
+        self::assertNull($data->height);
     }
 
     private function configureSrcsetGenerator(): void

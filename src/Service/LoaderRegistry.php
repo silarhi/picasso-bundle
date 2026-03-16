@@ -26,11 +26,13 @@ final readonly class LoaderRegistry
     /**
      * @param array<string, string> $defaultPlaceholders Loader name → default placeholder name
      * @param array<string, string> $defaultTransformers Loader name → default transformer name
+     * @param array<string, bool>   $resolveMetadataMap  Loader name → resolve metadata flag
      */
     public function __construct(
         private ContainerInterface $loaders,
         private array $defaultPlaceholders = [],
         private array $defaultTransformers = [],
+        private array $resolveMetadataMap = [],
     ) {
     }
 
@@ -59,5 +61,10 @@ final readonly class LoaderRegistry
     public function getDefaultTransformer(string $loaderName): ?string
     {
         return $this->defaultTransformers[$loaderName] ?? null;
+    }
+
+    public function getResolveMetadata(string $loaderName): ?bool
+    {
+        return $this->resolveMetadataMap[$loaderName] ?? null;
     }
 }

@@ -275,6 +275,9 @@ picasso:
     default_quality: 75 # 1–100
     default_fit: contain # contain | cover | crop | fill
 
+    # --- Metadata resolution ---
+    resolve_metadata: false # Whether to auto-detect image dimensions from source (default: false)
+
     # --- Metadata cache ---
     cache: true # true = cache.app, false = disabled, or a PSR-6 service ID
 
@@ -303,10 +306,12 @@ picasso:
             type: filesystem # inferred from key name
             paths:
                 - '%kernel.project_dir%/public/uploads'
+            # resolve_metadata: ~  # auto-set to true for filesystem loaders
 
         # my_flysystem:
         #     type: flysystem
         #     storage: 'default.storage'
+        #     resolve_metadata: ~  # inherits from global (false)
 
         # vich:
         #     type: vich
@@ -315,6 +320,7 @@ picasso:
         #     type: url
         #     http_client: ~       # optional: custom PSR-18 HTTP client service ID
         #     request_factory: ~   # optional: custom PSR-17 request factory service ID
+        #     resolve_metadata: ~  # inherits from global (false)
 
     # --- Transformers ---
     transformers:
@@ -379,6 +385,15 @@ Controls how images are resized within the target dimensions:
 | `crop`    | Crops to exact dimensions                                            |
 | `fill`    | Stretches to fill the box exactly                                    |
 
+#### `resolve_metadata`
+
+Controls whether the bundle reads image streams to auto-detect dimensions (width/height).
+
+- `false` (default) — dimensions are not auto-detected; provide them explicitly or accept no `width`/`height` in the HTML
+- `true` — enables auto-detection via the `MetadataGuesser`
+
+This can also be set **per-loader** (filesystem loaders default to `true`) and overridden at **runtime** with the `resolveMetadata` component prop or `imageData()` parameter.
+
 #### `cache`
 
 Configures PSR-6 caching for metadata detection (image dimensions) and BlurHash encoding:
@@ -429,17 +444,18 @@ with a full srcset.
 | `loading`         | `string`       | lazy    | `lazy` or `eager`. Auto-set when priority               |
 | `fetchPriority`   | `string`       | —       | `high`, `low`, `auto`. Auto-set when priority           |
 | `unoptimized`     | `bool`         | false   | Serve original image without transformation             |
+| `resolveMetadata` | `bool`         | —       | Override metadata resolution (see [below](#metadata-resolution)) |
 | `context`         | `array`        | `[]`    | Extra context for the loader (e.g. Vich)                |
 
 #### Automatic Dimension Detection
 
-When `width` and `height` are not provided, PicassoBundle automatically
-detects them from the image stream. You can also provide `sourceWidth`
+When `width` and `height` are not provided, PicassoBundle can
+detect them from the image stream. You can also provide `sourceWidth`
 and `sourceHeight` to skip detection entirely, which is useful for
 performance when you already know the image dimensions:
 
 ```twig
-{# Auto-detected dimensions #}
+{# Auto-detected dimensions (requires resolve_metadata enabled) #}
 <Picasso:Image src="photo.jpg" sizes="100vw" alt="Photo" />
 
 {# Explicit source dimensions (skips stream detection) #}
@@ -452,6 +468,35 @@ The component also preserves aspect ratio when only one display dimension is pro
 {# height is calculated automatically from the source aspect ratio #}
 <Picasso:Image src="photo.jpg" width="800" sizes="100vw" alt="Photo" />
 ```
+
+#### Metadata Resolution
+
+To reduce **Cumulative Layout Shift (CLS)**, `width` and `height`
+attributes are only rendered in the HTML when **both** are available.
+If only one dimension is provided and the other cannot be resolved,
+neither is output — preventing the browser from reserving incorrect
+space.
+
+Metadata resolution (reading the image stream to detect dimensions) is
+controlled at three levels, with this precedence: **runtime > per-loader > global**.
+
+| Level      | Option             | Default                                   |
+| ---------- | ------------------ | ----------------------------------------- |
+| Global     | `resolve_metadata` | `false`                                   |
+| Per-loader | `resolve_metadata` | `null` (inherit global); `true` for filesystem |
+| Runtime    | `resolveMetadata`  | `null` (inherit per-loader/global)        |
+
+```twig
+{# Force metadata resolution for this image, regardless of config #}
+<Picasso:Image src="photo.jpg" :resolveMetadata="true" width="800" sizes="100vw" alt="Photo" />
+
+{# Disable metadata resolution for this image #}
+<Picasso:Image src="photo.jpg" :resolveMetadata="false" width="800" height="600" alt="Photo" />
+```
+
+Filesystem loaders default to `resolve_metadata: true` because reading
+local files is cheap. For remote loaders (URL, Flysystem with remote
+backends), it defaults to `false` to avoid unnecessary network requests.
 
 #### Extra HTML Attributes
 

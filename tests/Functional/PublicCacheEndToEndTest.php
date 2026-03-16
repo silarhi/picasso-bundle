@@ -133,23 +133,23 @@ class PublicCacheEndToEndTest extends KernelTestCase
 
     private function parseSrcFromImg(string $html): string
     {
-        preg_match('/<img[^>]+src="([^"]+)"/', $html, $matches);
-        self::assertNotEmpty($matches[1], 'Could not find src attribute in rendered HTML');
+        $found = preg_match('/<img[^>]+src="([^"]+)"/', $html, $matches);
+        self::assertSame(1, $found, 'Could not find src attribute in rendered HTML');
 
         return html_entity_decode($matches[1], \ENT_QUOTES | \ENT_HTML5);
     }
 
     private function parseFirstSrcsetUrl(string $pattern, string $html): string
     {
-        preg_match($pattern, $html, $matches);
-        self::assertNotEmpty($matches[1], 'Could not find srcset in rendered HTML');
+        $found = preg_match($pattern, $html, $matches);
+        self::assertSame(1, $found, 'Could not find srcset in rendered HTML');
 
         $srcsetValue = html_entity_decode($matches[1], \ENT_QUOTES | \ENT_HTML5);
 
         // In public cache mode, URLs contain commas (e.g., fit_contain,fm_jpg,q_75,w_16.jpg).
         // Use regex to extract the first URL before a width descriptor.
-        preg_match('#(\S+)\s+\d+w#', $srcsetValue, $urlMatch);
-        self::assertNotEmpty($urlMatch[1], 'Could not parse srcset URL');
+        $urlFound = preg_match('#(\S+)\s+\d+w#', $srcsetValue, $urlMatch);
+        self::assertSame(1, $urlFound, 'Could not parse srcset URL');
 
         return $urlMatch[1];
     }
