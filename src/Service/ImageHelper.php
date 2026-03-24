@@ -132,7 +132,7 @@ final readonly class ImageHelper implements ImageHelperInterface
         $reference = new ImageReference($src, $context);
         $hasAllDisplayDims = null !== $width && null !== $height;
         $hasAllSourceDims = null !== $sourceWidth && null !== $sourceHeight;
-        $needsMetadata = $effectiveResolveMetadata && !$hasAllDisplayDims && !$hasAllSourceDims;
+        $needsMetadata = !$hasAllDisplayDims && !$hasAllSourceDims;
         $image = $this->pipeline->load($reference, $loader, $needsMetadata);
 
         [$width, $height, $resolvedSourceWidth] = $this->resolveDimensions(
