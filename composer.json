@@ -15,14 +15,14 @@
         "league/flysystem-bundle": "^3.6.2",
         "league/glide": "^2.3.2",
         "league/glide-symfony": "^2.0.1",
-        "phpstan/phpstan": "^2.1.40",
+        "phpstan/phpstan": "^2.1.44",
         "phpunit/phpunit": "^11.5.55",
         "psr/http-client": "^1.0.3",
         "psr/http-factory": "^1.1",
-        "rector/rector": "^2.3.8",
-        "symfony/http-client": "^6.4 || ^7.4.4 || ^8.0.7",
+        "rector/rector": "^2.3.9",
+        "symfony/http-client": "^6.4 || ^7.4.7 || ^8.0.7",
         "symfony/twig-bundle": "^6.4 || ^7.4.4 || ^8.0.4",
-        "vich/uploader-bundle": "^2.9.1",
+        "vich/uploader-bundle": "^2.9.2",
         "vincentlanglet/twig-cs-fixer": "^3.14"
     },
     "config": {
