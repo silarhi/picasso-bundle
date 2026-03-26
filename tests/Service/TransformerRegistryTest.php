@@ -25,8 +25,8 @@ class TransformerRegistryTest extends TestCase
     {
         $transformer = $this->createMock(ImageTransformerInterface::class);
         $container = $this->createMock(ContainerInterface::class);
-        $container->method('has')->with('glide')->willReturn(true);
-        $container->method('get')->with('glide')->willReturn($transformer);
+        $container->expects(self::any())->method('has')->with('glide')->willReturn(true);
+        $container->expects(self::any())->method('get')->with('glide')->willReturn($transformer);
 
         $registry = new TransformerRegistry($container);
 
@@ -36,7 +36,7 @@ class TransformerRegistryTest extends TestCase
     public function testHasReturnsTrueForKnownTransformer(): void
     {
         $container = $this->createMock(ContainerInterface::class);
-        $container->method('has')->with('glide')->willReturn(true);
+        $container->expects(self::any())->method('has')->with('glide')->willReturn(true);
 
         $registry = new TransformerRegistry($container);
 
@@ -46,7 +46,7 @@ class TransformerRegistryTest extends TestCase
     public function testHasReturnsFalseForUnknownTransformer(): void
     {
         $container = $this->createMock(ContainerInterface::class);
-        $container->method('has')->with('unknown')->willReturn(false);
+        $container->expects(self::any())->method('has')->with('unknown')->willReturn(false);
 
         $registry = new TransformerRegistry($container);
 
@@ -56,7 +56,7 @@ class TransformerRegistryTest extends TestCase
     public function testGetThrowsForUnknownTransformer(): void
     {
         $container = $this->createMock(ContainerInterface::class);
-        $container->method('has')->with('unknown')->willReturn(false);
+        $container->expects(self::any())->method('has')->with('unknown')->willReturn(false);
 
         $registry = new TransformerRegistry($container);
 

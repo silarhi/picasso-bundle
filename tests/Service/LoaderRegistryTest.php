@@ -25,8 +25,8 @@ class LoaderRegistryTest extends TestCase
     {
         $loader = $this->createMock(ImageLoaderInterface::class);
         $container = $this->createMock(ContainerInterface::class);
-        $container->method('has')->with('filesystem')->willReturn(true);
-        $container->method('get')->with('filesystem')->willReturn($loader);
+        $container->expects(self::any())->method('has')->with('filesystem')->willReturn(true);
+        $container->expects(self::any())->method('get')->with('filesystem')->willReturn($loader);
 
         $registry = new LoaderRegistry($container);
 
@@ -36,7 +36,7 @@ class LoaderRegistryTest extends TestCase
     public function testHasReturnsTrueForKnownLoader(): void
     {
         $container = $this->createMock(ContainerInterface::class);
-        $container->method('has')->with('filesystem')->willReturn(true);
+        $container->expects(self::any())->method('has')->with('filesystem')->willReturn(true);
 
         $registry = new LoaderRegistry($container);
 
@@ -46,7 +46,7 @@ class LoaderRegistryTest extends TestCase
     public function testHasReturnsFalseForUnknownLoader(): void
     {
         $container = $this->createMock(ContainerInterface::class);
-        $container->method('has')->with('unknown')->willReturn(false);
+        $container->expects(self::any())->method('has')->with('unknown')->willReturn(false);
 
         $registry = new LoaderRegistry($container);
 
@@ -56,7 +56,7 @@ class LoaderRegistryTest extends TestCase
     public function testGetThrowsForUnknownLoader(): void
     {
         $container = $this->createMock(ContainerInterface::class);
-        $container->method('has')->with('unknown')->willReturn(false);
+        $container->expects(self::any())->method('has')->with('unknown')->willReturn(false);
 
         $registry = new LoaderRegistry($container);
 

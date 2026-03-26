@@ -25,8 +25,8 @@ class FlysystemRegistryTest extends TestCase
     {
         $storage = $this->createMock(FilesystemOperator::class);
         $container = $this->createMock(ContainerInterface::class);
-        $container->method('has')->with('default')->willReturn(true);
-        $container->method('get')->with('default')->willReturn($storage);
+        $container->expects(self::any())->method('has')->with('default')->willReturn(true);
+        $container->expects(self::any())->method('get')->with('default')->willReturn($storage);
 
         $registry = new FlysystemRegistry($container);
 
@@ -36,7 +36,7 @@ class FlysystemRegistryTest extends TestCase
     public function testGetThrowsForUnknownStorage(): void
     {
         $container = $this->createMock(ContainerInterface::class);
-        $container->method('has')->with('unknown')->willReturn(false);
+        $container->expects(self::any())->method('has')->with('unknown')->willReturn(false);
 
         $registry = new FlysystemRegistry($container);
 
@@ -48,7 +48,7 @@ class FlysystemRegistryTest extends TestCase
     public function testHasReturnsTrueForKnownStorage(): void
     {
         $container = $this->createMock(ContainerInterface::class);
-        $container->method('has')->with('default')->willReturn(true);
+        $container->expects(self::any())->method('has')->with('default')->willReturn(true);
 
         $registry = new FlysystemRegistry($container);
 
@@ -58,7 +58,7 @@ class FlysystemRegistryTest extends TestCase
     public function testHasReturnsFalseForUnknownStorage(): void
     {
         $container = $this->createMock(ContainerInterface::class);
-        $container->method('has')->with('unknown')->willReturn(false);
+        $container->expects(self::any())->method('has')->with('unknown')->willReturn(false);
 
         $registry = new FlysystemRegistry($container);
 

@@ -25,8 +25,8 @@ class PlaceholderRegistryTest extends TestCase
     {
         $placeholder = $this->createMock(PlaceholderInterface::class);
         $container = $this->createMock(ContainerInterface::class);
-        $container->method('has')->with('blur')->willReturn(true);
-        $container->method('get')->with('blur')->willReturn($placeholder);
+        $container->expects(self::any())->method('has')->with('blur')->willReturn(true);
+        $container->expects(self::any())->method('get')->with('blur')->willReturn($placeholder);
 
         $registry = new PlaceholderRegistry($container);
 
@@ -36,7 +36,7 @@ class PlaceholderRegistryTest extends TestCase
     public function testHasReturnsTrueForKnownPlaceholder(): void
     {
         $container = $this->createMock(ContainerInterface::class);
-        $container->method('has')->with('blur')->willReturn(true);
+        $container->expects(self::any())->method('has')->with('blur')->willReturn(true);
 
         $registry = new PlaceholderRegistry($container);
 
@@ -46,7 +46,7 @@ class PlaceholderRegistryTest extends TestCase
     public function testHasReturnsFalseForUnknownPlaceholder(): void
     {
         $container = $this->createMock(ContainerInterface::class);
-        $container->method('has')->with('unknown')->willReturn(false);
+        $container->expects(self::any())->method('has')->with('unknown')->willReturn(false);
 
         $registry = new PlaceholderRegistry($container);
 
@@ -56,7 +56,7 @@ class PlaceholderRegistryTest extends TestCase
     public function testGetThrowsForUnknownPlaceholder(): void
     {
         $container = $this->createMock(ContainerInterface::class);
-        $container->method('has')->with('unknown')->willReturn(false);
+        $container->expects(self::any())->method('has')->with('unknown')->willReturn(false);
 
         $registry = new PlaceholderRegistry($container);
 
