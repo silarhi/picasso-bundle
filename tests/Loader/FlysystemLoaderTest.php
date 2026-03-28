@@ -41,7 +41,7 @@ class FlysystemLoaderTest extends TestCase
         self::assertNotFalse($stream);
 
         $storage = $this->createMock(FilesystemOperator::class);
-        $storage->method('readStream')
+        $storage->expects(self::any())->method('readStream')
             ->with('photo.jpg')
             ->willReturn($stream);
 

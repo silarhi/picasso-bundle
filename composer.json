@@ -16,7 +16,7 @@
         "league/glide": "^2.3.2",
         "league/glide-symfony": "^2.0.1",
         "phpstan/phpstan": "^2.1.44",
-        "phpunit/phpunit": "^11.5.55",
+        "phpunit/phpunit": "^11.5.55|^13.0.5",
         "psr/http-client": "^1.0.3",
         "psr/http-factory": "^1.1",
         "rector/rector": "^2.3.9",

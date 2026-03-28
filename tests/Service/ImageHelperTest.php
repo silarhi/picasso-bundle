@@ -53,14 +53,14 @@ class ImageHelperTest extends TestCase
         $this->glideTransformer = $this->createMock(ImageTransformerInterface::class);
 
         $transformerLocator = $this->createMock(ContainerInterface::class);
-        $transformerLocator->method('has')->with('glide')->willReturn(true);
-        $transformerLocator->method('get')->with('glide')->willReturn($this->glideTransformer);
+        $transformerLocator->expects(self::any())->method('has')->with('glide')->willReturn(true);
+        $transformerLocator->expects(self::any())->method('get')->with('glide')->willReturn($this->glideTransformer);
         $this->transformerRegistry = new TransformerRegistry($transformerLocator);
 
         $this->mockPlaceholder = $this->createMock(PlaceholderInterface::class);
         $placeholderLocator = $this->createMock(ContainerInterface::class);
         $placeholderLocator->method('has')->willReturnCallback(static fn (string $name): bool => 'blur' === $name);
-        $placeholderLocator->method('get')->with('blur')->willReturn($this->mockPlaceholder);
+        $placeholderLocator->expects(self::any())->method('get')->with('blur')->willReturn($this->mockPlaceholder);
         $this->placeholderRegistry = new PlaceholderRegistry($placeholderLocator);
 
         $loaderLocator = $this->createMock(ContainerInterface::class);
@@ -384,7 +384,7 @@ class ImageHelperTest extends TestCase
 
         $pipeline = $this->createMock(ImagePipeline::class);
         $pipeline->method('resolveLoaderName')->willReturn('filesystem');
-        $pipeline->method('resolveTransformerName')->with(null)->willReturn('glide');
+        $pipeline->expects(self::any())->method('resolveTransformerName')->with(null)->willReturn('glide');
         $pipeline->method('load')->willReturn(new Image(path: 'photo.jpg', stream: $stream));
         $this->metadataGuesser->method('guess')
             ->willReturn(['width' => 800, 'height' => 600, 'mimeType' => 'image/jpeg']);
@@ -434,7 +434,7 @@ class ImageHelperTest extends TestCase
 
         $pipeline = $this->createMock(ImagePipeline::class);
         $pipeline->method('resolveLoaderName')->willReturn('filesystem');
-        $pipeline->method('resolveTransformerName')->with('glide')->willReturn('glide');
+        $pipeline->expects(self::any())->method('resolveTransformerName')->with('glide')->willReturn('glide');
         $pipeline->method('load')->willReturn(new Image(path: 'photo.jpg', stream: $stream));
         $this->metadataGuesser->method('guess')
             ->willReturn(['width' => 800, 'height' => 600, 'mimeType' => 'image/jpeg']);

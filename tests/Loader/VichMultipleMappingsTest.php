@@ -219,15 +219,15 @@ class VichMultipleMappingsTest extends TestCase
     {
         $entity = new stdClass();
 
-        $this->mappingHelper->method('getFilePropertyName')
+        $this->mappingHelper->expects(self::any())->method('getFilePropertyName')
             ->with($entity, 'imageFile')
             ->willReturn('imageFile');
 
-        $this->mappingHelper->method('getUploadDestination')
+        $this->mappingHelper->expects(self::any())->method('getUploadDestination')
             ->with($entity, 'imageFile')
             ->willReturn('/var/www/app/public/uploads/images');
 
-        $this->storage->method('resolvePath')
+        $this->storage->expects(self::any())->method('resolvePath')
             ->with($entity, 'imageFile', null, true)
             ->willReturn('2024/photo.jpg');
 
@@ -251,15 +251,15 @@ class VichMultipleMappingsTest extends TestCase
     {
         $entity = new stdClass();
 
-        $this->mappingHelper->method('getFilePropertyName')
+        $this->mappingHelper->expects(self::any())->method('getFilePropertyName')
             ->with($entity, 'documentFile')
             ->willReturn('documentFile');
 
-        $this->mappingHelper->method('getUploadDestination')
+        $this->mappingHelper->expects(self::any())->method('getUploadDestination')
             ->with($entity, 'documentFile')
             ->willReturn('default.storage');
 
-        $this->storage->method('resolvePath')
+        $this->storage->expects(self::any())->method('resolvePath')
             ->with($entity, 'documentFile', null, true)
             ->willReturn('contracts/2024/agreement.pdf');
 
@@ -336,15 +336,15 @@ class VichMultipleMappingsTest extends TestCase
     {
         $entity = new stdClass();
 
-        $this->mappingHelper->method('getFilePropertyName')
+        $this->mappingHelper->expects(self::any())->method('getFilePropertyName')
             ->with($entity, null)
             ->willReturn('avatarFile');
 
-        $this->mappingHelper->method('getUploadDestination')
+        $this->mappingHelper->expects(self::any())->method('getUploadDestination')
             ->with($entity, null)
             ->willReturn('/var/uploads/avatars');
 
-        $this->storage->method('resolvePath')
+        $this->storage->expects(self::any())->method('resolvePath')
             ->with($entity, 'avatarFile', null, true)
             ->willReturn('users/42/avatar.jpg');
 

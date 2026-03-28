@@ -52,7 +52,7 @@ class ImageControllerTest extends TestCase
     public function testInvokeThrowsNotFoundForUnknownTransformer(): void
     {
         $transformerContainer = $this->createMock(ContainerInterface::class);
-        $transformerContainer->method('has')->with('unknown')->willReturn(false);
+        $transformerContainer->expects(self::any())->method('has')->with('unknown')->willReturn(false);
         $transformerRegistry = new TransformerRegistry($transformerContainer);
 
         $loaderContainer = $this->createMock(ContainerInterface::class);
@@ -86,7 +86,7 @@ class ImageControllerTest extends TestCase
         $transformerRegistry = $this->createRegistry(TransformerRegistry::class, 'glide', $transformer);
 
         $loaderContainer = $this->createMock(ContainerInterface::class);
-        $loaderContainer->method('has')->with('unknown')->willReturn(false);
+        $loaderContainer->expects(self::any())->method('has')->with('unknown')->willReturn(false);
         $loaderRegistry = new LoaderRegistry($loaderContainer);
 
         $controller = new ImageController($transformerRegistry, $loaderRegistry);
@@ -121,8 +121,8 @@ class ImageControllerTest extends TestCase
     private function createRegistry(string $registryClass, string $name, object $service): LoaderRegistry|TransformerRegistry
     {
         $container = $this->createMock(ContainerInterface::class);
-        $container->method('has')->with($name)->willReturn(true);
-        $container->method('get')->with($name)->willReturn($service);
+        $container->expects(self::any())->method('has')->with($name)->willReturn(true);
+        $container->expects(self::any())->method('get')->with($name)->willReturn($service);
 
         return new $registryClass($container);
     }

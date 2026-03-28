@@ -42,8 +42,8 @@ class TransformerPlaceholderTest extends TestCase
             ->willReturn('/picasso/blur.jpg');
 
         $locator = $this->createMock(ContainerInterface::class);
-        $locator->method('has')->with('glide')->willReturn(true);
-        $locator->method('get')->with('glide')->willReturn($transformer);
+        $locator->expects(self::any())->method('has')->with('glide')->willReturn(true);
+        $locator->expects(self::any())->method('get')->with('glide')->willReturn($transformer);
         $registry = new TransformerRegistry($locator);
 
         $placeholder = new TransformerPlaceholder($registry, size: 10, blur: 5, quality: 30, fit: 'crop', format: 'jpg');
@@ -72,8 +72,8 @@ class TransformerPlaceholderTest extends TestCase
             ->willReturn('/picasso/blur-custom.jpg');
 
         $locator = $this->createMock(ContainerInterface::class);
-        $locator->method('has')->with('glide')->willReturn(true);
-        $locator->method('get')->with('glide')->willReturn($transformer);
+        $locator->expects(self::any())->method('has')->with('glide')->willReturn(true);
+        $locator->expects(self::any())->method('get')->with('glide')->willReturn($transformer);
         $registry = new TransformerRegistry($locator);
 
         $placeholder = new TransformerPlaceholder($registry, size: 20, blur: 15, quality: 50, fit: 'crop', format: 'jpg');

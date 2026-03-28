@@ -61,15 +61,15 @@ class VichUploaderLoaderTest extends TestCase
     {
         $entity = new stdClass();
 
-        $this->mappingHelper->method('getFilePropertyName')
+        $this->mappingHelper->expects(self::any())->method('getFilePropertyName')
             ->with($entity, 'imageFile')
             ->willReturn('imageFile');
 
-        $this->mappingHelper->method('getUploadDestination')
+        $this->mappingHelper->expects(self::any())->method('getUploadDestination')
             ->with($entity, 'imageFile')
             ->willReturn('/var/uploads/images');
 
-        $this->storage->method('resolvePath')
+        $this->storage->expects(self::any())->method('resolvePath')
             ->with($entity, 'imageFile', null, true)
             ->willReturn('2024/february/photo.jpg');
 
@@ -86,15 +86,15 @@ class VichUploaderLoaderTest extends TestCase
     {
         $entity = new stdClass();
 
-        $this->mappingHelper->method('getFilePropertyName')
+        $this->mappingHelper->expects(self::any())->method('getFilePropertyName')
             ->with($entity, null)
             ->willReturn('imageFile');
 
-        $this->mappingHelper->method('getUploadDestination')
+        $this->mappingHelper->expects(self::any())->method('getUploadDestination')
             ->with($entity, null)
             ->willReturn('/var/uploads');
 
-        $this->storage->method('resolvePath')
+        $this->storage->expects(self::any())->method('resolvePath')
             ->with($entity, 'imageFile', null, true)
             ->willReturn('auto/detected.jpg');
 
@@ -110,7 +110,7 @@ class VichUploaderLoaderTest extends TestCase
     {
         $entity = new stdClass();
 
-        $this->mappingHelper->method('getFilePropertyName')
+        $this->mappingHelper->expects(self::any())->method('getFilePropertyName')
             ->with($entity, null)
             ->willReturn(null);
 
@@ -131,7 +131,7 @@ class VichUploaderLoaderTest extends TestCase
         $this->mappingHelper->method('getUploadDestination')
             ->willReturn(null);
 
-        $this->storage->method('resolvePath')
+        $this->storage->expects(self::any())->method('resolvePath')
             ->with($entity, 'imageFile', null, true)
             ->willReturn('/photo.jpg');
 
@@ -224,11 +224,11 @@ class VichUploaderLoaderTest extends TestCase
     {
         $filesystem = $this->createMock(FilesystemOperator::class);
 
-        $this->storageContainer->method('has')
+        $this->storageContainer->expects(self::any())->method('has')
             ->with('uploads.storage.public')
             ->willReturn(true);
 
-        $this->storageContainer->method('get')
+        $this->storageContainer->expects(self::any())->method('get')
             ->with('uploads.storage.public')
             ->willReturn($filesystem);
 
@@ -239,7 +239,7 @@ class VichUploaderLoaderTest extends TestCase
 
     public function testGetSourceReturnsStringWhenNotInRegistry(): void
     {
-        $this->storageContainer->method('has')
+        $this->storageContainer->expects(self::any())->method('has')
             ->with('/var/uploads/images')
             ->willReturn(false);
 
@@ -291,7 +291,7 @@ class VichUploaderLoaderTest extends TestCase
             ->with($entity, 'avatarFile')
             ->willReturn('/var/uploads/avatars');
 
-        $this->storage->method('resolvePath')
+        $this->storage->expects(self::any())->method('resolvePath')
             ->with($entity, 'avatarFile', null, true)
             ->willReturn('users/avatar.jpg');
 
@@ -310,10 +310,10 @@ class VichUploaderLoaderTest extends TestCase
 
         $this->mappingHelper->method('getFilePropertyName')->willReturn('imageFile');
         $this->mappingHelper->method('getUploadDestination')->willReturn('/var/uploads');
-        $this->mappingHelper->method('readDimensions')
+        $this->mappingHelper->expects(self::any())->method('readDimensions')
             ->with($entity, 'imageFile')
             ->willReturn([1024, 768]);
-        $this->mappingHelper->method('readMimeType')
+        $this->mappingHelper->expects(self::any())->method('readMimeType')
             ->with($entity, 'imageFile')
             ->willReturn('image/jpeg');
         $this->storage->method('resolvePath')->willReturn('photo.jpg');
