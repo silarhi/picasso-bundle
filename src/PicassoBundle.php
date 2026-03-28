@@ -448,17 +448,25 @@ final class PicassoBundle extends AbstractBundle
                         if (!$vichHelperRegistered) {
                             $services->set('.picasso.vich_mapping_helper', VichMappingHelper::class)
                                 ->args([service(\Vich\UploaderBundle\Mapping\PropertyMappingFactory::class)]);
-                            $services->set('.picasso.flysystem_registry', FlysystemRegistry::class)
-                                ->args([tagged_locator('flysystem.storage', 'storage')]);
+
+                            $hasFlysystem = interface_exists(\League\Flysystem\FilesystemOperator::class);
+                            if ($hasFlysystem) {
+                                $services->set('.picasso.flysystem_registry', FlysystemRegistry::class)
+                                    ->args([tagged_locator('flysystem.storage', 'storage')]);
+                            }
                             $vichHelperRegistered = true;
                         }
 
+                        $loaderArgs = [
+                            service(VichStorageInterface::class),
+                            service('.picasso.vich_mapping_helper'),
+                        ];
+                        if (isset($hasFlysystem) && $hasFlysystem) {
+                            $loaderArgs[] = service('.picasso.flysystem_registry');
+                        }
+
                         $services->set('picasso.loader.' . $name, VichUploaderLoader::class)
-                            ->args([
-                                service(VichStorageInterface::class),
-                                service('.picasso.vich_mapping_helper'),
-                                service('.picasso.flysystem_registry'),
-                            ])
+                            ->args($loaderArgs)
                             ->tag('picasso.loader', $tag);
                     }
                     break;

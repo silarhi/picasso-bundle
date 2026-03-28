@@ -248,6 +248,15 @@ class VichUploaderLoaderTest extends TestCase
         self::assertSame('/var/uploads/images', $source);
     }
 
+    public function testGetSourceReturnsStringWhenNoFlysystemRegistry(): void
+    {
+        $loader = new VichUploaderLoader($this->storage, $this->mappingHelper);
+
+        $source = $loader->getSource(['upload_destination' => '/var/uploads/images']);
+
+        self::assertSame('/var/uploads/images', $source);
+    }
+
     public function testLoadWithNullUploadDestinationReturnsEmptyMetadata(): void
     {
         $entity = new stdClass();
