@@ -27,7 +27,7 @@ final readonly class VichUploaderLoader implements ServableLoaderInterface
     public function __construct(
         private StorageInterface $storage,
         private VichMappingHelperInterface $mappingHelper,
-        private FlysystemRegistry $flysystemRegistry,
+        private ?FlysystemRegistry $flysystemRegistry = null,
     ) {
     }
 
@@ -81,7 +81,7 @@ final readonly class VichUploaderLoader implements ServableLoaderInterface
             throw new InvalidMetadataException('Upload destination is required to get the source.');
         }
 
-        if ($this->flysystemRegistry->has($uploadDestination)) {
+        if (null !== $this->flysystemRegistry && $this->flysystemRegistry->has($uploadDestination)) {
             return $this->flysystemRegistry->get($uploadDestination);
         }
 
