@@ -272,7 +272,7 @@ final readonly class ImageHelper implements ImageHelperInterface
         $quality = $quality ?? $this->defaultQuality;
         $fit = $fit ?? $this->defaultFit;
         $formats = $this->formats;
-        $fallbackFormat = end($formats) ?: 'jpg';
+        $fallbackFormat = false !== end($formats) ? end($formats) : 'jpg';
 
         $sources = [];
         $fallbackSrc = null;

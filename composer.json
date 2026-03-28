@@ -1,60 +1,66 @@
 {
-    "name": "silarhi/picasso-bundle",
-    "description": "Responsive image component for Symfony, inspired by next/image",
-    "type": "symfony-bundle",
-    "license": "MIT",
-    "require": {
-        "php": ">=8.2",
-        "symfony/framework-bundle": "^6.4 || ^7.0 || ^8.0",
-        "symfony/ux-twig-component": "^2.13"
+  "name": "silarhi/picasso-bundle",
+  "description": "Responsive image component for Symfony, inspired by next/image",
+  "type": "symfony-bundle",
+  "license": "MIT",
+  "require": {
+    "php": ">=8.2",
+    "symfony/framework-bundle": "^6.4 || ^7.0 || ^8.0",
+    "symfony/ux-twig-component": "^2.13"
+  },
+  "require-dev": {
+    "friendsofphp/php-cs-fixer": "^3.94.2",
+    "imagine/imagine": "^1.5.2",
+    "kornrunner/blurhash": "^1.2.2",
+    "league/flysystem-bundle": "^3.6.2",
+    "league/glide": "^2.3.2",
+    "league/glide-symfony": "^2.0.1",
+    "phpstan/extension-installer": "^1.4",
+    "phpstan/phpstan": "^2.1.44",
+    "phpstan/phpstan-strict-rules": "^2.0",
+    "phpstan/phpstan-symfony": "^2.0",
+    "phpunit/phpunit": "^11.5.55|^12|^13",
+    "psr/http-client": "^1.0.3",
+    "psr/http-factory": "^1.1",
+    "rector/rector": "^2.3.9",
+    "symfony/http-client": "^6.4 || ^7.4.7 || ^8.0.7",
+    "symfony/twig-bundle": "^6.4 || ^7.4.4 || ^8.0.4",
+    "vich/uploader-bundle": "^2.9.2",
+    "vincentlanglet/twig-cs-fixer": "^3.14"
+  },
+  "config": {
+    "preferred-install": {
+      "*": "dist"
     },
-    "require-dev": {
-        "friendsofphp/php-cs-fixer": "^3.94.2",
-        "imagine/imagine": "^1.5.2",
-        "kornrunner/blurhash": "^1.2.2",
-        "league/flysystem-bundle": "^3.6.2",
-        "league/glide": "^2.3.2",
-        "league/glide-symfony": "^2.0.1",
-        "phpstan/phpstan": "^2.1.44",
-        "phpunit/phpunit": "^11.5.55|^13.0.5",
-        "psr/http-client": "^1.0.3",
-        "psr/http-factory": "^1.1",
-        "rector/rector": "^2.3.9",
-        "symfony/http-client": "^6.4 || ^7.4.7 || ^8.0.7",
-        "symfony/twig-bundle": "^6.4 || ^7.4.4 || ^8.0.4",
-        "vich/uploader-bundle": "^2.9.2",
-        "vincentlanglet/twig-cs-fixer": "^3.14"
-    },
-    "config": {
-        "preferred-install": {
-            "*": "dist"
-        },
-        "bump-after-update": "dev",
-        "sort-packages": true
-    },
-    "suggest": {
-        "imagine/imagine": "Required for the BlurHash placeholder (supports GD and Imagick)",
-        "league/glide": "Required for the Glide transformer (local image transformation)",
-        "league/glide-symfony": "Required for the Glide transformer",
-        "league/flysystem": "Required for the Flysystem loader",
-        "kornrunner/blurhash": "Required for the BlurHash placeholder",
-        "vich/uploader-bundle": "Required for the VichUploader loader",
-        "psr/http-client": "Required for the URL loader (PSR-18 HTTP client interface)",
-        "psr/http-factory": "Required for the URL loader (PSR-17 HTTP factory interface)",
-        "symfony/http-client": "Provides a PSR-18 HTTP client implementation for the URL loader"
-    },
-    "scripts": {
-        "test": "phpunit",
-        "test:coverage": "phpunit"
-    },
-    "autoload": {
-        "psr-4": {
-            "Silarhi\\PicassoBundle\\": "src/"
-        }
-    },
-    "autoload-dev": {
-        "psr-4": {
-            "Silarhi\\PicassoBundle\\Tests\\": "tests/"
-        }
+    "bump-after-update": "dev",
+    "sort-packages": true,
+    "allow-plugins": {
+      "phpstan/extension-installer": true
     }
+  },
+  "suggest": {
+    "imagine/imagine": "Required for the BlurHash placeholder (supports GD and Imagick)",
+    "league/glide": "Required for the Glide transformer (local image transformation)",
+    "league/glide-symfony": "Required for the Glide transformer",
+    "league/flysystem": "Required for the Flysystem loader",
+    "kornrunner/blurhash": "Required for the BlurHash placeholder",
+    "vich/uploader-bundle": "Required for the VichUploader loader",
+    "psr/http-client": "Required for the URL loader (PSR-18 HTTP client interface)",
+    "psr/http-factory": "Required for the URL loader (PSR-17 HTTP factory interface)",
+    "symfony/http-client": "Provides a PSR-18 HTTP client implementation for the URL loader"
+  },
+  "scripts": {
+    "test": "phpunit",
+    "test:coverage": "phpunit"
+  },
+  "autoload": {
+    "psr-4": {
+      "Silarhi\\PicassoBundle\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Silarhi\\PicassoBundle\\Tests\\": "tests/"
+    }
+  }
 }

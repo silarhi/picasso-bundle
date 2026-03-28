@@ -131,6 +131,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface
             $params = [...$params, ...$cachedParams];
 
             $transformer = $this;
+            /** @phpstan-ignore closure.useThis (Glide Server rebinds $this on the closure via Closure::bind) */
             $cachePathCallable = function (string $path) use ($transformer, $cacheFilename, $context): string {
                 return $transformer->computeCachePath($path, $cacheFilename, $context);
             };
