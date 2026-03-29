@@ -426,26 +426,26 @@ with a full srcset.
 
 #### Component Properties
 
-| Property          | Type           | Default | Description                                             |
-| ----------------- | -------------- | ------- | ------------------------------------------------------- |
-| `src`             | `string`       | —       | Image path relative to the loader's base                |
-| `width`           | `int`          | auto    | Display width (auto-detected from source)               |
-| `height`          | `int`          | auto    | Display height (auto-detected from source)              |
-| `sizes`           | `string`       | —       | Responsive `sizes` attribute                            |
-| `sourceWidth`     | `int`          | auto    | Explicit source width (skips detection)                 |
-| `sourceHeight`    | `int`          | auto    | Explicit source height (skips detection)                |
-| `loader`          | `string`       | —       | Override default loader                                 |
-| `transformer`     | `string`       | —       | Override default transformer                            |
-| `quality`         | `int`          | 75      | Override quality (1–100)                                |
-| `fit`             | `string`       | contain | Fit mode: `contain`, `cover`, `crop`, `fill`            |
-| `placeholder`     | `string\|bool` | —       | `true`/`false` to enable/disable, or a placeholder name |
-| `placeholderData` | `string`       | —       | Literal data URI, bypasses placeholder services         |
-| `priority`        | `bool`         | false   | Eager loading, `fetchpriority="high"`, no placeholder   |
-| `loading`         | `string`       | lazy    | `lazy` or `eager`. Auto-set when priority               |
-| `fetchPriority`   | `string`       | —       | `high`, `low`, `auto`. Auto-set when priority           |
-| `unoptimized`     | `bool`         | false   | Serve original image without transformation             |
+| Property          | Type           | Default | Description                                                      |
+| ----------------- | -------------- | ------- | ---------------------------------------------------------------- |
+| `src`             | `string`       | —       | Image path relative to the loader's base                         |
+| `width`           | `int`          | auto    | Display width (auto-detected from source)                        |
+| `height`          | `int`          | auto    | Display height (auto-detected from source)                       |
+| `sizes`           | `string`       | —       | Responsive `sizes` attribute                                     |
+| `sourceWidth`     | `int`          | auto    | Explicit source width (skips detection)                          |
+| `sourceHeight`    | `int`          | auto    | Explicit source height (skips detection)                         |
+| `loader`          | `string`       | —       | Override default loader                                          |
+| `transformer`     | `string`       | —       | Override default transformer                                     |
+| `quality`         | `int`          | 75      | Override quality (1–100)                                         |
+| `fit`             | `string`       | contain | Fit mode: `contain`, `cover`, `crop`, `fill`                     |
+| `placeholder`     | `string\|bool` | —       | `true`/`false` to enable/disable, or a placeholder name          |
+| `placeholderData` | `string`       | —       | Literal data URI, bypasses placeholder services                  |
+| `priority`        | `bool`         | false   | Eager loading, `fetchpriority="high"`, no placeholder            |
+| `loading`         | `string`       | lazy    | `lazy` or `eager`. Auto-set when priority                        |
+| `fetchPriority`   | `string`       | —       | `high`, `low`, `auto`. Auto-set when priority                    |
+| `unoptimized`     | `bool`         | false   | Serve original image without transformation                      |
 | `resolveMetadata` | `bool`         | —       | Override metadata resolution (see [below](#metadata-resolution)) |
-| `context`         | `array`        | `[]`    | Extra context for the loader (e.g. Vich)                |
+| `context`         | `array`        | `[]`    | Extra context for the loader (e.g. Vich)                         |
 
 #### Automatic Dimension Detection
 
@@ -480,11 +480,11 @@ space.
 Metadata resolution (reading the image stream to detect dimensions) is
 controlled at three levels, with this precedence: **runtime > per-loader > global**.
 
-| Level      | Option             | Default                                   |
-| ---------- | ------------------ | ----------------------------------------- |
-| Global     | `resolve_metadata` | `false`                                   |
+| Level      | Option             | Default                                        |
+| ---------- | ------------------ | ---------------------------------------------- |
+| Global     | `resolve_metadata` | `false`                                        |
 | Per-loader | `resolve_metadata` | `null` (inherit global); `true` for filesystem |
-| Runtime    | `resolveMetadata`  | `null` (inherit per-loader/global)        |
+| Runtime    | `resolveMetadata`  | `null` (inherit per-loader/global)             |
 
 ```twig
 {# Force metadata resolution for this image, regardless of config #}

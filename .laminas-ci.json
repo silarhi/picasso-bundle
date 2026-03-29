@@ -1,8 +1,5 @@
 {
-    "extensions": [
-        "gd",
-        "pcov"
-    ],
+    "extensions": ["gd", "pcov"],
     "exclude": [
         {
             "name": "README Linting"

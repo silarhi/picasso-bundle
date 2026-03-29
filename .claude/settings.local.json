@@ -1,16 +1,16 @@
 {
-  "permissions": {
-    "allow": [
-      "Bash(vendor/bin/phpunit:*)",
-      "Bash(./vendor/bin/phpunit:*)",
-      "Bash(./vendor/bin/phpstan analyse:*)",
-      "Bash(composer show:*)",
-      "Bash(php:*)",
-      "Bash(vendor/bin/phpstan analyse:*)",
-      "Bash(composer require:*)",
-      "Bash(composer update:*)",
-      "Bash(vendor/bin/php-cs-fixer fix:*)",
-      "Bash(vendor/bin/twig-cs-fixer lint:*)"
-    ]
-  }
+    "permissions": {
+        "allow": [
+            "Bash(vendor/bin/phpunit:*)",
+            "Bash(./vendor/bin/phpunit:*)",
+            "Bash(./vendor/bin/phpstan analyse:*)",
+            "Bash(composer show:*)",
+            "Bash(php:*)",
+            "Bash(vendor/bin/phpstan analyse:*)",
+            "Bash(composer require:*)",
+            "Bash(composer update:*)",
+            "Bash(vendor/bin/php-cs-fixer fix:*)",
+            "Bash(vendor/bin/twig-cs-fixer lint:*)"
+        ]
+    }
 }
