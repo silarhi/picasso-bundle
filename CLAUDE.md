@@ -77,14 +77,14 @@ vendor/bin/rector process --dry-run
 ## Architecture Notes
 
 - **Loaders** fetch image data from a source (filesystem, Flysystem, URL, Vich). They implement `ImageLoaderInterface` and are registered via the `#[AsImageLoader('name')]` attribute or the `picasso.loader` service tag.
-  - `ServableLoaderInterface` extends `ImageLoaderInterface` for loaders that can provide direct filesystem access (used by local transformers like Glide).
-  - `UrlLoader` loads images from remote URLs via Symfony HttpClient.
-  - `FlysystemRegistry` manages multiple named Flysystem storage instances.
+    - `ServableLoaderInterface` extends `ImageLoaderInterface` for loaders that can provide direct filesystem access (used by local transformers like Glide).
+    - `UrlLoader` loads images from remote URLs via Symfony HttpClient.
+    - `FlysystemRegistry` manages multiple named Flysystem storage instances.
 - **Transformers** generate URLs for on-demand image transformation (Glide locally, Imgix via CDN). They implement `ImageTransformerInterface` and are registered via the `#[AsImageTransformer('name')]` attribute or the `picasso.transformer` service tag.
-  - `LocalTransformerInterface` extends `ImageTransformerInterface` for transformers that serve images locally (e.g., Glide) and need a loader to access source files.
+    - `LocalTransformerInterface` extends `ImageTransformerInterface` for transformers that serve images locally (e.g., Glide) and need a loader to access source files.
 - **Placeholders** generate placeholder data URIs or URLs for images (e.g., blurred thumbnails). They implement `PlaceholderInterface` and are registered via the `#[AsPlaceholder('name')]` attribute or the `picasso.placeholder` service tag.
-  - `TransformerPlaceholder` reuses the configured transformer to generate a tiny blurred image URL.
-  - `BlurHashPlaceholder` encodes the image as a BlurHash string and decodes it to a tiny PNG data URI (requires `kornrunner/blurhash`).
+    - `TransformerPlaceholder` reuses the configured transformer to generate a tiny blurred image URL.
+    - `BlurHashPlaceholder` encodes the image as a BlurHash string and decodes it to a tiny PNG data URI (requires `kornrunner/blurhash`).
 - **Registries** (`LoaderRegistry`, `TransformerRegistry`, `PlaceholderRegistry`) use Symfony service locators for lazy-loading.
 - **ImagePipeline** orchestrates loader + transformer for the Twig function.
 - **ImageHelper** provides a convenience API for generating single image URLs with named parameters. Supports `resolveMetadata` parameter to control metadata resolution at runtime.
@@ -97,16 +97,16 @@ vendor/bin/rector process --dry-run
 
 All bundle exceptions implement `PicassoExceptionInterface` (extends `Throwable`), allowing consumers to catch any bundle-level error with a single type. Always throw domain-specific exceptions rather than generic PHP exceptions (`LogicException`, `RuntimeException`, etc.).
 
-| Exception                      | Extends                    | When to use                                               |
-|-------------------------------|---------------------------|-----------------------------------------------------------|
-| `LoaderNotFoundException`      | `InvalidArgumentException` | Requested loader name is unknown or missing from context  |
-| `TransformerNotFoundException` | `InvalidArgumentException` | Requested transformer name is unknown or missing from context |
-| `ImageNotFoundException`       | `RuntimeException`         | Source image could not be found or signature is invalid    |
-| `EncryptionException`          | `RuntimeException`         | URL encryption/decryption failure                         |
-| `InvalidMetadataException`     | `LogicException`           | Image metadata is malformed or invalid                    |
-| `InvalidConfigurationException`| `LogicException`           | Invalid bundle configuration (missing type, missing package) |
-| `ImageProcessingException`     | `RuntimeException`         | Image processing failure (stream read errors, encoding)   |
-| `PlaceholderNotFoundException` | `InvalidArgumentException` | Requested placeholder name is unknown or missing from context |
+| Exception                       | Extends                    | When to use                                                   |
+| ------------------------------- | -------------------------- | ------------------------------------------------------------- |
+| `LoaderNotFoundException`       | `InvalidArgumentException` | Requested loader name is unknown or missing from context      |
+| `TransformerNotFoundException`  | `InvalidArgumentException` | Requested transformer name is unknown or missing from context |
+| `ImageNotFoundException`        | `RuntimeException`         | Source image could not be found or signature is invalid       |
+| `EncryptionException`           | `RuntimeException`         | URL encryption/decryption failure                             |
+| `InvalidMetadataException`      | `LogicException`           | Image metadata is malformed or invalid                        |
+| `InvalidConfigurationException` | `LogicException`           | Invalid bundle configuration (missing type, missing package)  |
+| `ImageProcessingException`      | `RuntimeException`         | Image processing failure (stream read errors, encoding)       |
+| `PlaceholderNotFoundException`  | `InvalidArgumentException` | Requested placeholder name is unknown or missing from context |
 
 ## Coding Conventions
 
@@ -123,19 +123,20 @@ The project uses PHPStan custom type aliases to avoid duplicating complex type a
 
 **Global type aliases** (defined in `phpstan.neon` via `typeAliases`):
 
-| Alias              | Type                          | Used in                                   |
-|-------------------|-------------------------------|-------------------------------------------|
-| `TransformerParams` | `array<string, int\|string>` | `GlideTransformer`, `ImgixTransformer`    |
+| Alias               | Type                         | Used in                                |
+| ------------------- | ---------------------------- | -------------------------------------- |
+| `TransformerParams` | `array<string, int\|string>` | `GlideTransformer`, `ImgixTransformer` |
 
 **Local type aliases** (defined with `@phpstan-type` on an interface, imported with `@phpstan-import-type` in implementations):
 
-| Alias                  | Type                                                               | Defined on                    | Imported in           |
-|-----------------------|-------------------------------------------------------------------|-------------------------------|-----------------------|
-| `ImageGuessedMetadata` | `array{width: int\|null, height: int\|null, mimeType: string\|null}` | `MetadataGuesserInterface`    | `MetadataGuesser`     |
-| `ImageDimensions`      | `array{0: int, 1: int}`                                          | `VichMappingHelperInterface`  | `VichMappingHelper`   |
-| `TransformerContext`   | `array<string, mixed>`                                            | `ImageTransformerInterface`   | `GlideTransformer`, `ImgixTransformer`, `PlaceholderInterface`, `TransformerPlaceholder`, `BlurHashPlaceholder`, `SrcsetGenerator` |
+| Alias                  | Type                                                                 | Defined on                   | Imported in                                                                                                                        |
+| ---------------------- | -------------------------------------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `ImageGuessedMetadata` | `array{width: int\|null, height: int\|null, mimeType: string\|null}` | `MetadataGuesserInterface`   | `MetadataGuesser`                                                                                                                  |
+| `ImageDimensions`      | `array{0: int, 1: int}`                                              | `VichMappingHelperInterface` | `VichMappingHelper`                                                                                                                |
+| `TransformerContext`   | `array<string, mixed>`                                               | `ImageTransformerInterface`  | `GlideTransformer`, `ImgixTransformer`, `PlaceholderInterface`, `TransformerPlaceholder`, `BlurHashPlaceholder`, `SrcsetGenerator` |
 
 **Guidelines for adding new custom types:**
+
 - Use `@phpstan-type` on the canonical interface when the type is part of a contract (interface + implementations).
 - Use `@phpstan-import-type from InterfaceName` in implementing classes to reference the type.
 - Use `typeAliases` in `phpstan.neon` when the type is shared between unrelated classes (no common interface).
@@ -149,15 +150,16 @@ When making API changes, update the following:
 
 1. **`README.md`** — Update usage examples, configuration reference, and feature descriptions to reflect the new or changed API.
 2. **`CLAUDE.md`** — Update the relevant sections:
-   - **Repository Structure** — Add new files/directories or update descriptions.
-   - **Architecture Notes** — Document new or changed services, interfaces, and their roles.
-   - **Domain Exceptions** table — Add entries for any new exception classes.
-   - **PHPStan Custom Types** tables — Add entries for new type aliases.
-   - **Common Patterns** — Update or add patterns for new extension points.
+    - **Repository Structure** — Add new files/directories or update descriptions.
+    - **Architecture Notes** — Document new or changed services, interfaces, and their roles.
+    - **Domain Exceptions** table — Add entries for any new exception classes.
+    - **PHPStan Custom Types** tables — Add entries for new type aliases.
+    - **Common Patterns** — Update or add patterns for new extension points.
 3. **PHPDoc blocks** — Ensure all public and protected methods on interfaces and services have accurate `@param`, `@return`, and `@throws` annotations.
 4. **Bundle configuration** — When adding or changing config options in `PicassoBundle::configure()`, document the new options in both `README.md` and the Architecture Notes.
 
 **Checklist for API changes:**
+
 - [ ] `README.md` reflects the current public API and configuration
 - [ ] `CLAUDE.md` sections are up to date (structure, architecture, exceptions, types, patterns)
 - [ ] PHPDoc annotations are accurate on all affected interfaces and classes
