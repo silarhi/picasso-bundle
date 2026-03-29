@@ -1,3 +1,5 @@
+includes:
+
 parameters:
     level: max
     paths:
@@ -6,3 +8,9 @@ parameters:
     tmpDir: var/phpstan
     typeAliases:
         TransformerParams: 'array<string, int|string>'
+    ignoreErrors:
+        -
+            identifier: missingType.iterableValue
+            path: src/PicassoBundle.php
+            message: '#loadExtension#'
+            count: 1

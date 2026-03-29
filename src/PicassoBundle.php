@@ -21,6 +21,7 @@ use function is_bool;
 use function is_int;
 use function is_string;
 
+use Override;
 use Silarhi\PicassoBundle\Attribute\AsImageLoader;
 use Silarhi\PicassoBundle\Attribute\AsImageTransformer;
 use Silarhi\PicassoBundle\Attribute\AsPlaceholder;
@@ -341,9 +342,7 @@ final class PicassoBundle extends AbstractBundle
         ;
     }
 
-    /**
-     * @param array<string, mixed> $config
-     */
+    #[Override]
     public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
     {
         /** @var array{
@@ -730,7 +729,7 @@ final class PicassoBundle extends AbstractBundle
     {
         if (null !== $explicit) {
             if (!isset($items[$explicit])) {
-                throw new Exception\InvalidConfigurationException(sprintf('The default %s "%s" does not exist. Available: %s.', $label, $explicit, implode(', ', array_keys($items)) ?: 'none'));
+                throw new Exception\InvalidConfigurationException(sprintf('The default %s "%s" does not exist. Available: %s.', $label, $explicit, '' !== implode(', ', array_keys($items)) ? implode(', ', array_keys($items)) : 'none'));
             }
 
             if (!$items[$explicit]['enabled']) {

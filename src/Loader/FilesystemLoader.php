@@ -46,7 +46,11 @@ final readonly class FilesystemLoader implements ServableLoaderInterface
                 $metadata['path'] = $basePath;
             }
 
-            $stream = (static fn () => @fopen($absolutePath, 'r') ?: null);
+            $stream = static function () use ($absolutePath) {
+                $handle = @fopen($absolutePath, 'r');
+
+                return false !== $handle ? $handle : null;
+            };
 
             return new Image(path: $path, stream: $stream, metadata: $metadata);
         }
