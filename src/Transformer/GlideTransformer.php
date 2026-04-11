@@ -203,7 +203,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
             /** @var string $loaderName */
             $loaderName = $context['loader'] ?? throw new LoaderNotFoundException('The "loader" key is required in the context array for public cache purge.');
 
-            $cachePath = $transformerName . '/' . $loaderName . '/' . $path;
+            $cachePath = $transformerName . '/' . $loaderName . '/' . ltrim($path, '/');
         }
 
         try {
