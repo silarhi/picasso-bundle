@@ -16,8 +16,12 @@ namespace Silarhi\PicassoBundle\Service;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
+use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
 use Silarhi\PicassoBundle\Exception\LoaderNotFoundException;
 use Silarhi\PicassoBundle\Exception\TransformerNotFoundException;
+use Silarhi\PicassoBundle\Transformer\PurgableTransformerInterface;
+
+use function sprintf;
 
 readonly class ImagePipeline
 {
@@ -56,6 +60,28 @@ readonly class ImagePipeline
         bool $withMetadata = false,
     ): Image {
         return $this->loaderRegistry->get($this->resolveLoaderName($loader))->load($reference, $withMetadata);
+    }
+
+    /**
+     * Purge all cached variants of an image.
+     *
+     * @throws InvalidConfigurationException When the transformer does not support purging
+     */
+    public function purge(
+        string $path,
+        ?string $loader = null,
+        ?string $transformer = null,
+    ): void {
+        $loaderName = $this->resolveLoaderName($loader);
+        $transformerName = $this->resolveTransformerName($transformer);
+
+        $imageTransformer = $this->transformerRegistry->get($transformerName);
+
+        if (!$imageTransformer instanceof PurgableTransformerInterface) {
+            throw new InvalidConfigurationException(sprintf('Transformer "%s" does not support cache purging.', $transformerName));
+        }
+
+        $imageTransformer->purge($path, ['loader' => $loaderName, 'transformer' => $transformerName]);
     }
 
     public function resolveLoaderName(?string $loader = null): string

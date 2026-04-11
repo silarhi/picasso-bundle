@@ -128,6 +128,7 @@ PicassoBundle solves this the same way Next.js Image did for React:
     - [Imgix (CDN)](#imgix-cdn)
     - [Custom Transformer](#custom-transformer)
 - [Routes](#routes)
+- [Cache Purge](#cache-purge)
 - [How It Works](#how-it-works)
 - [Testing & Quality](#testing--quality)
 - [Contributing](#contributing)
@@ -338,6 +339,10 @@ picasso:
         #     type: imgix
         #     base_url: ~      # e.g. https://my-source.imgix.net
         #     sign_key: ~      # optional signing key
+        #     api_key: ~       # optional API key for cache purge
+        #     http_client: ~   # PSR-18 HTTP client service ID for purge
+        #     request_factory: ~ # PSR-17 request factory service ID for purge
+        #     stream_factory: ~  # PSR-17 stream factory service ID for purge
 
         # my_transformer:
         #     type: service
@@ -909,6 +914,7 @@ picasso:
         imgix:
             base_url: 'https://my-source.imgix.net'
             sign_key: '%env(IMGIX_SIGN_KEY)%' # optional
+            api_key: '%env(IMGIX_API_KEY)%' # optional, enables cache purge
 ```
 
 ### Custom Transformer
@@ -960,6 +966,63 @@ picasso:
 > **Note:** Routes are only required when using a local transformer
 > like Glide. CDN-based transformers (Imgix) generate external URLs
 > and do not need this route.
+
+## Cache Purge
+
+Both built-in transformers support purging cached image variants via the `PurgableTransformerInterface`.
+
+### Glide
+
+Glide cache is purged automatically — no extra configuration needed. In standard mode, `Server::deleteCache()` removes all cached variants. In public cache mode, the bundle deletes the cache directory for the specific transformer/loader/path combination.
+
+### Imgix
+
+Imgix purge requires an API key and a PSR-18 HTTP client:
+
+```yaml
+picasso:
+    transformers:
+        imgix:
+            type: imgix
+            base_url: 'https://my-source.imgix.net'
+            api_key: '%env(IMGIX_API_KEY)%'
+            # Optional: defaults to psr18.http_client for all three
+            # http_client: 'psr18.http_client'
+            # request_factory: 'psr18.http_client'
+            # stream_factory: 'psr18.http_client'
+```
+
+### Programmatic Usage
+
+Use the `ImagePipeline` service to purge from your code:
+
+```php
+use Silarhi\PicassoBundle\Service\ImagePipeline;
+
+class ImageManager
+{
+    public function __construct(private ImagePipeline $pipeline) {}
+
+    public function deleteImage(string $path): void
+    {
+        // Purge all cached variants
+        $this->pipeline->purge($path);
+
+        // Or specify loader/transformer explicitly
+        $this->pipeline->purge($path, loader: 'filesystem', transformer: 'glide');
+    }
+}
+```
+
+You can also use the `PurgableTransformerInterface` directly:
+
+```php
+use Silarhi\PicassoBundle\Transformer\PurgableTransformerInterface;
+
+if ($transformer instanceof PurgableTransformerInterface) {
+    $transformer->purge($path, ['loader' => 'filesystem', 'transformer' => 'glide']);
+}
+```
 
 ## How It Works
 

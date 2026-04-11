@@ -30,17 +30,22 @@ use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Exception\EncryptionException;
 use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
 use Silarhi\PicassoBundle\Exception\LoaderNotFoundException;
+use Silarhi\PicassoBundle\Exception\PurgeException;
 use Silarhi\PicassoBundle\Exception\TransformerNotFoundException;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
 use Silarhi\PicassoBundle\Service\UrlEncryption;
+
+use function sprintf;
+
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use Throwable;
 
 /**
  * @phpstan-import-type TransformerContext from ImageTransformerInterface
  */
-final readonly class GlideTransformer implements LocalTransformerInterface
+final readonly class GlideTransformer implements LocalTransformerInterface, PurgableTransformerInterface
 {
     private Signature $signature;
     private Server $server;
@@ -186,6 +191,26 @@ final readonly class GlideTransformer implements LocalTransformerInterface
         $cachePrefix = $transformerName . '/' . $loaderName;
 
         return $cachePrefix . '/' . $path . '/' . $cacheFilename;
+    }
+
+    public function purge(string $path, array $context = []): void
+    {
+        $cachePath = $path;
+
+        if ($this->isPublicCacheEnabled()) {
+            /** @var string $transformerName */
+            $transformerName = $context['transformer'] ?? throw new TransformerNotFoundException('The "transformer" key is required in the context array for public cache purge.');
+            /** @var string $loaderName */
+            $loaderName = $context['loader'] ?? throw new LoaderNotFoundException('The "loader" key is required in the context array for public cache purge.');
+
+            $cachePath = $transformerName . '/' . $loaderName . '/' . $path;
+        }
+
+        try {
+            $this->server->deleteCache($cachePath);
+        } catch (Throwable $e) {
+            throw new PurgeException(sprintf('Failed to purge cache for "%s".', $path), $e->getCode(), previous: $e);
+        }
     }
 
     public function isPublicCacheEnabled(): bool
