@@ -739,16 +739,30 @@ class ConfigurationTest extends TestCase
         self::assertSame('imagick', $config['transformers']['my_glide']['driver']);
     }
 
+    public function testGlideTransformerWithVipsDriver(): void
+    {
+        $config = $this->processConfig([
+            'transformers' => [
+                'my_glide' => [
+                    'type' => 'glide',
+                    'driver' => 'vips',
+                ],
+            ],
+        ]);
+
+        self::assertSame('vips', $config['transformers']['my_glide']['driver']);
+    }
+
     public function testGlideTransformerInvalidDriverThrows(): void
     {
         $this->expectException(InvalidConfigurationException::class);
-        $this->expectExceptionMessageMatches('/Driver must be "gd" or "imagick"/');
+        $this->expectExceptionMessageMatches('/Driver must be "gd", "imagick" or "vips"/');
 
         $this->processConfig([
             'transformers' => [
                 'my_glide' => [
                     'type' => 'glide',
-                    'driver' => 'vips',
+                    'driver' => 'invalid',
                 ],
             ],
         ]);
