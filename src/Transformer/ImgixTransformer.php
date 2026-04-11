@@ -13,19 +13,36 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Transformer;
 
+use function in_array;
+
+use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\RequestFactoryInterface;
+use Psr\Http\Message\StreamFactoryInterface;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
+use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
+use Silarhi\PicassoBundle\Exception\PurgeException;
+
+use function sprintf;
+
+use Throwable;
 
 /**
  * @phpstan-import-type TransformerContext from ImageTransformerInterface
  *
  * @see https://docs.imgix.com/apis/rendering
  */
-final readonly class ImgixTransformer implements ImageTransformerInterface
+final readonly class ImgixTransformer implements PurgableTransformerInterface
 {
+    private const PURGE_API_URL = 'https://api.imgix.com/api/v1/purge';
+
     public function __construct(
         private string $baseUrl,
         private ?string $signKey = null,
+        private ?string $apiKey = null,
+        private ?ClientInterface $httpClient = null,
+        private ?RequestFactoryInterface $requestFactory = null,
+        private ?StreamFactoryInterface $streamFactory = null,
     ) {
     }
 
@@ -42,6 +59,47 @@ final readonly class ImgixTransformer implements ImageTransformerInterface
         }
 
         return rtrim($this->baseUrl, '/') . $path . ('' !== $queryString ? '?' . $queryString : '');
+    }
+
+    /**
+     * @see https://docs.imgix.com/en-US/apis/management/purges
+     */
+    public function purge(string $path, array $context = []): void
+    {
+        if (null === $this->apiKey || '' === $this->apiKey) {
+            throw new InvalidConfigurationException('Imgix purge requires an "api_key" to be configured.');
+        }
+
+        if (in_array(null, [$this->httpClient, $this->requestFactory, $this->streamFactory], true)) {
+            throw new InvalidConfigurationException('Imgix purge requires "http_client", "request_factory", and "stream_factory" services to be configured.');
+        }
+
+        $imgixUrl = rtrim($this->baseUrl, '/') . '/' . ltrim($path, '/');
+
+        $body = json_encode([
+            'data' => [
+                'attributes' => [
+                    'url' => $imgixUrl,
+                ],
+                'type' => 'purges',
+            ],
+        ], \JSON_THROW_ON_ERROR);
+
+        $request = $this->requestFactory->createRequest('POST', self::PURGE_API_URL)
+            ->withHeader('Authorization', 'Bearer ' . $this->apiKey)
+            ->withHeader('Content-Type', 'application/vnd.api+json')
+            ->withBody($this->streamFactory->createStream($body));
+
+        try {
+            $response = $this->httpClient->sendRequest($request);
+        } catch (Throwable $e) {
+            throw new PurgeException(sprintf('Imgix purge request failed for "%s".', $path), $e->getCode(), previous: $e);
+        }
+
+        $statusCode = $response->getStatusCode();
+        if ($statusCode < 200 || $statusCode >= 300) {
+            throw new PurgeException(sprintf('Imgix purge API returned HTTP %d for "%s".', $statusCode, $path));
+        }
     }
 
     /**

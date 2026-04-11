@@ -331,6 +331,10 @@ final class PicassoBundle extends AbstractBundle
                             ->end()
                             ->integerNode('max_image_size')->defaultNull()->info('Max image size for glide.')->end()
                             ->scalarNode('base_url')->defaultNull()->info('Base URL for imgix (e.g. https://my-source.imgix.net).')->end()
+                            ->scalarNode('api_key')->defaultNull()->info('Imgix API key for cache purge operations.')->end()
+                            ->scalarNode('http_client')->defaultNull()->info('PSR-18 HTTP client service ID for imgix purge.')->end()
+                            ->scalarNode('request_factory')->defaultNull()->info('PSR-17 request factory service ID for imgix purge.')->end()
+                            ->scalarNode('stream_factory')->defaultNull()->info('PSR-17 stream factory service ID for imgix purge.')->end()
                             ->scalarNode('service')->defaultNull()->info('Service ID for custom transformers (type: service).')->end()
                             ->arrayNode('public_cache')
                                 ->canBeEnabled()
@@ -358,7 +362,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_fit: string,
          *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int|null, quality: int|null, fit: string|null, format: string|null, components_x: int, components_y: int, driver: string, service: string|null}>,
          *     loaders: array<string, array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null, resolve_metadata: bool|null}>,
-         *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, public_cache: array{enabled: bool}}>
+         *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, api_key: string|null, http_client: string|null, request_factory: string|null, stream_factory: string|null, service: string|null, public_cache: array{enabled: bool}}>
          * } $config
          */
         $services = $container->services();
@@ -533,11 +537,21 @@ final class PicassoBundle extends AbstractBundle
                     break;
 
                 case 'imgix':
+                    $imgixArgs = [
+                        $transformerConfig['base_url'],
+                        $transformerConfig['sign_key'],
+                    ];
+
+                    if (null !== $transformerConfig['api_key']) {
+                        $httpClientService = $transformerConfig['http_client'] ?? 'psr18.http_client';
+                        $imgixArgs[] = $transformerConfig['api_key'];
+                        $imgixArgs[] = service($httpClientService);
+                        $imgixArgs[] = service($transformerConfig['request_factory'] ?? $httpClientService);
+                        $imgixArgs[] = service($transformerConfig['stream_factory'] ?? $httpClientService);
+                    }
+
                     $services->set('picasso.transformer.' . $name, ImgixTransformer::class)
-                        ->args([
-                            $transformerConfig['base_url'],
-                            $transformerConfig['sign_key'],
-                        ])
+                        ->args($imgixArgs)
                         ->tag('picasso.transformer', ['key' => $name]);
                     break;
 

@@ -29,7 +29,7 @@ src/
 │                       #   LoaderRegistry, TransformerRegistry, PlaceholderRegistry,
 │                       #   SrcsetGenerator, MetadataGuesser, MetadataGuesserInterface, UrlEncryption
 ├── Transformer/        # GlideTransformer, ImgixTransformer + interfaces
-│                       #   (ImageTransformerInterface, LocalTransformerInterface)
+│                       #   (ImageTransformerInterface, LocalTransformerInterface, PurgableTransformerInterface)
 ├── Twig/
 │   ├── Component/      # ImageComponent (Picasso:Image Twig component)
 │   └── Extension/      # PicassoExtension (picasso_image_url Twig function)
@@ -82,11 +82,12 @@ vendor/bin/rector process --dry-run
     - `FlysystemRegistry` manages multiple named Flysystem storage instances.
 - **Transformers** generate URLs for on-demand image transformation (Glide locally, Imgix via CDN). They implement `ImageTransformerInterface` and are registered via the `#[AsImageTransformer('name')]` attribute or the `picasso.transformer` service tag.
     - `LocalTransformerInterface` extends `ImageTransformerInterface` for transformers that serve images locally (e.g., Glide) and need a loader to access source files.
+    - `PurgableTransformerInterface` extends `ImageTransformerInterface` for transformers that support cache purging. GlideTransformer purges via `Server::deleteCache()` (standard mode) or Flysystem directory deletion (public cache mode). ImgixTransformer purges via the Imgix Management API (`POST /api/v1/purge`) when an `api_key` and PSR-18 HTTP client are configured.
 - **Placeholders** generate placeholder data URIs or URLs for images (e.g., blurred thumbnails). They implement `PlaceholderInterface` and are registered via the `#[AsPlaceholder('name')]` attribute or the `picasso.placeholder` service tag.
     - `TransformerPlaceholder` reuses the configured transformer to generate a tiny blurred image URL.
     - `BlurHashPlaceholder` encodes the image as a BlurHash string and decodes it to a tiny PNG data URI (requires `kornrunner/blurhash`).
 - **Registries** (`LoaderRegistry`, `TransformerRegistry`, `PlaceholderRegistry`) use Symfony service locators for lazy-loading.
-- **ImagePipeline** orchestrates loader + transformer for the Twig function.
+- **ImagePipeline** orchestrates loader + transformer for the Twig function. Also provides a `purge()` convenience method that resolves loader/transformer names and delegates to `PurgableTransformerInterface::purge()`.
 - **ImageHelper** provides a convenience API for generating single image URLs with named parameters. Supports `resolveMetadata` parameter to control metadata resolution at runtime.
 - **ImageComponent** is the main Twig component (`<Picasso:Image>`) that generates `<picture>` with `<source>` elements. Supports `resolveMetadata` prop.
 - **Metadata resolution** (`resolve_metadata`): Controls whether the `MetadataGuesser` reads image streams to detect dimensions. Configurable globally (default: `false`), per-loader (filesystem defaults to `true`), or at runtime via the `resolveMetadata` parameter. To reduce CLS, `width` and `height` attributes are only rendered when **both** are available.
@@ -107,6 +108,7 @@ All bundle exceptions implement `PicassoExceptionInterface` (extends `Throwable`
 | `InvalidConfigurationException` | `LogicException`           | Invalid bundle configuration (missing type, missing package)  |
 | `ImageProcessingException`      | `RuntimeException`         | Image processing failure (stream read errors, encoding)       |
 | `PlaceholderNotFoundException`  | `InvalidArgumentException` | Requested placeholder name is unknown or missing from context |
+| `PurgeException`                | `RuntimeException`         | Cache purge operation failure (filesystem error, API error)   |
 
 ## Coding Conventions
 
@@ -129,11 +131,11 @@ The project uses PHPStan custom type aliases to avoid duplicating complex type a
 
 **Local type aliases** (defined with `@phpstan-type` on an interface, imported with `@phpstan-import-type` in implementations):
 
-| Alias                  | Type                                                                 | Defined on                   | Imported in                                                                                                                        |
-| ---------------------- | -------------------------------------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `ImageGuessedMetadata` | `array{width: int\|null, height: int\|null, mimeType: string\|null}` | `MetadataGuesserInterface`   | `MetadataGuesser`                                                                                                                  |
-| `ImageDimensions`      | `array{0: int, 1: int}`                                              | `VichMappingHelperInterface` | `VichMappingHelper`                                                                                                                |
-| `TransformerContext`   | `array<string, mixed>`                                               | `ImageTransformerInterface`  | `GlideTransformer`, `ImgixTransformer`, `PlaceholderInterface`, `TransformerPlaceholder`, `BlurHashPlaceholder`, `SrcsetGenerator` |
+| Alias                  | Type                                                                 | Defined on                   | Imported in                                                                                                                                                        |
+| ---------------------- | -------------------------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ImageGuessedMetadata` | `array{width: int\|null, height: int\|null, mimeType: string\|null}` | `MetadataGuesserInterface`   | `MetadataGuesser`                                                                                                                                                  |
+| `ImageDimensions`      | `array{0: int, 1: int}`                                              | `VichMappingHelperInterface` | `VichMappingHelper`                                                                                                                                                |
+| `TransformerContext`   | `array<string, mixed>`                                               | `ImageTransformerInterface`  | `GlideTransformer`, `ImgixTransformer`, `PurgableTransformerInterface`, `PlaceholderInterface`, `TransformerPlaceholder`, `BlurHashPlaceholder`, `SrcsetGenerator` |
 
 **Guidelines for adding new custom types:**
 
@@ -169,6 +171,6 @@ When making API changes, update the following:
 ## Common Patterns
 
 - **Adding a new loader**: Create a class implementing `ImageLoaderInterface` (or `ServableLoaderInterface` if it provides filesystem access), add `#[AsImageLoader('name')]`, and it auto-registers.
-- **Adding a new transformer**: Create a class implementing `ImageTransformerInterface` (or `LocalTransformerInterface` for local serving), add `#[AsImageTransformer('name')]`, and it auto-registers.
+- **Adding a new transformer**: Create a class implementing `ImageTransformerInterface` (or `LocalTransformerInterface` for local serving, or `PurgableTransformerInterface` for cache purge support), add `#[AsImageTransformer('name')]`, and it auto-registers.
 - **Adding a new placeholder**: Create a class implementing `PlaceholderInterface`, add `#[AsPlaceholder('name')]`, and it auto-registers. Alternatively, configure via `type: service` in the `placeholders` config.
 - **Bundle configuration**: All config options are defined in `PicassoBundle::configure()` and wired in `PicassoBundle::loadExtension()`.
