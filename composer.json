@@ -6,7 +6,7 @@
     "require": {
         "php": ">=8.2",
         "symfony/framework-bundle": "^6.4 || ^7.0 || ^8.0",
-        "symfony/ux-twig-component": "^2.13"
+        "symfony/ux-twig-component": "^3.0"
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.94.2",
