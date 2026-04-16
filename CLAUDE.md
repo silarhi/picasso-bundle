@@ -32,13 +32,14 @@ src/
 │                       #   (ImageTransformerInterface, LocalTransformerInterface, PurgableTransformerInterface)
 ├── Twig/
 │   ├── Component/      # ImageComponent (Picasso:Image Twig component)
-│   └── Extension/      # PicassoExtension (picasso_image_url Twig function)
+│   └── Extension/      # PicassoExtension (picasso_image_url, picasso_image Twig functions)
 └── PicassoBundle.php   # Bundle class with configuration tree and service wiring
 config/
 └── routes.php          # Bundle routes
 templates/
+├── image.html.twig     # Generic <picture>/<img> render template (used by function and component)
 └── components/
-    └── Image.html.twig # Twig template for the Image component
+    └── Image.html.twig # Twig component template (thin wrapper around image.html.twig)
 tests/                  # PHPUnit tests mirroring src/ structure
 ```
 
@@ -90,6 +91,9 @@ vendor/bin/rector process --dry-run
 - **ImagePipeline** orchestrates loader + transformer for the Twig function. Also provides a `purge()` convenience method that resolves loader/transformer names and delegates to `PurgableTransformerInterface::purge()`.
 - **ImageHelper** provides a convenience API for generating single image URLs with named parameters. Supports `resolveMetadata` parameter to control metadata resolution at runtime.
 - **ImageComponent** is the main Twig component (`<twig:Picasso:Image>`) that generates `<picture>` with `<source>` elements. Supports `resolveMetadata` prop.
+- **PicassoExtension** registers two Twig functions:
+    - `picasso_image_url(path, …)` — returns a single transformed image URL.
+    - `picasso_image(src, …, attributes={…})` — renders a full responsive `<picture>` element (same HTML as the `<twig:Picasso:Image>` component). Intended for consumers that do not install `symfony/ux-twig-component`. Uses `needs_environment` + `is_safe: ['html']` and renders `@Picasso/image.html.twig`, which is the same template the component delegates to.
 - **Metadata resolution** (`resolve_metadata`): Controls whether the `MetadataGuesser` reads image streams to detect dimensions. Configurable globally (default: `false`), per-loader (filesystem defaults to `true`), or at runtime via the `resolveMetadata` parameter. To reduce CLS, `width` and `height` attributes are only rendered when **both** are available.
 - **SrcsetGenerator** builds responsive srcset strings across configured widths and formats.
 - All bundle configuration and service wiring lives in `PicassoBundle.php` (uses `AbstractBundle`).

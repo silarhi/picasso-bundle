@@ -1,0 +1,53 @@
+{#
+    Generic image rendering template.
+
+    Parameters:
+      - data: Silarhi\PicassoBundle\Dto\ImageRenderData
+      - attributes: array<string, scalar|null> — extra HTML attributes (alt, class, id, data-*, …)
+
+    This template is used by both:
+      - the <Picasso:Image> Twig component (via components/Image.html.twig)
+      - the picasso_image() Twig function (for consumers without symfony/ux-twig-component)
+#}
+{% set userStyle = attributes.style|default('') %}
+{% set blurStyle = data.placeholderUri ? 'background-size:cover;background-position:center;background-repeat:no-repeat;background-image:url(' ~ data.placeholderUri ~ ');' : '' %}
+{% set fullStyle = blurStyle ~ userStyle %}
+{% set extraAttrs = attributes|filter((_, k) => k != 'style') %}
+
+{% if data.fallbackSrc %}
+    {% if data.unoptimized or data.sources is empty %}
+        <img
+            src="{{ data.fallbackSrc }}"
+            {% if data.fallbackSrcset %}srcset="{{ data.fallbackSrcset }}"{% endif %}
+            {% if data.sizes %}sizes="{{ data.sizes }}"{% endif %}
+            {% if data.width and data.height %}width="{{ data.width }}" height="{{ data.height }}"{% endif %}
+            loading="{{ data.loading }}"
+            {% if data.fetchPriority %}fetchpriority="{{ data.fetchPriority }}"{% endif %}
+            {% if fullStyle %}style="{{ fullStyle }}"{% endif %}
+            {% if data.placeholderUri %}onload="this.style.backgroundImage=''"{% endif %}
+            {% for name, value in extraAttrs %} {{ name }}="{{ value }}"{% endfor %}
+        />
+    {% else %}
+        <picture>
+            {% for source in data.sources %}
+                <source
+                    type="{{ source.type }}"
+                    srcset="{{ source.srcset }}"
+                    {% if data.sizes %}sizes="{{ data.sizes }}"{% endif %}
+                />
+            {% endfor %}
+
+            <img
+                src="{{ data.fallbackSrc }}"
+                srcset="{{ data.fallbackSrcset }}"
+                {% if data.sizes %}sizes="{{ data.sizes }}"{% endif %}
+                {% if data.width and data.height %}width="{{ data.width }}" height="{{ data.height }}"{% endif %}
+                loading="{{ data.loading }}"
+                {% if data.fetchPriority %}fetchpriority="{{ data.fetchPriority }}"{% endif %}
+                {% if fullStyle %}style="{{ fullStyle }}"{% endif %}
+                {% if data.placeholderUri %}onload="this.style.backgroundImage=''"{% endif %}
+                {% for name, value in extraAttrs %} {{ name }}="{{ value }}"{% endfor %}
+            />
+        </picture>
+    {% endif %}
+{% endif %}
