@@ -529,7 +529,44 @@ Use `unoptimized` to serve the image as-is, without any transformation. The `src
 
 ### Twig Function
 
-The `picasso_image_url()` function generates a single transformed image URL.
+Two Twig functions are available:
+
+- **`picasso_image()`** — renders a full responsive `<picture>` element (same
+  output as the `<twig:Picasso:Image>` component) for consumers who don't want to
+  install `symfony/ux-twig-component`.
+- **`picasso_image_url()`** — generates a single transformed image URL.
+
+#### `picasso_image()`
+
+Renders a complete responsive `<picture>` element with all configured formats,
+srcsets, placeholder, and `<img>` fallback. It accepts the same named arguments
+as the `<twig:Picasso:Image>` Twig component.
+
+```twig
+{# Same output as <twig:Picasso:Image src="photo.jpg" width="800" height="600" sizes="100vw" alt="A photo" /> #}
+{{ picasso_image(
+    src='photo.jpg',
+    width=800,
+    height=600,
+    sizes='100vw',
+    attributes={alt: 'A photo', class: 'rounded shadow-lg'}
+) }}
+```
+
+Extra HTML attributes (`alt`, `class`, `id`, `data-*`, …) are passed via the
+`attributes` named argument and forwarded to the inner `<img>` tag.
+
+All available parameters mirror the `<twig:Picasso:Image>` component:
+`src`, `width`, `height`, `sizes`, `sourceWidth`, `sourceHeight`, `loader`,
+`transformer`, `quality`, `fit`, `placeholder`, `placeholderData`, `priority`,
+`loading`, `fetchPriority`, `unoptimized`, `resolveMetadata`, `context`,
+`attributes`.
+
+See [Component Properties](#component-properties) for the full reference.
+
+#### `picasso_image_url()`
+
+Generates a single transformed image URL.
 Useful for backgrounds, meta tags, Open Graph images, or anywhere you need a plain URL.
 
 ```twig
