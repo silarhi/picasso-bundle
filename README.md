@@ -66,7 +66,7 @@
 ### After PicassoBundle
 
 ```twig
-<Picasso:Image src="hero.jpg" width="1920" height="1080" sizes="100vw" alt="Hero" />
+<twig:Picasso:Image src="hero.jpg" width="1920" height="1080" sizes="100vw" alt="Hero" />
 ```
 
 > Same output. Zero boilerplate. All formats, srcsets, and placeholders generated automatically.
@@ -138,7 +138,7 @@ PicassoBundle solves this the same way Next.js Image did for React:
 
 ## Features
 
-- **One component, full optimization** — `<Picasso:Image>` renders a complete `<picture>` with AVIF, WebP, and JPEG sources
+- **One component, full optimization** — `<twig:Picasso:Image>` renders a complete `<picture>` with AVIF, WebP, and JPEG sources
 - **Automatic responsive srcset** — generates width descriptors for all configured breakpoints, no manual work
 - **Blur placeholders** — built-in LQIP and [BlurHash](https://blurha.sh/) support for instant perceived loading
 - **Smart dimension detection** — reads image dimensions from the stream automatically, preserves aspect ratio
@@ -224,7 +224,7 @@ picasso:
 **3. Use the Twig component** in your templates:
 
 ```twig
-<Picasso:Image
+<twig:Picasso:Image
     src="photo.jpg"
     width="800"
     height="600"
@@ -415,12 +415,12 @@ Configures PSR-6 caching for metadata detection (image dimensions) and BlurHash 
 
 ### Twig Component (recommended)
 
-The `<Picasso:Image>` component renders a responsive `<picture>` element
+The `<twig:Picasso:Image>` component renders a responsive `<picture>` element
 with `<source>` tags for each configured format and a fallback `<img>`
 with a full srcset.
 
 ```twig
-<Picasso:Image
+<twig:Picasso:Image
     src="photo.jpg"
     width="800"
     height="600"
@@ -461,17 +461,17 @@ performance when you already know the image dimensions:
 
 ```twig
 {# Auto-detected dimensions (requires resolve_metadata enabled) #}
-<Picasso:Image src="photo.jpg" sizes="100vw" alt="Photo" />
+<twig:Picasso:Image src="photo.jpg" sizes="100vw" alt="Photo" />
 
 {# Explicit source dimensions (skips stream detection) #}
-<Picasso:Image src="photo.jpg" :sourceWidth="4000" :sourceHeight="3000" width="800" height="600" alt="Photo" />
+<twig:Picasso:Image src="photo.jpg" :sourceWidth="4000" :sourceHeight="3000" width="800" height="600" alt="Photo" />
 ```
 
 The component also preserves aspect ratio when only one display dimension is provided:
 
 ```twig
 {# height is calculated automatically from the source aspect ratio #}
-<Picasso:Image src="photo.jpg" width="800" sizes="100vw" alt="Photo" />
+<twig:Picasso:Image src="photo.jpg" width="800" sizes="100vw" alt="Photo" />
 ```
 
 #### Metadata Resolution
@@ -493,10 +493,10 @@ controlled at three levels, with this precedence: **runtime > per-loader > globa
 
 ```twig
 {# Force metadata resolution for this image, regardless of config #}
-<Picasso:Image src="photo.jpg" :resolveMetadata="true" width="800" sizes="100vw" alt="Photo" />
+<twig:Picasso:Image src="photo.jpg" :resolveMetadata="true" width="800" sizes="100vw" alt="Photo" />
 
 {# Disable metadata resolution for this image #}
-<Picasso:Image src="photo.jpg" :resolveMetadata="false" width="800" height="600" alt="Photo" />
+<twig:Picasso:Image src="photo.jpg" :resolveMetadata="false" width="800" height="600" alt="Photo" />
 ```
 
 Filesystem loaders default to `resolve_metadata: true` because reading
@@ -508,7 +508,7 @@ backends), it defaults to `false` to avoid unnecessary network requests.
 The component forwards any extra attributes to the inner `<img>` tag:
 
 ```twig
-<Picasso:Image
+<twig:Picasso:Image
     src="photo.jpg"
     width="400"
     height="300"
@@ -524,7 +524,7 @@ The component forwards any extra attributes to the inner `<img>` tag:
 Use `unoptimized` to serve the image as-is, without any transformation. The `src` value is passed directly to the `<img>` tag:
 
 ```twig
-<Picasso:Image src="/images/logo.svg" :unoptimized="true" alt="Logo" />
+<twig:Picasso:Image src="/images/logo.svg" :unoptimized="true" alt="Logo" />
 ```
 
 ### Twig Function
@@ -649,7 +649,7 @@ The JSON response contains everything a frontend needs to render a responsive `<
 }
 ```
 
-`imageData()` accepts the same parameters as the `<Picasso:Image>` Twig component (`src`, `width`, `height`, `sizes`, `quality`, `fit`, `placeholder`, `priority`, `loader`, `transformer`, etc.).
+`imageData()` accepts the same parameters as the `<twig:Picasso:Image>` Twig component (`src`, `width`, `height`, `sizes`, `quality`, `fit`, `placeholder`, `priority`, `loader`, `transformer`, etc.).
 
 ## Placeholders
 
@@ -732,16 +732,16 @@ picasso:
 
 ```twig
 {# Uses the default placeholder from config #}
-<Picasso:Image src="photo.jpg" width="800" height="600" sizes="100vw" alt="Photo" />
+<twig:Picasso:Image src="photo.jpg" width="800" height="600" sizes="100vw" alt="Photo" />
 
 {# Disable placeholder for this image #}
-<Picasso:Image src="icon.png" width="64" height="64" :placeholder="false" />
+<twig:Picasso:Image src="icon.png" width="64" height="64" :placeholder="false" />
 
 {# Select a specific named placeholder #}
-<Picasso:Image src="hero.jpg" width="1200" height="800" placeholder="blurhash" />
+<twig:Picasso:Image src="hero.jpg" width="1200" height="800" placeholder="blurhash" />
 
 {# Pass a literal data URI directly (bypasses all placeholder services) #}
-<Picasso:Image src="photo.jpg" width="800" height="600" placeholderData="data:image/png;base64,..." />
+<twig:Picasso:Image src="photo.jpg" width="800" height="600" placeholderData="data:image/png;base64,..." />
 ```
 
 ## Priority Images
@@ -751,7 +751,7 @@ This sets `loading="eager"`, `fetchpriority="high"`, and disables the blur
 placeholder for optimal Largest Contentful Paint (LCP) performance:
 
 ```twig
-<Picasso:Image
+<twig:Picasso:Image
     src="hero-banner.jpg"
     width="1920"
     height="1080"
@@ -783,7 +783,7 @@ picasso:
 ```
 
 ```twig
-<Picasso:Image src="photos/landscape.jpg" width="800" height="600" alt="Landscape" />
+<twig:Picasso:Image src="photos/landscape.jpg" width="800" height="600" alt="Landscape" />
 ```
 
 ### Flysystem Loader
@@ -803,7 +803,7 @@ picasso:
 ```
 
 ```twig
-<Picasso:Image src="photo.jpg" loader="my_s3" width="800" height="600" alt="S3 image" />
+<twig:Picasso:Image src="photo.jpg" loader="my_s3" width="800" height="600" alt="S3 image" />
 ```
 
 ### VichUploaderBundle Loader
@@ -821,7 +821,7 @@ picasso:
 ```
 
 ```twig
-<Picasso:Image
+<twig:Picasso:Image
     src="product-photo.jpg"
     :context="{ entity: product, field: 'imageFile' }"
     width="400"
@@ -847,7 +847,7 @@ picasso:
 ```
 
 ```twig
-<Picasso:Image
+<twig:Picasso:Image
     src="https://example.com/remote-image.jpg"
     loader="url"
     width="800"
@@ -1026,7 +1026,7 @@ if ($transformer instanceof PurgableTransformerInterface) {
 
 ## How It Works
 
-When you use `<Picasso:Image>`, the component:
+When you use `<twig:Picasso:Image>`, the component:
 
 1. **Loads** the image metadata via the configured loader (filesystem, Flysystem, Vich, URL)
 2. **Detects dimensions** from the image stream (or uses explicitly provided values)

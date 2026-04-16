@@ -89,7 +89,7 @@ vendor/bin/rector process --dry-run
 - **Registries** (`LoaderRegistry`, `TransformerRegistry`, `PlaceholderRegistry`) use Symfony service locators for lazy-loading.
 - **ImagePipeline** orchestrates loader + transformer for the Twig function. Also provides a `purge()` convenience method that resolves loader/transformer names and delegates to `PurgableTransformerInterface::purge()`.
 - **ImageHelper** provides a convenience API for generating single image URLs with named parameters. Supports `resolveMetadata` parameter to control metadata resolution at runtime.
-- **ImageComponent** is the main Twig component (`<Picasso:Image>`) that generates `<picture>` with `<source>` elements. Supports `resolveMetadata` prop.
+- **ImageComponent** is the main Twig component (`<twig:Picasso:Image>`) that generates `<picture>` with `<source>` elements. Supports `resolveMetadata` prop.
 - **Metadata resolution** (`resolve_metadata`): Controls whether the `MetadataGuesser` reads image streams to detect dimensions. Configurable globally (default: `false`), per-loader (filesystem defaults to `true`), or at runtime via the `resolveMetadata` parameter. To reduce CLS, `width` and `height` attributes are only rendered when **both** are available.
 - **SrcsetGenerator** builds responsive srcset strings across configured widths and formats.
 - All bundle configuration and service wiring lives in `PicassoBundle.php` (uses `AbstractBundle`).
