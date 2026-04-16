@@ -54,6 +54,17 @@ abstract class AbstractPicassoKernel extends Kernel
                 'default_path' => '%kernel.project_dir%/templates',
             ]);
 
+            // symfony/ux-twig-component v3 requires "defaults" and "anonymous_template_directory"
+            // to be configured explicitly. v2 accepts the same keys with no change in behaviour
+            // (the bundle declares Picasso:Image via the twig.component tag, not legacy autonaming).
+            // Skip the config when the extension is absent — PicassoTestKernel omits TwigComponentBundle.
+            if ($container->hasExtension('twig_component')) {
+                $container->loadFromExtension('twig_component', [
+                    'anonymous_template_directory' => 'components',
+                    'defaults' => [],
+                ]);
+            }
+
             $this->configureContainer($container);
         });
     }
