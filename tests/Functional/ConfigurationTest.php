@@ -708,6 +708,25 @@ class ConfigurationTest extends TestCase
         self::assertFalse($config['transformers']['my_glide']['public_cache']['enabled']);
     }
 
+    public function testGlideTransformerCacheAcceptsFlysystemStorageName(): void
+    {
+        $config = $this->processConfig([
+            'transformers' => [
+                'my_glide' => [
+                    'type' => 'glide',
+                    'sign_key' => 'secret-key',
+                    'cache' => 'thumbs.storage',
+                    'driver' => 'gd',
+                ],
+            ],
+        ]);
+
+        // The config layer is intentionally polymorphic: 'cache' carries either a
+        // local path or a Flysystem storage name. Resolution happens in
+        // GlideTransformer::__construct via FlysystemRegistry::has().
+        self::assertSame('thumbs.storage', $config['transformers']['my_glide']['cache']);
+    }
+
     public function testGlideTransformerPublicCacheConfig(): void
     {
         $config = $this->processConfig([

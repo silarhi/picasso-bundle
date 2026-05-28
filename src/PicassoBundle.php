@@ -321,7 +321,7 @@ final class PicassoBundle extends AbstractBundle
                                 ->info('Transformer type. Inferred from name when it matches a known type.')
                             ->end()
                             ->scalarNode('sign_key')->defaultNull()->end()
-                            ->scalarNode('cache')->defaultNull()->info('Cache directory for glide.')->end()
+                            ->scalarNode('cache')->defaultNull()->info('Glide cache target. Either a local path or a Flysystem storage name (resolved via FlysystemRegistry).')->end()
                             ->scalarNode('driver')
                                 ->defaultValue('gd')
                                 ->validate()
@@ -380,6 +380,14 @@ final class PicassoBundle extends AbstractBundle
         }
         $services->alias(MetadataGuesser::class, 'picasso.metadata_guesser');
         $services->alias(MetadataGuesserInterface::class, 'picasso.metadata_guesser');
+
+        // --- Flysystem registry (shared by Vich loader + Glide cache) ---
+
+        $hasFlysystem = interface_exists(\League\Flysystem\FilesystemOperator::class);
+        if ($hasFlysystem) {
+            $services->set('.picasso.flysystem_registry', FlysystemRegistry::class)
+                ->args([tagged_locator('flysystem.storage', 'storage')]);
+        }
 
         // --- Loaders ---
 
@@ -451,12 +459,6 @@ final class PicassoBundle extends AbstractBundle
                         if (!$vichHelperRegistered) {
                             $services->set('.picasso.vich_mapping_helper', VichMappingHelper::class)
                                 ->args([service(\Vich\UploaderBundle\Mapping\PropertyMappingFactory::class)]);
-
-                            $hasFlysystem = interface_exists(\League\Flysystem\FilesystemOperator::class);
-                            if ($hasFlysystem) {
-                                $services->set('.picasso.flysystem_registry', FlysystemRegistry::class)
-                                    ->args([tagged_locator('flysystem.storage', 'storage')]);
-                            }
                             $vichHelperRegistered = true;
                         }
 
@@ -464,7 +466,7 @@ final class PicassoBundle extends AbstractBundle
                             service(VichStorageInterface::class),
                             service('.picasso.vich_mapping_helper'),
                         ];
-                        if (isset($hasFlysystem) && $hasFlysystem) {
+                        if ($hasFlysystem) {
                             $loaderArgs[] = service('.picasso.flysystem_registry');
                         }
 
@@ -532,6 +534,7 @@ final class PicassoBundle extends AbstractBundle
                             $transformerConfig['driver'],
                             $transformerConfig['max_image_size'],
                             $transformerConfig['public_cache']['enabled'],
+                            $hasFlysystem ? service('.picasso.flysystem_registry') : null,
                         ])
                         ->tag('picasso.transformer', ['key' => $name]);
                     break;
