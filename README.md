@@ -328,7 +328,7 @@ picasso:
         glide:
             type: glide # inferred from key name
             sign_key: ~ # signing key for secure URLs
-            cache: '%kernel.project_dir%/var/glide-cache'
+            cache: '%kernel.project_dir%/var/glide-cache' # local path OR a Flysystem storage name (e.g. 'thumbs.storage')
             driver: gd # gd | imagick
             max_image_size: ~ # optional max pixel count
             public_cache:
@@ -940,6 +940,41 @@ picasso:
 ```
 
 > **Important:** When using Glide, you must [import the bundle routes](#routes) so that the image controller can serve transformed images.
+
+#### Storing the Glide cache on Flysystem
+
+The `cache` option is polymorphic: pass a local path _or_ the name of a [Flysystem bundle](https://github.com/thephpleague/flysystem-bundle) storage. The bundle resolves the name at boot via its internal `FlysystemRegistry` (the same one used by the Vich loader) — if no storage matches, the value is treated as a path. This lets you keep sources and derivatives on different Flysystem instances:
+
+```yaml
+# config/packages/flysystem.yaml
+flysystem:
+    storages:
+        sources.storage:
+            adapter: 'aws'
+            options:
+                client: 'aws_s3_client'
+                bucket: 'my-originals'
+        thumbs.storage:
+            adapter: 'aws'
+            options:
+                client: 'aws_s3_client'
+                bucket: 'my-thumbs'
+```
+
+```yaml
+# config/packages/picasso.yaml
+picasso:
+    loaders:
+        flysystem:
+            storage: 'sources.storage' # source images
+    transformers:
+        glide:
+            sign_key: '%env(PICASSO_SIGN_KEY)%'
+            cache: 'thumbs.storage' # rendered cache on a different Flysystem
+            driver: gd
+```
+
+> **Note:** `public_cache: enabled: true` writes rendered files at a path your web server is expected to serve directly. Combined with a remote Flysystem cache, that only works if the underlying bucket is publicly served at the matching URL prefix — otherwise leave `public_cache` disabled and let the bundle's controller stream the cached file.
 
 ### Imgix (CDN)
 

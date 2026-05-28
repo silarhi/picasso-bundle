@@ -32,6 +32,7 @@ use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
 use Silarhi\PicassoBundle\Exception\LoaderNotFoundException;
 use Silarhi\PicassoBundle\Exception\PurgeException;
 use Silarhi\PicassoBundle\Exception\TransformerNotFoundException;
+use Silarhi\PicassoBundle\Loader\FlysystemRegistry;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
 use Silarhi\PicassoBundle\Service\UrlEncryption;
 
@@ -58,12 +59,17 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         string $driver,
         ?int $maxImageSize,
         private bool $publicCache,
+        ?FlysystemRegistry $flysystemRegistry = null,
     ) {
         $this->signature = SignatureFactory::create($signKey);
 
+        $resolvedCache = null !== $flysystemRegistry && $flysystemRegistry->has($cache)
+            ? $flysystemRegistry->get($cache)
+            : $cache;
+
         $serverConfig = [
-            'source' => $cache,
-            'cache' => $cache,
+            'source' => $resolvedCache,
+            'cache' => $resolvedCache,
             'driver' => $driver,
         ];
 
