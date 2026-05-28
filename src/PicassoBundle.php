@@ -26,6 +26,9 @@ use Silarhi\PicassoBundle\Attribute\AsImageLoader;
 use Silarhi\PicassoBundle\Attribute\AsImageTransformer;
 use Silarhi\PicassoBundle\Attribute\AsPlaceholder;
 use Silarhi\PicassoBundle\Controller\ImageController;
+use Silarhi\PicassoBundle\DataCollector\CollectingImageHelper;
+use Silarhi\PicassoBundle\DataCollector\CollectingMetadataGuesser;
+use Silarhi\PicassoBundle\DataCollector\PicassoDataCollector;
 use Silarhi\PicassoBundle\Loader\FilesystemLoader;
 use Silarhi\PicassoBundle\Loader\FlysystemLoader;
 use Silarhi\PicassoBundle\Loader\FlysystemRegistry;
@@ -197,6 +200,10 @@ final class PicassoBundle extends AbstractBundle
                     ->defaultFalse()
                     ->info('Whether to resolve image metadata (dimensions) from the source by default. Filesystem loaders default to true.')
                 ->end()
+                ->booleanNode('collector')
+                    ->defaultFalse()
+                    ->info('Enable the web profiler data collector for Picasso. Disabled by default; turn on in dev to debug image rendering.')
+                ->end()
                 ->scalarNode('default_placeholder')
                     ->defaultNull()
                     ->info('Default placeholder name. Auto-detected when only one is configured.')
@@ -354,6 +361,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_transformer: string|null,
          *     default_placeholder: string|null,
          *     resolve_metadata: bool,
+         *     collector: bool,
          *     cache: bool|string,
          *     device_sizes: list<int>,
          *     image_sizes: list<int>,
@@ -724,6 +732,30 @@ final class PicassoBundle extends AbstractBundle
                 'key' => 'Picasso:Image',
                 'template' => '@Picasso/components/Image.html.twig',
             ]);
+
+        // --- Data Collector (web profiler) ---
+
+        if ($config['collector']) {
+            $services->set('picasso.data_collector', PicassoDataCollector::class)
+                ->tag('data_collector', [
+                    'id' => 'picasso',
+                    'template' => '@Picasso/Collector/picasso.html.twig',
+                ]);
+
+            $services->set('.picasso.image_helper.collecting', CollectingImageHelper::class)
+                ->decorate('picasso.image_helper')
+                ->args([
+                    service('.picasso.image_helper.collecting.inner'),
+                    service('picasso.data_collector'),
+                ]);
+
+            $services->set('.picasso.metadata_guesser.collecting', CollectingMetadataGuesser::class)
+                ->decorate('picasso.metadata_guesser')
+                ->args([
+                    service('.picasso.metadata_guesser.collecting.inner'),
+                    service('picasso.data_collector'),
+                ]);
+        }
     }
 
     public function prependExtension(ContainerConfigurator $container, ContainerBuilder $builder): void
