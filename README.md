@@ -282,6 +282,9 @@ picasso:
     # --- Metadata cache ---
     cache: true # true = cache.app, false = disabled, or a PSR-6 service ID
 
+    # --- Web profiler data collector (dev only) ---
+    collector: false # set to true to record image renders / URL generations in the Symfony toolbar
+
     # --- Placeholders ---
     placeholders:
         blur:

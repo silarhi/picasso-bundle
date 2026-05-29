@@ -19,6 +19,8 @@ PicassoBundle is a Symfony bundle that provides responsive image components, ins
 src/
 ├── Attribute/          # AsImageLoader, AsImageTransformer, AsPlaceholder attributes
 ├── Controller/         # ImageController (serves transformed images)
+├── DataCollector/      # PicassoDataCollector + CollectingImageHelper decorator (web profiler integration)
+│   └── Dto/            #   RenderEntry, UrlEntry, PlaceholderEntry, MetadataEntry, Totals (collector payload DTOs)
 ├── Dto/                # Image, ImageReference, ImageRenderData, ImageSource, ImageTransformation, SrcsetEntry
 ├── Exception/          # Domain exceptions (PicassoExceptionInterface and implementations)
 ├── Loader/             # FilesystemLoader, FlysystemLoader, FlysystemRegistry, UrlLoader,
@@ -38,8 +40,10 @@ config/
 └── routes.php          # Bundle routes
 templates/
 ├── image.html.twig     # Generic <picture>/<img> render template (used by function and component)
-└── components/
-    └── Image.html.twig # Twig component template (thin wrapper around image.html.twig)
+├── components/
+│   └── Image.html.twig # Twig component template (thin wrapper around image.html.twig)
+└── Collector/
+    └── picasso.html.twig # Web profiler toolbar/panel template (opt-in via picasso.collector: true)
 tests/                  # PHPUnit tests mirroring src/ structure
 ```
 
@@ -97,6 +101,7 @@ vendor/bin/rector process --dry-run
     - `picasso_image(src, …, attributes={…})` — renders a full responsive `<picture>` element (same HTML as the `<twig:Picasso:Image>` component). Intended for consumers that do not install `symfony/ux-twig-component`. Uses `needs_environment` + `is_safe: ['html']` and renders `@Picasso/image.html.twig`, which is the same template the component delegates to.
 - **Metadata resolution** (`resolve_metadata`): Controls whether the `MetadataGuesser` reads image streams to detect dimensions. Configurable globally (default: `false`), per-loader (filesystem defaults to `true`), or at runtime via the `resolveMetadata` parameter. To reduce CLS, `width` and `height` attributes are only rendered when **both** are available.
 - **SrcsetGenerator** builds responsive srcset strings across configured widths and formats.
+- **PicassoDataCollector** is an opt-in `AbstractDataCollector` for the Symfony web profiler. Enabled via the bundle `collector` option (default: `false`). When enabled, the bundle registers `CollectingImageHelper`, a decorator over `ImageHelperInterface` that times every `imageData()` / `imageUrl()` call and forwards the result to the collector. Recorded entries are stored as typed DTOs in `src/DataCollector/Dto/` (`RenderEntry`, `UrlEntry`, `PlaceholderEntry`, `MetadataEntry`, `Totals`) so the template consumes property access instead of array shapes. The toolbar headline counts `renders + urls` (direct Twig calls); the full panel breaks down each operation type with durations.
 - All bundle configuration and service wiring lives in `PicassoBundle.php` (uses `AbstractBundle`).
 
 ## Domain Exceptions
