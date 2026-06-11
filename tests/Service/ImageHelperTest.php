@@ -513,6 +513,44 @@ class ImageHelperTest extends TestCase
         self::assertSame([], $data->sources);
         self::assertNull($data->placeholderUri);
         self::assertTrue($data->unoptimized);
+        self::assertNull($data->loader);
+        self::assertNull($data->transformer);
+        self::assertNull($data->placeholder);
+    }
+
+    public function testImageDataExposesResolvedNames(): void
+    {
+        $stream = fopen('php://memory', 'r+');
+        self::assertNotFalse($stream);
+        $this->pipeline->method('load')
+            ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
+        $this->metadataGuesser->method('guess')
+            ->willReturn(['width' => 1920, 'height' => 1080, 'mimeType' => 'image/jpeg']);
+        $this->mockPlaceholder->method('generate')->willReturn('data:image/jpeg;base64,tiny');
+        $this->configureSrcsetGenerator();
+
+        $helper = $this->createHelper(defaultPlaceholder: 'blur');
+        $data = $helper->imageData(src: 'photo.jpg', sizes: '100vw');
+
+        self::assertSame('filesystem', $data->loader);
+        self::assertSame('glide', $data->transformer);
+        self::assertSame('blur', $data->placeholder);
+    }
+
+    public function testImageDataExposesNullPlaceholderNameWhenDisabled(): void
+    {
+        $stream = fopen('php://memory', 'r+');
+        self::assertNotFalse($stream);
+        $this->pipeline->method('load')
+            ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
+        $this->metadataGuesser->method('guess')
+            ->willReturn(['width' => 1920, 'height' => 1080, 'mimeType' => 'image/jpeg']);
+        $this->configureSrcsetGenerator();
+
+        $helper = $this->createHelper(defaultPlaceholder: 'blur');
+        $data = $helper->imageData(src: 'photo.jpg', placeholder: false, sizes: '100vw');
+
+        self::assertNull($data->placeholder);
     }
 
     public function testPlaceholderPropOverridesConfig(): void

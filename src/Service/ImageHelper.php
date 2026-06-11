@@ -143,9 +143,10 @@ final readonly class ImageHelper implements ImageHelperInterface
         $imageTransformer = $this->transformerRegistry->get($transformerName);
         $transformerContext = ['loader' => $loaderName, 'transformer' => $transformerName];
 
+        $placeholderName = $this->resolvePlaceholderName($placeholder, $loaderName);
         $placeholderUri = $this->generatePlaceholder(
-            $image, $loaderName, $transformerContext,
-            $priority, $placeholderData, $placeholder,
+            $image, $transformerContext,
+            $priority, $placeholderData, $placeholderName,
             $width, $height, $quality, $fit,
         );
 
@@ -166,6 +167,9 @@ final readonly class ImageHelper implements ImageHelperInterface
             sizes: $sizes,
             unoptimized: false,
             attributes: $attributes,
+            loader: $loaderName,
+            transformer: $transformerName,
+            placeholder: $placeholderName,
         );
     }
 
@@ -220,11 +224,10 @@ final readonly class ImageHelper implements ImageHelperInterface
      */
     private function generatePlaceholder(
         Image $image,
-        string $loaderName,
         array $transformerContext,
         bool $priority,
         ?string $placeholderData,
-        string|bool|null $placeholder,
+        ?string $placeholderName,
         ?int $width,
         ?int $height,
         ?int $quality,
@@ -238,7 +241,6 @@ final readonly class ImageHelper implements ImageHelperInterface
             return $placeholderData;
         }
 
-        $placeholderName = $this->resolvePlaceholderName($placeholder, $loaderName);
         if (null !== $placeholderName) {
             return $this->placeholderRegistry
                 ->get($placeholderName)

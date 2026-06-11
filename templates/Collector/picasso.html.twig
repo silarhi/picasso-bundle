@@ -2,46 +2,47 @@
 
 {% block toolbar %}
     {% set totals = collector.totals %}
-    {% set icon %}
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
-        <span class="sf-toolbar-value">{{ totals.headline }}</span>
-    {% endset %}
 
-    {% set text %}
-        <div class="sf-toolbar-info-piece">
-            <b>Picture renders</b>
-            <span class="sf-toolbar-status">{{ totals.renders }}</span>
-        </div>
-        <div class="sf-toolbar-info-piece">
-            <b>URL generations</b>
-            <span class="sf-toolbar-status">{{ totals.urls }}</span>
-        </div>
-        <div class="sf-toolbar-info-piece">
-            <b>Placeholders</b>
-            <span class="sf-toolbar-status">{{ totals.placeholders }}</span>
-        </div>
-        <div class="sf-toolbar-info-piece">
-            <b>Metadata guesses</b>
-            <span class="sf-toolbar-status">{{ totals.metadata }}</span>
-        </div>
-        <div class="sf-toolbar-info-piece">
-            <b>Total duration</b>
-            <span>{{ totals.duration|number_format(2) }} ms</span>
-        </div>
-    {% endset %}
+    {% if totals.handled > 0 %}
+        {% set icon %}
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+            <span class="sf-toolbar-value">{{ totals.headline }}</span>
+        {% endset %}
 
-    {{ include('@WebProfiler/Profiler/toolbar_item.html.twig', {link: profiler_url, status: ''}) }}
+        {% set text %}
+            <div class="sf-toolbar-info-piece">
+                <b>Picture renders</b>
+                <span class="sf-toolbar-status">{{ totals.renders }}</span>
+            </div>
+            <div class="sf-toolbar-info-piece">
+                <b>URL generations</b>
+                <span class="sf-toolbar-status">{{ totals.urls }}</span>
+            </div>
+            <div class="sf-toolbar-info-piece">
+                <b>Metadata guesses</b>
+                <span class="sf-toolbar-status">{{ totals.metadata }}</span>
+            </div>
+            <div class="sf-toolbar-info-piece">
+                <b>Total duration</b>
+                <span>{{ totals.duration|number_format(2) }} ms</span>
+            </div>
+        {% endset %}
+
+        {{ include('@WebProfiler/Profiler/toolbar_item.html.twig', {link: profiler_url}) }}
+    {% endif %}
 {% endblock %}
 
 {% block menu %}
-    <span class="label {{ collector.totals.headline == 0 ? 'disabled' }}">
+    <span class="label {{ collector.totals.handled == 0 ? 'disabled' }}">
         <span class="icon">
             <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
         </span>
         <strong>Picasso</strong>
-        <span class="count">
-            <span>{{ collector.totals.headline }}</span>
-        </span>
+        {% if collector.totals.headline > 0 %}
+            <span class="count">
+                <span>{{ collector.totals.headline }}</span>
+            </span>
+        {% endif %}
     </span>
 {% endblock %}
 
@@ -50,160 +51,134 @@
 
     <h2>Picasso</h2>
 
-    <div class="metrics">
-        <div class="metric">
-            <span class="value">{{ totals.renders }}</span>
-            <span class="label">Picture renders</span>
+    {% if totals.handled == 0 %}
+        <div class="empty empty-panel">
+            <p>No images were handled by Picasso.</p>
         </div>
-        <div class="metric">
-            <span class="value">{{ totals.urls }}</span>
-            <span class="label">URL generations</span>
-        </div>
-        <div class="metric">
-            <span class="value">{{ totals.placeholders }}</span>
-            <span class="label">Placeholders</span>
-        </div>
-        <div class="metric">
-            <span class="value">{{ totals.metadata }}</span>
-            <span class="label">Metadata guesses</span>
-        </div>
-        <div class="metric">
-            <span class="value">{{ totals.duration|number_format(2) }} <span class="unit">ms</span></span>
-            <span class="label">Total duration</span>
-        </div>
-    </div>
-
-    <h3>Picture renders</h3>
-    {% if collector.renders is empty %}
-        <div class="empty"><p>No <code>&lt;twig:Picasso:Image&gt;</code> or <code>picasso_image()</code> calls.</p></div>
     {% else %}
-        <table>
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Source</th>
-                    <th>Loader</th>
-                    <th>Transformer</th>
-                    <th>Placeholder</th>
-                    <th>Dimensions</th>
-                    <th>Sources</th>
-                    <th>Priority</th>
-                    <th>Duration</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for i, render in collector.renders %}
-                    <tr>
-                        <td>{{ i + 1 }}</td>
-                        <td><code>{{ render.src ?: '(none)' }}</code></td>
-                        <td>{{ render.loader ?: '(default)' }}</td>
-                        <td>{{ render.transformer ?: '(default)' }}</td>
-                        <td>{{ render.placeholder is same as(false) ? 'disabled' : (render.placeholder ?: '(default)') }}</td>
-                        <td>{{ render.width ?? '?' }} × {{ render.height ?? '?' }}</td>
-                        <td>{{ render.sourcesCount }}</td>
-                        <td>{{ render.priority ? 'eager' : 'lazy' }}</td>
-                        <td>{{ render.duration|number_format(2) }} ms</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    {% endif %}
+        <div class="metrics">
+            <div class="metric">
+                <span class="value">{{ totals.renders }}</span>
+                <span class="label">Picture renders</span>
+            </div>
+            <div class="metric">
+                <span class="value">{{ totals.urls }}</span>
+                <span class="label">URL generations</span>
+            </div>
+            <div class="metric">
+                <span class="value">{{ totals.metadata }}</span>
+                <span class="label">Metadata guesses</span>
+            </div>
+            <div class="metric">
+                <span class="value">{{ totals.duration|number_format(2) }} <span class="unit">ms</span></span>
+                <span class="label">Total duration</span>
+            </div>
+        </div>
 
-    <h3>URL generations</h3>
-    {% if collector.urls is empty %}
-        <div class="empty"><p>No <code>picasso_image_url()</code> calls.</p></div>
-    {% else %}
-        <table>
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Source</th>
-                    <th>Loader</th>
-                    <th>Transformer</th>
-                    <th>Width</th>
-                    <th>Height</th>
-                    <th>Format</th>
-                    <th>Quality</th>
-                    <th>Fit</th>
-                    <th>URL</th>
-                    <th>Duration</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for i, url in collector.urls %}
+        <h3>Picture renders</h3>
+        {% if collector.renders is empty %}
+            <div class="empty"><p>No <code>&lt;twig:Picasso:Image&gt;</code> or <code>picasso_image()</code> calls.</p></div>
+        {% else %}
+            <table>
+                <thead>
                     <tr>
-                        <td>{{ i + 1 }}</td>
-                        <td><code>{{ url.src }}</code></td>
-                        <td>{{ url.loader ?: '(default)' }}</td>
-                        <td>{{ url.transformer ?: '(default)' }}</td>
-                        <td>{{ url.width ?? '—' }}</td>
-                        <td>{{ url.height ?? '—' }}</td>
-                        <td>{{ url.format ?? '—' }}</td>
-                        <td>{{ url.quality ?? '—' }}</td>
-                        <td>{{ url.fit ?? '—' }}</td>
-                        <td><code style="word-break: break-all;">{{ url.url }}</code></td>
-                        <td>{{ url.duration|number_format(2) }} ms</td>
+                        <th>#</th>
+                        <th>Source</th>
+                        <th>Loader</th>
+                        <th>Transformer</th>
+                        <th>Placeholder</th>
+                        <th>Dimensions</th>
+                        <th>Sources</th>
+                        <th>Priority</th>
+                        <th>Duration</th>
                     </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    {% endif %}
+                </thead>
+                <tbody>
+                    {% for i, render in collector.renders %}
+                        <tr>
+                            <td>{{ i + 1 }}</td>
+                            <td><code>{{ render.src ?: '(none)' }}</code></td>
+                            <td>{{ render.loader ?? '—' }}</td>
+                            <td>{{ render.transformer ?? '—' }}</td>
+                            <td>{{ render.placeholder ?? 'none' }}</td>
+                            <td>{{ render.width ?? '?' }} × {{ render.height ?? '?' }}</td>
+                            <td>{{ render.sourcesCount }}</td>
+                            <td>{{ render.priority ? 'eager' : 'lazy' }}</td>
+                            <td>{{ render.duration|number_format(2) }} ms</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
 
-    <h3>Placeholders</h3>
-    {% if collector.placeholders is empty %}
-        <div class="empty"><p>No placeholder generations.</p></div>
-    {% else %}
-        <table>
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Name</th>
-                    <th>Source</th>
-                    <th>Duration</th>
-                    <th>Error</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for i, p in collector.placeholders %}
+        <h3>URL generations</h3>
+        {% if collector.urls is empty %}
+            <div class="empty"><p>No <code>picasso_image_url()</code> calls.</p></div>
+        {% else %}
+            <table>
+                <thead>
                     <tr>
-                        <td>{{ i + 1 }}</td>
-                        <td>{{ p.name }}</td>
-                        <td><code>{{ p.src ?: '(none)' }}</code></td>
-                        <td>{{ p.duration|number_format(2) }} ms</td>
-                        <td>{{ p.error ?: '—' }}</td>
+                        <th>#</th>
+                        <th>Source</th>
+                        <th>Loader</th>
+                        <th>Transformer</th>
+                        <th>Width</th>
+                        <th>Height</th>
+                        <th>Format</th>
+                        <th>Quality</th>
+                        <th>Fit</th>
+                        <th>URL</th>
+                        <th>Duration</th>
                     </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    {% endif %}
+                </thead>
+                <tbody>
+                    {% for i, url in collector.urls %}
+                        <tr>
+                            <td>{{ i + 1 }}</td>
+                            <td><code>{{ url.src }}</code></td>
+                            <td>{{ url.loader }}</td>
+                            <td>{{ url.transformer }}</td>
+                            <td>{{ url.width ?? '—' }}</td>
+                            <td>{{ url.height ?? '—' }}</td>
+                            <td>{{ url.format ?? '—' }}</td>
+                            <td>{{ url.quality ?? '—' }}</td>
+                            <td>{{ url.fit ?? '—' }}</td>
+                            <td><code style="word-break: break-all;">{{ url.url }}</code></td>
+                            <td>{{ url.duration|number_format(2) }} ms</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
 
-    <h3>Metadata guesses</h3>
-    {% if collector.metadata is empty %}
-        <div class="empty"><p>No metadata stream reads.</p></div>
-    {% else %}
-        <table>
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Cache key</th>
-                    <th>Width</th>
-                    <th>Height</th>
-                    <th>MIME type</th>
-                    <th>Duration</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for i, m in collector.metadata %}
+        <h3>Metadata guesses</h3>
+        {% if collector.metadata is empty %}
+            <div class="empty"><p>No metadata stream reads.</p></div>
+        {% else %}
+            <table>
+                <thead>
                     <tr>
-                        <td>{{ i + 1 }}</td>
-                        <td><code>{{ m.key }}</code></td>
-                        <td>{{ m.width ?? '—' }}</td>
-                        <td>{{ m.height ?? '—' }}</td>
-                        <td>{{ m.mimeType ?? '—' }}</td>
-                        <td>{{ m.duration|number_format(2) }} ms</td>
+                        <th>#</th>
+                        <th>Cache key</th>
+                        <th>Width</th>
+                        <th>Height</th>
+                        <th>MIME type</th>
+                        <th>Duration</th>
                     </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    {% for i, m in collector.metadata %}
+                        <tr>
+                            <td>{{ i + 1 }}</td>
+                            <td><code>{{ m.key }}</code></td>
+                            <td>{{ m.width ?? '—' }}</td>
+                            <td>{{ m.height ?? '—' }}</td>
+                            <td>{{ m.mimeType ?? '—' }}</td>
+                            <td>{{ m.duration|number_format(2) }} ms</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
     {% endif %}
 {% endblock %}

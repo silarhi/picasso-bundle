@@ -38,6 +38,9 @@ class ImageRenderDataTest extends TestCase
             sizes: '100vw',
             unoptimized: false,
             attributes: ['alt' => 'A photo', 'class' => 'hero'],
+            loader: 'filesystem',
+            transformer: 'glide',
+            placeholder: 'blur',
         );
 
         $json = $data->jsonSerialize();
@@ -56,6 +59,9 @@ class ImageRenderDataTest extends TestCase
         self::assertSame('100vw', $json['sizes']);
         self::assertFalse($json['unoptimized']);
         self::assertSame(['alt' => 'A photo', 'class' => 'hero'], $json['attributes']);
+        self::assertSame('filesystem', $json['loader']);
+        self::assertSame('glide', $json['transformer']);
+        self::assertSame('blur', $json['placeholder']);
     }
 
     public function testJsonSerializeUnoptimized(): void
@@ -83,6 +89,9 @@ class ImageRenderDataTest extends TestCase
         self::assertSame('eager', $json['loading']);
         self::assertSame('high', $json['fetchPriority']);
         self::assertSame([], $json['attributes']);
+        self::assertNull($json['loader']);
+        self::assertNull($json['transformer']);
+        self::assertNull($json['placeholder']);
     }
 
     public function testJsonEncodeProducesValidJson(): void

@@ -747,6 +747,7 @@ final class PicassoBundle extends AbstractBundle
                 ->args([
                     service('.picasso.image_helper.collecting.inner'),
                     service('picasso.data_collector'),
+                    service('picasso.pipeline'),
                 ]);
 
             $services->set('.picasso.metadata_guesser.collecting', CollectingMetadataGuesser::class)

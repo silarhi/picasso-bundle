@@ -17,8 +17,8 @@ final readonly class UrlEntry
 {
     public function __construct(
         public string $src,
-        public ?string $loader,
-        public ?string $transformer,
+        public string $loader,
+        public string $transformer,
         public ?int $width,
         public ?int $height,
         public ?string $format,

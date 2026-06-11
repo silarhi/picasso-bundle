@@ -24,8 +24,11 @@ use JsonSerializable;
 final readonly class ImageRenderData implements JsonSerializable
 {
     /**
-     * @param ImageSource[]              $sources    <source> elements for the <picture> tag
-     * @param array<string, scalar|null> $attributes Extra HTML attributes (alt, class, …)
+     * @param ImageSource[]              $sources     <source> elements for the <picture> tag
+     * @param array<string, scalar|null> $attributes  Extra HTML attributes (alt, class, …)
+     * @param string|null                $loader      Resolved loader name (null when unoptimized)
+     * @param string|null                $transformer Resolved transformer name (null when unoptimized)
+     * @param string|null                $placeholder Resolved placeholder name (null when disabled or none configured)
      */
     public function __construct(
         public ?string $fallbackSrc,
@@ -39,6 +42,9 @@ final readonly class ImageRenderData implements JsonSerializable
         public ?string $sizes,
         public bool $unoptimized,
         public array $attributes = [],
+        public ?string $loader = null,
+        public ?string $transformer = null,
+        public ?string $placeholder = null,
     ) {
     }
 
@@ -54,7 +60,10 @@ final readonly class ImageRenderData implements JsonSerializable
      *     fetchPriority: string|null,
      *     sizes: string|null,
      *     unoptimized: bool,
-     *     attributes: array<string, scalar|null>
+     *     attributes: array<string, scalar|null>,
+     *     loader: string|null,
+     *     transformer: string|null,
+     *     placeholder: string|null
      * }
      */
     public function jsonSerialize(): array
@@ -77,6 +86,9 @@ final readonly class ImageRenderData implements JsonSerializable
             'sizes' => $this->sizes,
             'unoptimized' => $this->unoptimized,
             'attributes' => $this->attributes,
+            'loader' => $this->loader,
+            'transformer' => $this->transformer,
+            'placeholder' => $this->placeholder,
         ];
     }
 }

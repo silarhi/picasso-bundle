@@ -17,6 +17,7 @@ use Override;
 use Silarhi\PicassoBundle\Dto\ImageRenderData;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Service\ImageHelperInterface;
+use Silarhi\PicassoBundle\Service\ImagePipeline;
 
 /**
  * Decorates ImageHelperInterface to record calls into the Picasso data collector.
@@ -28,6 +29,7 @@ final readonly class CollectingImageHelper implements ImageHelperInterface
     public function __construct(
         private ImageHelperInterface $inner,
         private PicassoDataCollector $collector,
+        private ImagePipeline $pipeline,
     ) {
     }
 
@@ -61,10 +63,11 @@ final readonly class CollectingImageHelper implements ImageHelperInterface
         );
         $duration = (microtime(true) - $start) * 1000;
 
+        // The inner call resolved these same names without throwing, so resolution cannot fail here.
         $this->collector->collectImageUrl(
             src: $path,
-            loader: $loader,
-            transformer: $transformer,
+            loader: $this->pipeline->resolveLoaderName($loader),
+            transformer: $this->pipeline->resolveTransformerName($transformer),
             transformation: new ImageTransformation(
                 width: $width,
                 height: $height,
@@ -129,9 +132,6 @@ final readonly class CollectingImageHelper implements ImageHelperInterface
 
         $this->collector->collectImageRender(
             src: $src,
-            loader: $loader,
-            transformer: $transformer,
-            placeholder: $placeholder,
             data: $data,
             duration: $duration,
         );

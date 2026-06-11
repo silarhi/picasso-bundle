@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace Silarhi\PicassoBundle\Tests\DataCollector;
 
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 use Silarhi\PicassoBundle\DataCollector\PicassoDataCollector;
 use Silarhi\PicassoBundle\Dto\ImageRenderData;
 use Silarhi\PicassoBundle\Dto\ImageSource;
@@ -32,14 +31,13 @@ class PicassoDataCollectorTest extends TestCase
         $totals = $collector->getTotals();
         self::assertSame(0, $totals->renders);
         self::assertSame(0, $totals->urls);
-        self::assertSame(0, $totals->placeholders);
         self::assertSame(0, $totals->metadata);
         self::assertSame(0, $totals->headline);
+        self::assertSame(0, $totals->handled);
         self::assertSame(0.0, $totals->duration);
 
         self::assertSame([], $collector->getRenders());
         self::assertSame([], $collector->getUrls());
-        self::assertSame([], $collector->getPlaceholders());
         self::assertSame([], $collector->getMetadata());
     }
 
@@ -49,6 +47,7 @@ class PicassoDataCollectorTest extends TestCase
 
         $totals = $collector->getTotals();
         self::assertSame(0, $totals->headline);
+        self::assertSame(0, $totals->handled);
     }
 
     public function testCollectsImageRender(): void
@@ -65,9 +64,12 @@ class PicassoDataCollectorTest extends TestCase
             fetchPriority: 'high',
             sizes: '100vw',
             unoptimized: false,
+            loader: 'filesystem',
+            transformer: 'glide',
+            placeholder: 'blur',
         );
 
-        $collector->collectImageRender('hero.jpg', 'filesystem', 'glide', 'blur', $data, 12.5);
+        $collector->collectImageRender('hero.jpg', $data, 12.5);
         $collector->collect(new Request(), new Response());
 
         $renders = $collector->getRenders();
@@ -113,20 +115,6 @@ class PicassoDataCollectorTest extends TestCase
         self::assertSame(3.2, $urls[0]->duration);
     }
 
-    public function testCollectsPlaceholderWithAndWithoutError(): void
-    {
-        $collector = new PicassoDataCollector();
-
-        $collector->collectPlaceholder('blur', 'a.jpg', 1.5);
-        $collector->collectPlaceholder('blurhash', 'b.jpg', 2.5, new RuntimeException('boom'));
-        $collector->collect(new Request(), new Response());
-
-        $placeholders = $collector->getPlaceholders();
-        self::assertCount(2, $placeholders);
-        self::assertNull($placeholders[0]->error);
-        self::assertSame('boom', $placeholders[1]->error);
-    }
-
     public function testCollectsMetadataGuess(): void
     {
         $collector = new PicassoDataCollector();
@@ -142,7 +130,7 @@ class PicassoDataCollectorTest extends TestCase
         self::assertSame('image/jpeg', $metadata[0]->mimeType);
     }
 
-    public function testCollectAggregatesTotalsAndHeadlineEqualsRendersPlusUrls(): void
+    public function testCollectAggregatesTotals(): void
     {
         $collector = new PicassoDataCollector();
         $data = new ImageRenderData(
@@ -159,10 +147,9 @@ class PicassoDataCollectorTest extends TestCase
         );
         $transformation = new ImageTransformation(width: 100);
 
-        $collector->collectImageRender('a.jpg', null, null, null, $data, 1.0);
-        $collector->collectImageRender('b.jpg', null, null, null, $data, 2.0);
-        $collector->collectImageUrl('c.jpg', null, null, $transformation, '/c', 3.0);
-        $collector->collectPlaceholder('blur', 'd.jpg', 4.0);
+        $collector->collectImageRender('a.jpg', $data, 1.0);
+        $collector->collectImageRender('b.jpg', $data, 2.0);
+        $collector->collectImageUrl('c.jpg', 'filesystem', 'glide', $transformation, '/c', 3.0);
         $collector->collectMetadataGuess('key', 1, 1, 'image/jpeg', 5.0);
 
         $collector->collect(new Request(), new Response());
@@ -170,10 +157,10 @@ class PicassoDataCollectorTest extends TestCase
         $totals = $collector->getTotals();
         self::assertSame(2, $totals->renders);
         self::assertSame(1, $totals->urls);
-        self::assertSame(1, $totals->placeholders);
         self::assertSame(1, $totals->metadata);
-        self::assertSame(15.0, $totals->duration);
+        self::assertSame(11.0, $totals->duration);
         self::assertSame(3, $totals->headline, 'headline is renders + urls');
+        self::assertSame(4, $totals->handled, 'handled counts every recorded operation');
     }
 
     public function testResetClearsAccumulatorsAndData(): void

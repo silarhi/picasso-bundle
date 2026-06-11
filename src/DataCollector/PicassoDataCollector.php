@@ -17,7 +17,6 @@ use function count;
 
 use Override;
 use Silarhi\PicassoBundle\DataCollector\Dto\MetadataEntry;
-use Silarhi\PicassoBundle\DataCollector\Dto\PlaceholderEntry;
 use Silarhi\PicassoBundle\DataCollector\Dto\RenderEntry;
 use Silarhi\PicassoBundle\DataCollector\Dto\Totals;
 use Silarhi\PicassoBundle\DataCollector\Dto\UrlEntry;
@@ -39,25 +38,16 @@ final class PicassoDataCollector extends AbstractDataCollector
     /** @var list<UrlEntry> */
     private array $urls = [];
 
-    /** @var list<PlaceholderEntry> */
-    private array $placeholders = [];
-
     /** @var list<MetadataEntry> */
     private array $metadata = [];
 
-    public function collectImageRender(
-        ?string $src,
-        ?string $loader,
-        ?string $transformer,
-        string|bool|null $placeholder,
-        ImageRenderData $data,
-        float $duration,
-    ): void {
+    public function collectImageRender(?string $src, ImageRenderData $data, float $duration): void
+    {
         $this->renders[] = new RenderEntry(
             src: $src,
-            loader: $loader,
-            transformer: $transformer,
-            placeholder: $placeholder,
+            loader: $data->loader,
+            transformer: $data->transformer,
+            placeholder: $data->placeholder,
             width: $data->width,
             height: $data->height,
             priority: 'eager' === $data->loading,
@@ -70,8 +60,8 @@ final class PicassoDataCollector extends AbstractDataCollector
 
     public function collectImageUrl(
         string $src,
-        ?string $loader,
-        ?string $transformer,
+        string $loader,
+        string $transformer,
         ImageTransformation $transformation,
         string $url,
         float $duration,
@@ -87,16 +77,6 @@ final class PicassoDataCollector extends AbstractDataCollector
             fit: $transformation->fit,
             duration: $duration,
             url: $url,
-        );
-    }
-
-    public function collectPlaceholder(string $name, ?string $src, float $duration, ?Throwable $error = null): void
-    {
-        $this->placeholders[] = new PlaceholderEntry(
-            name: $name,
-            src: $src,
-            duration: $duration,
-            error: $error?->getMessage(),
         );
     }
 
@@ -121,9 +101,6 @@ final class PicassoDataCollector extends AbstractDataCollector
         foreach ($this->urls as $entry) {
             $duration += $entry->duration;
         }
-        foreach ($this->placeholders as $entry) {
-            $duration += $entry->duration;
-        }
         foreach ($this->metadata as $entry) {
             $duration += $entry->duration;
         }
@@ -131,15 +108,12 @@ final class PicassoDataCollector extends AbstractDataCollector
         $this->data = [
             'renders' => $this->renders,
             'urls' => $this->urls,
-            'placeholders' => $this->placeholders,
             'metadata' => $this->metadata,
             'totals' => new Totals(
                 renders: count($this->renders),
                 urls: count($this->urls),
-                placeholders: count($this->placeholders),
                 metadata: count($this->metadata),
                 duration: $duration,
-                headline: count($this->renders) + count($this->urls),
             ),
         ];
     }
@@ -149,7 +123,6 @@ final class PicassoDataCollector extends AbstractDataCollector
     {
         $this->renders = [];
         $this->urls = [];
-        $this->placeholders = [];
         $this->metadata = [];
         $this->data = [];
     }
@@ -189,17 +162,6 @@ final class PicassoDataCollector extends AbstractDataCollector
     }
 
     /**
-     * @return list<PlaceholderEntry>
-     */
-    public function getPlaceholders(): array
-    {
-        /** @var list<PlaceholderEntry> $placeholders */
-        $placeholders = $this->data['placeholders'] ?? [];
-
-        return $placeholders;
-    }
-
-    /**
      * @return list<MetadataEntry>
      */
     public function getMetadata(): array
@@ -215,6 +177,6 @@ final class PicassoDataCollector extends AbstractDataCollector
         /** @var Totals|null $totals */
         $totals = $this->data['totals'] ?? null;
 
-        return $totals ?? new Totals(0, 0, 0, 0, 0.0, 0);
+        return $totals ?? new Totals(0, 0, 0, 0.0);
     }
 }
