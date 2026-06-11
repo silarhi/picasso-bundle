@@ -789,6 +789,40 @@ class ImageHelperTest extends TestCase
         self::assertSame('(max-width: 768px) 100vw, 50vw', $data->sizes);
     }
 
+    public function testWidthOnlyResolvesHeightFromAspectRatio(): void
+    {
+        $stream = fopen('php://memory', 'r+');
+        self::assertNotFalse($stream);
+        $this->pipeline->method('load')
+            ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
+        $this->metadataGuesser->method('guess')
+            ->willReturn(['width' => 800, 'height' => 600, 'mimeType' => 'image/jpeg']);
+        $this->configureSrcsetGenerator();
+
+        $helper = $this->createHelper();
+        $data = $helper->imageData(src: 'photo.jpg', width: 400, sizes: '100vw');
+
+        self::assertSame(400, $data->width);
+        self::assertSame(300, $data->height);
+    }
+
+    public function testHeightOnlyResolvesWidthFromAspectRatio(): void
+    {
+        $stream = fopen('php://memory', 'r+');
+        self::assertNotFalse($stream);
+        $this->pipeline->method('load')
+            ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
+        $this->metadataGuesser->method('guess')
+            ->willReturn(['width' => 800, 'height' => 600, 'mimeType' => 'image/jpeg']);
+        $this->configureSrcsetGenerator();
+
+        $helper = $this->createHelper();
+        $data = $helper->imageData(src: 'photo.jpg', height: 300, sizes: '100vw');
+
+        self::assertSame(400, $data->width);
+        self::assertSame(300, $data->height);
+    }
+
     public function testResolveMetadataFalseSkipsGuesser(): void
     {
         $stream = fopen('php://memory', 'r+');
