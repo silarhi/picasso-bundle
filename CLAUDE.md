@@ -137,6 +137,13 @@ All bundle exceptions implement `PicassoExceptionInterface` (extends `Throwable`
 - Twig style enforced by Twig-CS-Fixer (`.twig-cs-fixer.php`)
 - Code modernization managed by Rector (`rector.php`) — targets PHP 8.2+, includes deadCode, codeQuality, and typeDeclarations rulesets
 
+### Dependency Constraints
+
+- **Integration libraries** (symfony/_, league/_, imagine, vich, psr/\*, kornrunner/blurhash) keep **wide version ranges** (e.g. `^6.4 || ^7.0 || ^8.0`) so the CI matrix genuinely tests from the lowest to the latest supported versions. Never bump their floors to the currently installed version.
+- **QA tools** (php-cs-fixer, phpstan/\*, phpunit, rector, twig-cs-fixer, composer-normalize) are bumped to current versions via `composer bump:tools`.
+- `config.bump-after-update` was removed on purpose: it bumped **all** dev dependencies after every `composer update`, including integration libraries — do not re-add it.
+- Floors are empirically verified: when changing a floor, run `composer update --prefer-lowest && vendor/bin/phpunit` locally. Known hard floors: `league/glide ^2.3` (needs `Server::setCachePathCallable`), `vich/uploader-bundle ^2.9` (tests use `Metadata\Driver\AttributeDriver`).
+
 ### PHPStan Custom Types
 
 The project uses PHPStan custom type aliases to avoid duplicating complex type annotations across classes. When a structured type is used in multiple files, define it once and import it.
