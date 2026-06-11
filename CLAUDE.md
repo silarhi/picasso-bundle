@@ -70,6 +70,13 @@ vendor/bin/twig-cs-fixer lint
 
 # Code modernization check
 vendor/bin/rector process --dry-run
+
+# composer.json validation + normalization check
+composer validate --strict
+composer normalize --dry-run
+
+# composer.json normalization fix
+composer normalize
 ```
 
 ## CI/CD
@@ -77,6 +84,7 @@ vendor/bin/rector process --dry-run
 - Uses **Laminas CI Matrix Action** (`.github/workflows/continuous-integration.yml`)
 - Configured extensions: `gd`, `pcov`
 - Ignores PHP platform requirements for PHP 8.4+ (future versions)
+- Additional check (`.laminas-ci.json`): `composer validate --strict && composer normalize --dry-run --diff` on lowest PHP with latest dependencies
 - Runs on: `ubuntu-latest`
 
 ## Architecture Notes

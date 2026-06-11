@@ -1,25 +1,26 @@
 {
     "name": "silarhi/picasso-bundle",
     "description": "Responsive image component for Symfony, inspired by next/image",
-    "type": "symfony-bundle",
     "license": "MIT",
+    "type": "symfony-bundle",
     "require": {
         "php": ">=8.2",
         "symfony/framework-bundle": "^6.4 || ^7.0 || ^8.0",
         "symfony/ux-twig-component": "^2.13 || ^3.0"
     },
     "require-dev": {
+        "ergebnis/composer-normalize": "^2.52",
         "friendsofphp/php-cs-fixer": "^3.94.2",
         "imagine/imagine": "^1.5.2",
         "kornrunner/blurhash": "^1.2.2",
         "league/flysystem-bundle": "^3.6.2",
-        "league/glide": "^2.3.2|^3.2",
+        "league/glide": "^2.3.2 || ^3.2",
         "league/glide-symfony": "^2.1.0",
         "phpstan/extension-installer": "^1.4",
         "phpstan/phpstan": "^2.1.44",
         "phpstan/phpstan-strict-rules": "^2.0",
         "phpstan/phpstan-symfony": "^2.0",
-        "phpunit/phpunit": "^11.5.55|^12|^13",
+        "phpunit/phpunit": "^11.5.55 || ^12 || ^13",
         "psr/http-client": "^1.0.3",
         "psr/http-factory": "^1.1",
         "rector/rector": "^2.3.9",
@@ -28,30 +29,16 @@
         "vich/uploader-bundle": "^2.9.2",
         "vincentlanglet/twig-cs-fixer": "^3.14"
     },
-    "config": {
-        "preferred-install": {
-            "*": "dist"
-        },
-        "bump-after-update": "dev",
-        "sort-packages": true,
-        "allow-plugins": {
-            "phpstan/extension-installer": true
-        }
-    },
     "suggest": {
         "imagine/imagine": "Required for the BlurHash placeholder (supports GD and Imagick)",
+        "kornrunner/blurhash": "Required for the BlurHash placeholder",
+        "league/flysystem": "Required for the Flysystem loader",
         "league/glide": "Required for the Glide transformer (local image transformation)",
         "league/glide-symfony": "Required for the Glide transformer",
-        "league/flysystem": "Required for the Flysystem loader",
-        "kornrunner/blurhash": "Required for the BlurHash placeholder",
-        "vich/uploader-bundle": "Required for the VichUploader loader",
         "psr/http-client": "Required for the URL loader (PSR-18 HTTP client interface)",
         "psr/http-factory": "Required for the URL loader (PSR-17 HTTP factory interface)",
-        "symfony/http-client": "Provides a PSR-18 HTTP client implementation for the URL loader"
-    },
-    "scripts": {
-        "test": "phpunit",
-        "test:coverage": "phpunit"
+        "symfony/http-client": "Provides a PSR-18 HTTP client implementation for the URL loader",
+        "vich/uploader-bundle": "Required for the VichUploader loader"
     },
     "autoload": {
         "psr-4": {
@@ -62,5 +49,20 @@
         "psr-4": {
             "Silarhi\\PicassoBundle\\Tests\\": "tests/"
         }
+    },
+    "config": {
+        "allow-plugins": {
+            "ergebnis/composer-normalize": true,
+            "phpstan/extension-installer": true
+        },
+        "bump-after-update": "dev",
+        "preferred-install": {
+            "*": "dist"
+        },
+        "sort-packages": true
+    },
+    "scripts": {
+        "test": "phpunit",
+        "test:coverage": "phpunit"
     }
 }
