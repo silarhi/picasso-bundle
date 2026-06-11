@@ -142,7 +142,11 @@ All bundle exceptions implement `PicassoExceptionInterface` (extends `Throwable`
 - **Integration libraries** (symfony/_, league/_, imagine, vich, psr/\*, kornrunner/blurhash) keep **wide version ranges** (e.g. `^6.4 || ^7.0 || ^8.0`) so the CI matrix genuinely tests from the lowest to the latest supported versions. Never bump their floors to the currently installed version.
 - **QA tools** (php-cs-fixer, phpstan/\*, phpunit, rector, twig-cs-fixer, composer-normalize) are bumped to current versions via `composer bump:tools`.
 - `config.bump-after-update` was removed on purpose: it bumped **all** dev dependencies after every `composer update`, including integration libraries — do not re-add it.
-- Floors are empirically verified: when changing a floor, run `composer update --prefer-lowest && vendor/bin/phpunit` locally. Known hard floors: `league/glide ^2.3` (needs `Server::setCachePathCallable`), `vich/uploader-bundle ^2.9` (tests use `Metadata\Driver\AttributeDriver`).
+- Floors are empirically verified: when changing a floor, run `composer update --prefer-lowest && vendor/bin/phpunit` locally. Known hard floors:
+    - `league/glide ^2.3` — needs `Server::setCachePathCallable`.
+    - `league/flysystem-bundle ^2.1` — 2.0 only supports Symfony 4/5. Tests must stick to flysystem v2-compatible APIs (`fileExists`, not the v3-only `directoryExists`).
+    - `vich/uploader-bundle ^2.9` — tests use `Metadata\Driver\AttributeDriver` and fixtures use the `Mapping\Attribute` namespace, both introduced in 2.9.
+    - `kornrunner/blurhash ^1.2` — 1.0/1.1 declare PHP `^7.x` only and can never install on this bundle's PHP ≥8.2.
 
 ### PHPStan Custom Types
 
