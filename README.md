@@ -641,7 +641,8 @@ class MyController
 #### Image Data for JSON APIs
 
 The `imageData()` method returns an `ImageRenderData` DTO containing all
-rendering data (sources, srcset, placeholder, dimensions, loading attributes).
+rendering data (sources, srcset, placeholder, dimensions, loading attributes)
+plus the resolved loader, transformer and placeholder names.
 It implements `JsonSerializable`, making it ideal for headless / API-driven
 frontends (React, Vue, mobile apps, etc.):
 
@@ -685,7 +686,10 @@ The JSON response contains everything a frontend needs to render a responsive `<
     "fetchPriority": null,
     "sizes": "100vw",
     "unoptimized": false,
-    "attributes": {}
+    "attributes": {},
+    "loader": "filesystem",
+    "transformer": "glide",
+    "placeholder": "blur"
 }
 ```
 

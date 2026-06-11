@@ -13,11 +13,13 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Tests\DataCollector;
 
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\DataCollector\CollectingImageHelper;
 use Silarhi\PicassoBundle\DataCollector\PicassoDataCollector;
 use Silarhi\PicassoBundle\Dto\ImageRenderData;
 use Silarhi\PicassoBundle\Service\ImageHelperInterface;
+use Silarhi\PicassoBundle\Service\ImagePipeline;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -32,7 +34,7 @@ class CollectingImageHelperTest extends TestCase
             ->willReturn('/result.webp');
 
         $collector = new PicassoDataCollector();
-        $decorator = new CollectingImageHelper($inner, $collector);
+        $decorator = new CollectingImageHelper($inner, $collector, $this->createPipeline());
 
         $result = $decorator->imageUrl(
             path: 'hero.jpg',
@@ -63,7 +65,24 @@ class CollectingImageHelperTest extends TestCase
         self::assertGreaterThanOrEqual(0.0, $urls[0]->duration);
     }
 
-    public function testImageDataForwardsToInnerAndRecordsRender(): void
+    public function testImageUrlRecordsResolvedDefaultNames(): void
+    {
+        $inner = $this->createMock(ImageHelperInterface::class);
+        $inner->method('imageUrl')->willReturn('/result.webp');
+
+        $collector = new PicassoDataCollector();
+        $decorator = new CollectingImageHelper($inner, $collector, $this->createPipeline());
+
+        $decorator->imageUrl(path: 'hero.jpg');
+
+        $collector->collect(new Request(), new Response());
+        $urls = $collector->getUrls();
+        self::assertCount(1, $urls);
+        self::assertSame('filesystem', $urls[0]->loader, 'null loader is recorded under its resolved default name');
+        self::assertSame('glide', $urls[0]->transformer, 'null transformer is recorded under its resolved default name');
+    }
+
+    public function testImageDataForwardsToInnerAndRecordsResolvedRender(): void
     {
         $renderData = new ImageRenderData(
             fallbackSrc: '/a.jpg',
@@ -76,6 +95,9 @@ class CollectingImageHelperTest extends TestCase
             fetchPriority: null,
             sizes: null,
             unoptimized: false,
+            loader: 'filesystem',
+            transformer: 'glide',
+            placeholder: 'blur',
         );
 
         $inner = $this->createMock(ImageHelperInterface::class);
@@ -84,16 +106,9 @@ class CollectingImageHelperTest extends TestCase
             ->willReturn($renderData);
 
         $collector = new PicassoDataCollector();
-        $decorator = new CollectingImageHelper($inner, $collector);
+        $decorator = new CollectingImageHelper($inner, $collector, $this->createPipeline());
 
-        $result = $decorator->imageData(
-            src: 'hero.jpg',
-            width: 1920,
-            height: 1080,
-            loader: 'filesystem',
-            transformer: 'glide',
-            placeholder: 'blur',
-        );
+        $result = $decorator->imageData(src: 'hero.jpg', width: 1920, height: 1080);
 
         self::assertSame($renderData, $result);
 
@@ -101,12 +116,23 @@ class CollectingImageHelperTest extends TestCase
         $renders = $collector->getRenders();
         self::assertCount(1, $renders);
         self::assertSame('hero.jpg', $renders[0]->src);
-        self::assertSame('filesystem', $renders[0]->loader);
-        self::assertSame('glide', $renders[0]->transformer);
-        self::assertSame('blur', $renders[0]->placeholder);
+        self::assertSame('filesystem', $renders[0]->loader, 'loader name comes from the resolved render data');
+        self::assertSame('glide', $renders[0]->transformer, 'transformer name comes from the resolved render data');
+        self::assertSame('blur', $renders[0]->placeholder, 'placeholder name comes from the resolved render data');
         self::assertSame(1920, $renders[0]->width);
         self::assertSame(1080, $renders[0]->height);
         self::assertFalse($renders[0]->priority);
         self::assertFalse($renders[0]->hasPlaceholder);
+    }
+
+    private function createPipeline(): ImagePipeline&MockObject
+    {
+        $pipeline = $this->createMock(ImagePipeline::class);
+        $pipeline->method('resolveLoaderName')
+            ->willReturnCallback(static fn (?string $loader): string => $loader ?? 'filesystem');
+        $pipeline->method('resolveTransformerName')
+            ->willReturnCallback(static fn (?string $transformer): string => $transformer ?? 'glide');
+
+        return $pipeline;
     }
 }

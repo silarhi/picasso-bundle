@@ -13,13 +13,17 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\DataCollector\Dto;
 
+/**
+ * Loader, transformer and placeholder hold resolved names from ImageRenderData,
+ * not the raw call arguments (null when unoptimized or no placeholder applies).
+ */
 final readonly class RenderEntry
 {
     public function __construct(
         public ?string $src,
         public ?string $loader,
         public ?string $transformer,
-        public string|bool|null $placeholder,
+        public ?string $placeholder,
         public ?int $width,
         public ?int $height,
         public bool $priority,
