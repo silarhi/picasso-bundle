@@ -54,7 +54,8 @@ class ImgixTransformerPurgeTest extends TestCase
             });
 
         $requestFactory = $this->createMock(RequestFactoryInterface::class);
-        $requestFactory->method('createRequest')
+        $requestFactory->expects(self::once())
+            ->method('createRequest')
             ->with('POST', 'https://api.imgix.com/api/v1/purge')
             ->willReturn($request);
 

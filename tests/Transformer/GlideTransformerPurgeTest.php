@@ -65,7 +65,9 @@ class GlideTransformerPurgeTest extends TestCase
 
         $transformer->purge('uploads/photo.jpg', ['transformer' => 'glide', 'loader' => 'filesystem']);
 
-        self::assertFalse($cacheFs->directoryExists('glide/filesystem/uploads/photo.jpg'));
+        // fileExists instead of directoryExists: the latter requires flysystem ^3
+        self::assertFalse($cacheFs->fileExists('glide/filesystem/uploads/photo.jpg/w_300,fm_webp.webp'));
+        self::assertFalse($cacheFs->fileExists('glide/filesystem/uploads/photo.jpg/w_600,fm_avif.avif'));
     }
 
     public function testPurgePublicCacheThrowsWhenTransformerMissing(): void
@@ -99,7 +101,7 @@ class GlideTransformerPurgeTest extends TestCase
 
         $transformer->purge('uploads/photo.jpg', ['transformer' => 'glide', 'loader' => 'filesystem']);
 
-        self::assertFalse($cacheFs->directoryExists('glide/filesystem/uploads/photo.jpg'));
+        self::assertFalse($cacheFs->fileExists('glide/filesystem/uploads/photo.jpg/w_300.webp'));
         self::assertTrue($cacheFs->fileExists('glide/filesystem/uploads/other.jpg/w_300.webp'));
     }
 

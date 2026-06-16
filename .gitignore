@@ -7,3 +7,4 @@
 .php-cs-fixer.cache
 .twig-cs-fixer.cache
 /var/
+/config/reference.php
