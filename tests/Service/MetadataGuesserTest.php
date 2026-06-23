@@ -16,6 +16,7 @@ namespace Silarhi\PicassoBundle\Tests\Service;
 use function dirname;
 
 use PHPUnit\Framework\TestCase;
+use Silarhi\PicassoBundle\Service\CacheKeyGenerator;
 use Silarhi\PicassoBundle\Service\MetadataGuesser;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
 
@@ -65,6 +66,59 @@ class MetadataGuesserTest extends TestCase
         self::assertSame(100, $result['width']);
         self::assertSame(50, $result['height']);
         self::assertSame('image/jpeg', $result['mimeType']);
+    }
+
+    public function testGuessJpegWithHeadersBeyondInitialReadSize(): void
+    {
+        $jpeg = file_get_contents(dirname(__DIR__) . '/Fixtures/photo.jpg');
+        self::assertNotFalse($jpeg);
+
+        // Insert two ~48KB APP1 segments after SOI so the SOF marker (which
+        // holds the dimensions) sits beyond the initial 64KB read, mimicking
+        // JPEGs with large embedded EXIF/ICC/XMP blocks.
+        $payload = str_repeat("\0", 49150);
+        $segment = "\xFF\xE1" . pack('n', 49152) . $payload;
+        $jpegWithMetadata = substr($jpeg, 0, 2) . $segment . $segment . substr($jpeg, 2);
+
+        $stream = $this->createStream($jpegWithMetadata);
+
+        $result = $this->guesser->guess($stream);
+
+        self::assertSame(100, $result['width']);
+        self::assertSame(50, $result['height']);
+        self::assertSame('image/jpeg', $result['mimeType']);
+    }
+
+    public function testGuessGivesUpOnUnparseableLargeStream(): void
+    {
+        $stream = $this->createStream(str_repeat("\0", 3 * 1024 * 1024));
+
+        $result = $this->guesser->guess($stream);
+
+        self::assertNull($result['width']);
+        self::assertNull($result['height']);
+        self::assertNull($result['mimeType']);
+    }
+
+    public function testGuessIgnoresCacheEntriesFromFormerNamespace(): void
+    {
+        $cache = new ArrayAdapter();
+
+        // Simulate an entry poisoned by the former 64KB read cap, stored
+        // under the pre-v2 cache namespace
+        $item = $cache->getItem(CacheKeyGenerator::generate('metadata', ['poisoned.gif']));
+        $item->set(['width' => null, 'height' => null, 'mimeType' => null]);
+        $cache->save($item);
+
+        $guesser = new MetadataGuesser($cache);
+        $gif = file_get_contents(dirname(__DIR__) . '/Fixtures/pixel.gif');
+        self::assertNotFalse($gif);
+
+        $result = $guesser->guess($this->createStream($gif), 'poisoned.gif');
+
+        self::assertSame(1, $result['width']);
+        self::assertSame(1, $result['height']);
+        self::assertSame('image/gif', $result['mimeType']);
     }
 
     public function testGuessEmptyStreamReturnsNulls(): void

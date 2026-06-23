@@ -402,6 +402,8 @@ Controls whether the bundle reads image streams to auto-detect dimensions (width
 
 This can also be set **per-loader** (filesystem loaders default to `true`) and overridden at **runtime** with the `resolveMetadata` component prop or `imageData()` parameter.
 
+Detection reads the stream progressively (64KB initially, doubling up to 2MB), so dimensions are found even in files whose headers sit behind large embedded EXIF/ICC/XMP segments. SVG is not supported (`getimagesize()` cannot parse XML); pass explicit dimensions or use `unoptimized` for SVG sources.
+
 #### `cache`
 
 Configures PSR-6 caching for metadata detection (image dimensions) and BlurHash encoding:
