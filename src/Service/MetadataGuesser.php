@@ -16,12 +16,24 @@ namespace Silarhi\PicassoBundle\Service;
 use Closure;
 use Psr\Cache\CacheItemPoolInterface;
 
+use function strlen;
+
 /**
  * @phpstan-import-type ImageGuessedMetadata from MetadataGuesserInterface
  */
 final readonly class MetadataGuesser implements MetadataGuesserInterface
 {
-    private const READ_SIZE = 65536;
+    /**
+     * Cache namespace, versioned to invalidate entries poisoned by the former
+     * fixed 64KB read cap (failed guesses were cached with null dimensions).
+     */
+    private const CACHE_NAMESPACE = 'metadata.v2';
+
+    /** Initial read size; covers images whose header sits near the start (the vast majority). */
+    private const INITIAL_READ_SIZE = 65536;
+
+    /** Stop growing the buffer past this point (unparseable formats, e.g. SVG). */
+    private const MAX_READ_SIZE = 2097152;
 
     public function __construct(
         private ?CacheItemPoolInterface $cache = null,
@@ -30,7 +42,9 @@ final readonly class MetadataGuesser implements MetadataGuesserInterface
 
     /**
      * Guess image dimensions and MIME type from a stream.
-     * Reads only the first bytes needed for header detection.
+     * Reads progressively, starting with the first bytes needed for header
+     * detection and growing the buffer when the dimensions sit further into
+     * the file (e.g. JPEGs with large embedded EXIF/ICC/XMP segments).
      *
      * When the stream is a Closure, it is only invoked on cache miss,
      * avoiding unnecessary I/O for cached metadata.
@@ -42,7 +56,7 @@ final readonly class MetadataGuesser implements MetadataGuesserInterface
     public function guess(mixed $stream, ?string $identifier = null): array
     {
         if ($this->cache instanceof CacheItemPoolInterface && null !== $identifier) {
-            $cacheKey = CacheKeyGenerator::generate('metadata', [$identifier]);
+            $cacheKey = CacheKeyGenerator::generate(self::CACHE_NAMESPACE, [$identifier]);
             $item = $this->cache->getItem($cacheKey);
 
             if ($item->isHit()) {
@@ -79,22 +93,37 @@ final readonly class MetadataGuesser implements MetadataGuesserInterface
      */
     private function doGuess($stream): array
     {
-        $data = stream_get_contents($stream, self::READ_SIZE, 0);
-
-        if (false === $data || '' === $data) {
-            return ['width' => null, 'height' => null, 'mimeType' => null];
+        if (stream_get_meta_data($stream)['seekable']) {
+            rewind($stream);
         }
 
-        $info = @getimagesizefromstring($data);
+        $data = '';
 
-        if (false === $info) {
-            return ['width' => null, 'height' => null, 'mimeType' => null];
-        }
+        do {
+            // Double the buffer on each pass: 64KB, 128KB, 256KB, ... up to MAX_READ_SIZE
+            $chunkSize = '' === $data ? self::INITIAL_READ_SIZE : strlen($data);
+            $chunk = stream_get_contents($stream, $chunkSize);
 
-        return [
-            'width' => $info[0],
-            'height' => $info[1],
-            'mimeType' => $info['mime'],
-        ];
+            if (false === $chunk || '' === $chunk) {
+                break;
+            }
+
+            $data .= $chunk;
+            $info = @getimagesizefromstring($data);
+
+            if (false !== $info) {
+                return [
+                    'width' => $info[0],
+                    'height' => $info[1],
+                    'mimeType' => $info['mime'],
+                ];
+            }
+
+            if (strlen($chunk) < $chunkSize) {
+                break; // EOF: getimagesizefromstring already saw the whole stream
+            }
+        } while (strlen($data) < self::MAX_READ_SIZE);
+
+        return ['width' => null, 'height' => null, 'mimeType' => null];
     }
 }
