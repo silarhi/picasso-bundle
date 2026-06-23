@@ -27,7 +27,7 @@
         "symfony/http-client": "^6.4 || ^7.0 || ^8.0",
         "symfony/twig-bundle": "^6.4 || ^7.0 || ^8.0",
         "vich/uploader-bundle": "^2.9",
-        "vincentlanglet/twig-cs-fixer": "^3.14"
+        "vincentlanglet/twig-cs-fixer": "^4.0"
     },
     "suggest": {
         "imagine/imagine": "Required for the BlurHash placeholder (supports GD and Imagick)",
