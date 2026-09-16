@@ -145,7 +145,7 @@ All bundle exceptions implement `PicassoExceptionInterface` (extends `Throwable`
 - Floors are empirically verified: when changing a floor, run `composer update --prefer-lowest && vendor/bin/phpunit` locally. Known hard floors:
     - `league/glide ^2.3` — needs `Server::setCachePathCallable`.
     - `league/flysystem-bundle ^2.1` — 2.0 only supports Symfony 4/5. Tests must stick to flysystem v2-compatible APIs (`fileExists`, not the v3-only `directoryExists`).
-    - `vich/uploader-bundle ^2.9` — tests use `Metadata\Driver\AttributeDriver` and fixtures use the `Mapping\Attribute` namespace, both introduced in 2.9.
+    - `vich/uploader-bundle ^2.9 || ^3.0` — floor: tests use `Metadata\Driver\AttributeDriver` and fixtures use the `Mapping\Attribute` namespace, both introduced in 2.9. v3 is supported too (it needs PHP ≥8.3, so composer falls back to v2 on PHP 8.2). v3 makes `PropertyMappingFactory` return `PropertyMappingInterface` instead of the concrete `PropertyMapping`; `VichMappingHelper` therefore keeps resolved mappings in **local variables** only — naming either type in a signature would break the other version.
     - `kornrunner/blurhash ^1.2` — 1.0/1.1 declare PHP `^7.x` only and can never install on this bundle's PHP ≥8.2.
 
 ### PHPStan Custom Types

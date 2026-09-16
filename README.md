@@ -860,6 +860,8 @@ Loads images managed by [VichUploaderBundle](https://github.com/dustin10/VichUpl
 composer require vich/uploader-bundle
 ```
 
+Both VichUploaderBundle `2.9+` and `3.0+` are supported. VichUploader v3 requires PHP `8.3+`, so Composer resolves to v2 on PHP 8.2.
+
 ```yaml
 picasso:
     loaders:
