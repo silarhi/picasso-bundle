@@ -202,10 +202,22 @@ final readonly class ImageHelper implements ImageHelperInterface
                 $h ??= $guessed['height'];
             }
 
-            // Preserve aspect ratio when only one display dimension is provided
+            // Preserve aspect ratio when exactly one display dimension is provided
             $ratio = (null !== $w && null !== $h && $w > 0) ? $h / $w : null;
-            $width ??= null !== $ratio && null !== $height ? (int) round($height / $ratio) : $w;
-            $height ??= null !== $ratio && null !== $width ? (int) round($width * $ratio) : $h;
+
+            // The enclosing guard guarantees at least one of them is null, so the
+            // dimension not tested for here is always the one being derived.
+            if (null !== $ratio) {
+                if (null !== $width) {
+                    $height = (int) round($width * $ratio);
+                } elseif (null !== $height) {
+                    $width = (int) round($height / $ratio);
+                }
+            }
+
+            // Anything still unresolved falls back to the source dimensions
+            $width ??= $w;
+            $height ??= $h;
         }
 
         // Prevent upscaling beyond source dimensions
