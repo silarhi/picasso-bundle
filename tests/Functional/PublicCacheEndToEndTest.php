@@ -15,6 +15,7 @@ namespace Silarhi\PicassoBundle\Tests\Functional;
 
 use function assert;
 
+use League\Glide\Signatures\SignatureFactory;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -58,8 +59,10 @@ class PublicCacheEndToEndTest extends KernelTestCase
 
         $srcUrl = $this->parseSrcFromImg($html);
 
-        // In public cache mode, transformation params are in the path segment (e.g., fit_contain,fm_webp,q_75,w_300.webp)
-        self::assertMatchesRegularExpression('/\/photo\.jpg\/[a-z0-9_,]+\.\w+/', $srcUrl);
+        // In public cache mode, transformation params are in the path segment, with
+        // commas percent-encoded (e.g. fit_contain%2Cfm_webp%2Cq_75%2Cw_300.webp)
+        self::assertMatchesRegularExpression('/\/photo\.jpg\/[a-z0-9_]+(?:%2C[a-z0-9_]+)*\.\w+/', $srcUrl);
+        self::assertStringNotContainsString(',', $srcUrl);
     }
 
     public function testPublicCacheServeFallbackSrc(): void
@@ -94,6 +97,48 @@ class PublicCacheEndToEndTest extends KernelTestCase
         self::assertStringContainsString('image/', (string) $response->headers->get('Content-Type'));
     }
 
+    public function testLegacyQueryStringUrlRedirectsToCanonicalUrl(): void
+    {
+        self::bootKernel();
+
+        $legacyUrl = $this->buildLegacyUrl('photo.jpg', ['fit' => 'contain', 'fm' => 'jpg', 'h' => '50', 'q' => '75', 'w' => '100']);
+
+        $response = $this->handleRequest($legacyUrl);
+
+        self::assertSame(301, $response->getStatusCode(), 'Legacy URL should redirect: ' . $response->getContent());
+
+        $target = (string) $response->headers->get('Location');
+        self::assertStringContainsString('/photo.jpg/fit_contain%2Cfm_jpg%2Ch_50%2Cq_75%2Cw_100.jpg', $target);
+        self::assertStringNotContainsString('w=100', $target, 'Transformation params should move into the path');
+
+        // The target must itself be servable, or we would redirect into a 404.
+        self::assertSame(200, $this->handleRequest($target)->getStatusCode());
+    }
+
+    public function testLegacyUrlWithoutTransformationParamsRedirects(): void
+    {
+        self::bootKernel();
+
+        $legacyUrl = $this->buildLegacyUrl('photo.jpg', []);
+
+        $response = $this->handleRequest($legacyUrl);
+
+        self::assertSame(301, $response->getStatusCode(), 'Untransformed legacy URL should redirect: ' . $response->getContent());
+    }
+
+    public function testLegacyUrlWithTamperedSignatureReturns404(): void
+    {
+        self::bootKernel();
+
+        $legacyUrl = $this->buildLegacyUrl('photo.jpg', ['fm' => 'jpg', 'w' => '100']);
+        $tamperedUrl = preg_replace('/s=[a-f0-9]+/', 's=tampered', $legacyUrl);
+        self::assertNotNull($tamperedUrl);
+
+        $response = $this->handleRequest($tamperedUrl);
+
+        self::assertSame(404, $response->getStatusCode(), 'A forged legacy URL must not redirect: ' . $response->getContent());
+    }
+
     public function testPublicCacheTamperedSignatureReturns404(): void
     {
         $rendered = $this->renderTwigComponent('Picasso:Image', [
@@ -121,6 +166,19 @@ class PublicCacheEndToEndTest extends KernelTestCase
         $srcUrl = $this->parseSrcFromImg($html);
         $response = $this->handleRequest($srcUrl);
         self::assertSame(404, $response->getStatusCode(), 'Non-existent image should return 404: ' . $response->getContent());
+    }
+
+    /**
+     * Build a URL in the pre-public-cache shape: transformation params in the
+     * query string, signed over that path and those params.
+     *
+     * @param array<string, string> $params
+     */
+    private function buildLegacyUrl(string $path, array $params): string
+    {
+        $signature = SignatureFactory::create('public-cache-key')->generateSignature($path, $params);
+
+        return '/image/glide/filesystem/' . $path . '?' . http_build_query([...$params, 's' => $signature]);
     }
 
     private function handleRequest(string $url): Response
