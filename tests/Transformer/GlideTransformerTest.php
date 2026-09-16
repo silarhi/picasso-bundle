@@ -366,10 +366,14 @@ class GlideTransformerTest extends TestCase
 
         $url = $transformer->url($image, $transformation, ['loader' => 'filesystem', 'transformer' => 'glide']);
 
+        // Commas in the params segment are percent-encoded so that naive srcset
+        // splitters cannot tear the URL apart; decode like the router does.
+        self::assertStringNotContainsString(',', $url);
+
         // Extract filename from URL path
         $urlPath = parse_url($url, \PHP_URL_PATH);
         self::assertIsString($urlPath);
-        $filename = basename($urlPath);
+        $filename = rawurldecode(basename($urlPath));
         $parsed = GlideTransformer::parseParamsFilename($filename);
 
         self::assertSame('800', $parsed['params']['w']);
