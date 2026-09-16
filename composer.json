@@ -26,7 +26,7 @@
         "rector/rector": "^2.4.5",
         "symfony/http-client": "^6.4 || ^7.0 || ^8.0",
         "symfony/twig-bundle": "^6.4 || ^7.0 || ^8.0",
-        "vich/uploader-bundle": "^2.9",
+        "vich/uploader-bundle": "^2.9 || ^3.0",
         "vincentlanglet/twig-cs-fixer": "^4.0"
     },
     "suggest": {

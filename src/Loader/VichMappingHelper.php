@@ -16,11 +16,15 @@ namespace Silarhi\PicassoBundle\Loader;
 use function is_array;
 use function is_string;
 
-use Vich\UploaderBundle\Mapping\PropertyMapping;
 use Vich\UploaderBundle\Mapping\PropertyMappingFactory;
 
 /**
  * @phpstan-import-type ImageDimensions from VichMappingHelperInterface
+ *
+ * Resolved mappings are deliberately kept in local variables rather than returned
+ * from a shared private method: VichUploader 2.x resolves them to PropertyMapping
+ * while 3.x resolves them to PropertyMappingInterface, and neither type can be
+ * named in a signature that works on both. Every method called here exists on both.
  */
 final readonly class VichMappingHelper implements VichMappingHelperInterface
 {
@@ -35,15 +39,11 @@ final readonly class VichMappingHelper implements VichMappingHelperInterface
      */
     public function getFilePropertyName(object $entity, ?string $field): ?string
     {
-        if (null !== $field) {
-            $mapping = $this->factory->fromField($entity, $field);
+        $mapping = null !== $field
+            ? $this->factory->fromField($entity, $field)
+            : ($this->factory->fromObject($entity)[0] ?? null);
 
-            return $mapping?->getFilePropertyName();
-        }
-
-        $mappings = $this->factory->fromObject($entity);
-
-        return isset($mappings[0]) ? $mappings[0]->getFilePropertyName() : null;
+        return $mapping?->getFilePropertyName();
     }
 
     /**
@@ -51,37 +51,23 @@ final readonly class VichMappingHelper implements VichMappingHelperInterface
      */
     public function getUploadDestination(object $entity, ?string $field): ?string
     {
-        if (null !== $field) {
-            $mapping = $this->factory->fromField($entity, $field);
+        $mapping = null !== $field
+            ? $this->factory->fromField($entity, $field)
+            : ($this->factory->fromObject($entity)[0] ?? null);
 
-            return $mapping?->getUploadDestination();
-        }
-
-        $mappings = $this->factory->fromObject($entity);
-
-        return isset($mappings[0]) ? $mappings[0]->getUploadDestination() : null;
+        return $mapping?->getUploadDestination();
     }
 
     public function readMimeType(object $entity, ?string $field): ?string
     {
-        $mapping = $this->getMapping($entity, $field);
-        if (!$mapping instanceof PropertyMapping) {
-            return null;
-        }
-
-        $value = $mapping->readProperty($entity, 'mimeType');
+        $value = $this->readMappedProperty($entity, $field, 'mimeType');
 
         return is_string($value) ? $value : null;
     }
 
     public function readDimensions(object $entity, ?string $field): ?array
     {
-        $mapping = $this->getMapping($entity, $field);
-        if (!$mapping instanceof PropertyMapping) {
-            return null;
-        }
-
-        $value = $mapping->readProperty($entity, 'dimensions');
+        $value = $this->readMappedProperty($entity, $field, 'dimensions');
 
         if (!is_array($value) || !isset($value[0], $value[1]) || !is_numeric($value[0]) || !is_numeric($value[1])) {
             return null;
@@ -90,14 +76,15 @@ final readonly class VichMappingHelper implements VichMappingHelperInterface
         return [(int) $value[0], (int) $value[1]];
     }
 
-    private function getMapping(object $entity, ?string $field): ?PropertyMapping
+    /**
+     * Reads a property from the entity's mapping, or null when no mapping matches.
+     */
+    private function readMappedProperty(object $entity, ?string $field, string $property): mixed
     {
-        if (null !== $field) {
-            return $this->factory->fromField($entity, $field);
-        }
+        $mapping = null !== $field
+            ? $this->factory->fromField($entity, $field)
+            : ($this->factory->fromObject($entity)[0] ?? null);
 
-        $mappings = $this->factory->fromObject($entity);
-
-        return $mappings[0] ?? null;
+        return $mapping?->readProperty($entity, $property);
     }
 }
