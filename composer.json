@@ -23,7 +23,7 @@
         "phpunit/phpunit": "^11.5.55 || ^12 || ^13",
         "psr/http-client": "^1.0.3",
         "psr/http-factory": "^1.1",
-        "rector/rector": "^2.4.5",
+        "rector/rector": "^2.6.7",
         "symfony/http-client": "^6.4 || ^7.0 || ^8.0",
         "symfony/twig-bundle": "^6.4 || ^7.0 || ^8.0",
         "vich/uploader-bundle": "^2.9 || ^3.0",
