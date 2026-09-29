@@ -9,7 +9,7 @@
         "symfony/ux-twig-component": "^2.13 || ^3.0"
     },
     "require-dev": {
-        "ergebnis/composer-normalize": "^2.52",
+        "ergebnis/composer-normalize": "^2.54.0",
         "friendsofphp/php-cs-fixer": "^3.95.27",
         "imagine/imagine": "^1.5.2",
         "kornrunner/blurhash": "^1.2",
