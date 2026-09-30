@@ -25,6 +25,7 @@ use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemOperator;
 use League\Flysystem\Local\LocalFilesystemAdapter;
 use League\Glide\Filesystem\FileNotFoundException;
+use League\Glide\Filesystem\FilesystemException;
 use League\Glide\Responses\SymfonyResponseFactory;
 use League\Glide\Server;
 use League\Glide\ServerFactory;
@@ -237,6 +238,19 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
             return $response;
         } catch (FileNotFoundException|InvalidArgumentException $e) {
             throw new ImageNotFoundException('Image not found.', $e->getCode(), previous: $e);
+        } catch (FilesystemException $e) {
+            // Concurrent requests for the same variant all render it and race to
+            // write it; object stores may reject the losers (e.g. S3-compatible
+            // storages answering 409 to a conflicting conditional write). Once
+            // the variant is there, serve it rather than fail the request.
+            if (!$this->server->cacheFileExists($path, $params)) {
+                throw $e;
+            }
+
+            /** @var Response $response */
+            $response = $this->server->getImageResponse($path, $params);
+
+            return $response;
         } catch (Throwable $e) {
             if (!$this->isDecodingFailure($e)) {
                 throw $e;

@@ -1069,6 +1069,8 @@ if ($throwable instanceof NotFoundHttpException
 }
 ```
 
+When two requests render the same variant at once and the cache storage rejects the second write (S3-compatible storages may answer `409 Conflict`), the request is still answered with the variant the first one cached, instead of an error.
+
 ## Cache Purge
 
 Both built-in transformers support purging cached image variants via the `PurgableTransformerInterface`.
