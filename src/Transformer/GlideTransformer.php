@@ -15,6 +15,7 @@ namespace Silarhi\PicassoBundle\Transformer;
 
 use function in_array;
 
+use Intervention\Image\Exceptions\DecoderException;
 use InvalidArgumentException;
 
 use function is_scalar;
@@ -24,6 +25,7 @@ use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemOperator;
 use League\Flysystem\Local\LocalFilesystemAdapter;
 use League\Glide\Filesystem\FileNotFoundException;
+use League\Glide\Filesystem\FilesystemException;
 use League\Glide\Responses\SymfonyResponseFactory;
 use League\Glide\Server;
 use League\Glide\ServerFactory;
@@ -37,6 +39,7 @@ use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
 use Silarhi\PicassoBundle\Exception\LoaderNotFoundException;
 use Silarhi\PicassoBundle\Exception\PurgeException;
 use Silarhi\PicassoBundle\Exception\TransformerNotFoundException;
+use Silarhi\PicassoBundle\Exception\UndecodableImageException;
 use Silarhi\PicassoBundle\Loader\FlysystemRegistry;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
 use Silarhi\PicassoBundle\Service\UrlEncryption;
@@ -66,6 +69,18 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
      * so a shorter window keeps a future scheme change from being pinned.
      */
     private const LEGACY_REDIRECT_MAX_AGE = 2592000;
+
+    /**
+     * What Glide lets through when the source bytes are not a decodable image
+     * (truncated upload, PDF saved under an image name...). Matched with
+     * instanceof rather than caught: each supported league/glide major pulls a
+     * different intervention/image major, so only one of these classes exists at
+     * a time, and Glide's @throws does not declare them.
+     */
+    private const DECODING_EXCEPTIONS = [
+        DecoderException::class, // intervention/image 3 and 4
+        'Intervention\\Image\\Exception\\NotReadableException', // intervention/image 2
+    ];
 
     private Signature $signature;
     private Server $server;
@@ -223,7 +238,37 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
             return $response;
         } catch (FileNotFoundException|InvalidArgumentException $e) {
             throw new ImageNotFoundException('Image not found.', $e->getCode(), previous: $e);
+        } catch (FilesystemException $e) {
+            // Concurrent requests for the same variant all render it and race to
+            // write it; object stores may reject the losers (e.g. S3-compatible
+            // storages answering 409 to a conflicting conditional write). Once
+            // the variant is there, serve it rather than fail the request.
+            if (!$this->server->cacheFileExists($path, $params)) {
+                throw $e;
+            }
+
+            /** @var Response $response */
+            $response = $this->server->getImageResponse($path, $params);
+
+            return $response;
+        } catch (Throwable $e) {
+            if (!$this->isDecodingFailure($e)) {
+                throw $e;
+            }
+
+            throw new UndecodableImageException('Source image could not be decoded.', $e->getCode(), previous: $e);
         }
+    }
+
+    private function isDecodingFailure(Throwable $e): bool
+    {
+        foreach (self::DECODING_EXCEPTIONS as $class) {
+            if ($e instanceof $class) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

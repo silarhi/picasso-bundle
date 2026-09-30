@@ -97,6 +97,7 @@ composer normalize
     - `LocalTransformerInterface` extends `ImageTransformerInterface` for transformers that serve images locally (e.g., Glide) and need a loader to access source files.
     - `PurgableTransformerInterface` extends `ImageTransformerInterface` for transformers that support cache purging. GlideTransformer purges via `Server::deleteCache()` (standard mode) or Flysystem directory deletion (public cache mode). ImgixTransformer purges via the Imgix Management API (`POST /api/v1/purge`) when an `api_key` and PSR-18 HTTP client are configured.
     - `GlideTransformer`'s `cache` constructor argument is polymorphic: it accepts a local path string and, when a `FlysystemRegistry` is injected and `has($cache)` returns true, resolves the string to the matching `FilesystemOperator` (a Flysystem storage name). This lets users write `cache: 'thumbs.storage'` in YAML and have it route to a Flysystem bucket without a second config option. `FlysystemRegistry` is registered unconditionally whenever `League\Flysystem\FilesystemOperator` is installed (no longer gated behind the Vich loader).
+    - `GlideTransformer::serve()` error mapping: a missing source, bad signature or bad `_metadata` throws `ImageNotFoundException`; a source that exists but cannot be decoded throws `UndecodableImageException`. `ImageController` turns both into a `NotFoundHttpException` with the domain exception as previous, so consumers can tell them apart. Decoder failures are matched by class name (`DECODING_EXCEPTIONS`) rather than caught, because each supported Glide major pulls a different intervention/image major (v2 `NotReadableException`, v3/v4 `DecoderException`). A Glide `FilesystemException` (e.g. an object store rejecting the losing write of two concurrent renders of the same variant) is swallowed only when `Server::cacheFileExists()` now reports the variant, which is then served from the cache; otherwise it is rethrown.
 - **Placeholders** generate placeholder data URIs or URLs for images (e.g., blurred thumbnails). They implement `PlaceholderInterface` and are registered via the `#[AsPlaceholder('name')]` attribute or the `picasso.placeholder` service tag.
     - `TransformerPlaceholder` reuses the configured transformer to generate a tiny blurred image URL.
     - `BlurHashPlaceholder` encodes the image as a BlurHash string and decodes it to a tiny PNG data URI (requires `kornrunner/blurhash`).
@@ -116,17 +117,18 @@ composer normalize
 
 All bundle exceptions implement `PicassoExceptionInterface` (extends `Throwable`), allowing consumers to catch any bundle-level error with a single type. Always throw domain-specific exceptions rather than generic PHP exceptions (`LogicException`, `RuntimeException`, etc.).
 
-| Exception                       | Extends                    | When to use                                                   |
-| ------------------------------- | -------------------------- | ------------------------------------------------------------- |
-| `LoaderNotFoundException`       | `InvalidArgumentException` | Requested loader name is unknown or missing from context      |
-| `TransformerNotFoundException`  | `InvalidArgumentException` | Requested transformer name is unknown or missing from context |
-| `ImageNotFoundException`        | `RuntimeException`         | Source image could not be found or signature is invalid       |
-| `EncryptionException`           | `RuntimeException`         | URL encryption/decryption failure                             |
-| `InvalidMetadataException`      | `LogicException`           | Image metadata is malformed or invalid                        |
-| `InvalidConfigurationException` | `LogicException`           | Invalid bundle configuration (missing type, missing package)  |
-| `ImageProcessingException`      | `RuntimeException`         | Image processing failure (stream read errors, encoding)       |
-| `PlaceholderNotFoundException`  | `InvalidArgumentException` | Requested placeholder name is unknown or missing from context |
-| `PurgeException`                | `RuntimeException`         | Cache purge operation failure (filesystem error, API error)   |
+| Exception                       | Extends                    | When to use                                                                                                                                                                                  |
+| ------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LoaderNotFoundException`       | `InvalidArgumentException` | Requested loader name is unknown or missing from context                                                                                                                                     |
+| `TransformerNotFoundException`  | `InvalidArgumentException` | Requested transformer name is unknown or missing from context                                                                                                                                |
+| `ImageNotFoundException`        | `RuntimeException`         | Source image could not be found or signature is invalid                                                                                                                                      |
+| `EncryptionException`           | `RuntimeException`         | URL encryption/decryption failure                                                                                                                                                            |
+| `InvalidMetadataException`      | `LogicException`           | Image metadata is malformed or invalid                                                                                                                                                       |
+| `InvalidConfigurationException` | `LogicException`           | Invalid bundle configuration (missing type, missing package)                                                                                                                                 |
+| `ImageProcessingException`      | `RuntimeException`         | Image processing failure (stream read errors, encoding)                                                                                                                                      |
+| `PlaceholderNotFoundException`  | `InvalidArgumentException` | Requested placeholder name is unknown or missing from context                                                                                                                                |
+| `PurgeException`                | `RuntimeException`         | Cache purge operation failure (filesystem error, API error)                                                                                                                                  |
+| `UndecodableImageException`     | `RuntimeException`         | Source image exists but cannot be decoded (truncated, not an image); mapped to 404 like `ImageNotFoundException`, but kept distinct so consumers can tell a broken source from a missing one |
 
 ## Coding Conventions
 
