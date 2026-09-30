@@ -192,6 +192,20 @@ class GlideTransformerTest extends TestCase
         self::assertSame(['upload_destination' => '/var/uploads/images'], $decrypted);
     }
 
+    public function testUrlWithMetadataIsStable(): void
+    {
+        // The same thumb requested twice (twice in a page, or on another request)
+        // must get the same URL so browsers and CDNs fetch it only once.
+        $image = new Image(path: 'photo.jpg', metadata: ['upload_destination' => '/var/uploads/images']);
+        $transformation = new ImageTransformation(width: 300, format: 'webp');
+        $context = ['loader' => 'vich', 'transformer' => 'glide'];
+
+        $publicCacheTransformer = new GlideTransformer($this->router, new UrlEncryption(self::SIGN_KEY), self::SIGN_KEY, '/tmp/cache', 'gd', null, true);
+
+        self::assertSame($this->transformer->url($image, $transformation, $context), $this->transformer->url($image, $transformation, $context));
+        self::assertSame($publicCacheTransformer->url($image, $transformation, $context), $publicCacheTransformer->url($image, $transformation, $context));
+    }
+
     public function testUrlOmitsMetadataWhenEmpty(): void
     {
         $image = new Image(path: 'photo.jpg');
