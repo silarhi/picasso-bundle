@@ -23,7 +23,8 @@ interface ServableLoaderInterface extends ImageLoaderInterface
     /**
      * Get the source the original images are read from when serving them.
      *
-     * @param array<string, mixed> $metadata
+     * A servable loader reads from exactly one source: the loader name in a
+     * served image's URL is all that is needed to find the original again.
      */
-    public function getSource(array $metadata): ImageSourceInterface;
+    public function getSource(): ImageSourceInterface;
 }

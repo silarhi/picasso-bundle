@@ -20,7 +20,6 @@ use InvalidArgumentException;
 
 use function is_scalar;
 
-use JsonException;
 use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemOperator;
 use League\Flysystem\Local\LocalFilesystemAdapter;
@@ -34,7 +33,6 @@ use League\Glide\Signatures\SignatureException;
 use League\Glide\Signatures\SignatureFactory;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
-use Silarhi\PicassoBundle\Exception\EncryptionException;
 use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
 use Silarhi\PicassoBundle\Exception\LoaderNotFoundException;
 use Silarhi\PicassoBundle\Exception\PurgeException;
@@ -42,7 +40,6 @@ use Silarhi\PicassoBundle\Exception\TransformerNotFoundException;
 use Silarhi\PicassoBundle\Exception\UndecodableImageException;
 use Silarhi\PicassoBundle\Loader\FlysystemRegistry;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
-use Silarhi\PicassoBundle\Service\UrlEncryption;
 use Silarhi\PicassoBundle\Source\ImageSourceFlysystemAdapter;
 
 use function sprintf;
@@ -81,6 +78,12 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
     private const LEGACY_REDIRECT_MAX_AGE = 2592000;
 
     /**
+     * Query param pre-2.0 URLs used to carry encrypted loader metadata in.
+     * Ignored when serving; see {@see serve()}.
+     */
+    private const LEGACY_METADATA_PARAM = '_metadata';
+
+    /**
      * What Glide lets through when the source bytes are not a decodable image
      * (truncated upload, PDF saved under an image name...). Matched with
      * instanceof rather than caught: each supported league/glide major pulls a
@@ -112,7 +115,6 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
      */
     public function __construct(
         private UrlGeneratorInterface $router,
-        private UrlEncryption $urlEncryption,
         string $signKey,
         string $cache,
         string $driver,
@@ -157,23 +159,15 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         /** @var string $transformerName */
         $transformerName = $context['transformer'] ?? throw new TransformerNotFoundException('The "transformer" key is required in the context array.');
 
-        if ([] !== $image->metadata) {
-            $glideParams['_metadata'] = $this->urlEncryption->encrypt(json_encode($image->metadata, \JSON_THROW_ON_ERROR));
-        }
-
         if ($this->isPublicCacheEnabled()) {
-            // Move transformation params into the path, keep only _metadata as query param
+            // Move transformation params into the path, leaving only the signature in the query
             $paramsSegment = $this->buildParamsSegment($glideParams);
             if ('' === $paramsSegment) {
                 $paramsSegment = self::UNTRANSFORMED_PARAMS_SEGMENT;
             }
             $format = isset($glideParams['fm']) ? (string) $glideParams['fm'] : pathinfo($path, \PATHINFO_EXTENSION);
             $path = $path . '/' . $paramsSegment . '.' . $format;
-            $glideParams = array_filter(
-                $glideParams,
-                static fn (string $key): bool => str_starts_with($key, '_'),
-                \ARRAY_FILTER_USE_KEY,
-            );
+            $glideParams = [];
         }
 
         $signature = $this->signature
@@ -244,22 +238,12 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
             };
         }
 
-        if (isset($params['_metadata'])) {
-            try {
-                /** @var string $encryptedMetadata */
-                $encryptedMetadata = $params['_metadata'];
-                unset($params['_metadata']);
-                $metadata = json_decode($this->urlEncryption->decrypt($encryptedMetadata), true, flags: \JSON_THROW_ON_ERROR);
-            } catch (EncryptionException|JsonException $e) {
-                throw new ImageNotFoundException('Invalid metadata parameter.', $e->getCode(), previous: $e);
-            }
-        } else {
-            $metadata = [];
-        }
+        // URLs minted before 2.0 may carry an encrypted "_metadata" param locating
+        // the source. Their signature (checked above) still covers it, but each
+        // loader now reads from a single source, so it is no longer needed.
+        unset($params[self::LEGACY_METADATA_PARAM]);
 
-        /** @var array<string, mixed> $metadata */
-        $source = $loader->getSource($metadata);
-        $this->server->setSource(new Filesystem(new ImageSourceFlysystemAdapter($source)));
+        $this->server->setSource(new Filesystem(new ImageSourceFlysystemAdapter($loader->getSource())));
         $this->server->setResponseFactory(new SymfonyResponseFactory($request));
         $this->server->setCachePathCallable($cachePathCallable);
 
@@ -452,20 +436,8 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
      */
     private function buildCanonicalUrl(string $path, array $params, array $context): string
     {
-        $metadata = [];
-        if (isset($params['_metadata'])) {
-            try {
-                /** @var string $encryptedMetadata */
-                $encryptedMetadata = $params['_metadata'];
-                /** @var array<string, mixed> $metadata */
-                $metadata = json_decode($this->urlEncryption->decrypt($encryptedMetadata), true, flags: \JSON_THROW_ON_ERROR);
-            } catch (EncryptionException|JsonException $e) {
-                throw new ImageNotFoundException('Invalid metadata parameter.', $e->getCode(), previous: $e);
-            }
-        }
-
         return $this->url(
-            new Image(path: $path, metadata: $metadata),
+            new Image(path: $path),
             new ImageTransformation(
                 width: self::intParam($params, 'w'),
                 height: self::intParam($params, 'h'),
@@ -496,7 +468,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
     }
 
     /**
-     * Build the params segment from Glide params (excluding _metadata and s).
+     * Build the params segment from Glide params (excluding the signature and pre-2.0 "_metadata").
      *
      * @param TransformerParams $glideParams
      */
@@ -504,7 +476,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
     {
         $filtered = array_filter(
             $glideParams,
-            static fn (string $key): bool => '_metadata' !== $key && 's' !== $key,
+            static fn (string $key): bool => self::LEGACY_METADATA_PARAM !== $key && 's' !== $key,
             \ARRAY_FILTER_USE_KEY,
         );
 

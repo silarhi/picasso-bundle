@@ -80,7 +80,7 @@ class FlysystemLoaderTest extends TestCase
     {
         $storage = $this->createMock(FilesystemOperator::class);
         $loader = new FlysystemLoader($storage);
-        $source = $loader->getSource([]);
+        $source = $loader->getSource();
 
         self::assertSame($storage, $source->getStorage());
     }

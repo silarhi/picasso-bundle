@@ -19,7 +19,6 @@ use function dirname;
 
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\ImageReference;
-use Silarhi\PicassoBundle\Exception\InvalidMetadataException;
 use Silarhi\PicassoBundle\Loader\FilesystemLoader;
 
 class FilesystemLoaderTest extends TestCase
@@ -33,7 +32,7 @@ class FilesystemLoaderTest extends TestCase
 
     public function testLoadStripsLeadingSlash(): void
     {
-        $loader = new FilesystemLoader(['/tmp/nonexistent']);
+        $loader = new FilesystemLoader('/tmp/nonexistent');
         $image = $loader->load(new ImageReference('/uploads/photo.jpg'));
 
         self::assertSame('uploads/photo.jpg', $image->path);
@@ -41,7 +40,7 @@ class FilesystemLoaderTest extends TestCase
 
     public function testLoadNonExistentFileHasNullStream(): void
     {
-        $loader = new FilesystemLoader(['/tmp/nonexistent']);
+        $loader = new FilesystemLoader('/tmp/nonexistent');
         $image = $loader->load(new ImageReference('missing.jpg'));
 
         self::assertSame('missing.jpg', $image->path);
@@ -50,39 +49,22 @@ class FilesystemLoaderTest extends TestCase
 
     public function testLoadDoesNotResolvePathsOutsideTheBaseDirectory(): void
     {
-        $loader = new FilesystemLoader([self::$fixturesDir . '/Entity']);
+        $loader = new FilesystemLoader(self::$fixturesDir . '/Entity');
         $image = $loader->load(new ImageReference('../photo.jpg'));
 
         self::assertNull($image->stream);
     }
 
-    public function testGetSourceReturnsPathFromMetadata(): void
+    public function testGetSourceReadsTheConfiguredDirectory(): void
     {
-        $loader = new FilesystemLoader(['/var/www/uploads', '/var/www/images']);
-        $source = $loader->getSource(['path' => '/var/www/images']);
-
-        self::assertSame('/var/www/images', $source->getRoot());
-    }
-
-    public function testGetSourceReturnsSinglePath(): void
-    {
-        $loader = new FilesystemLoader(['/var/www/uploads']);
-        $source = $loader->getSource([]);
+        $source = (new FilesystemLoader('/var/www/uploads/'))->getSource();
 
         self::assertSame('/var/www/uploads', $source->getRoot());
     }
 
-    public function testGetSourceThrowsOnMultiplePathsWithoutMetadata(): void
-    {
-        $loader = new FilesystemLoader(['/var/www/uploads', '/var/www/images']);
-
-        $this->expectException(InvalidMetadataException::class);
-        $loader->getSource([]);
-    }
-
     public function testLoadWithNullPath(): void
     {
-        $loader = new FilesystemLoader(['/tmp']);
+        $loader = new FilesystemLoader('/tmp');
         $image = $loader->load(new ImageReference());
 
         self::assertSame('', $image->path);
@@ -90,7 +72,7 @@ class FilesystemLoaderTest extends TestCase
 
     public function testLoadExistingFileHasLazyStream(): void
     {
-        $loader = new FilesystemLoader([self::$fixturesDir]);
+        $loader = new FilesystemLoader(self::$fixturesDir);
         $image = $loader->load(new ImageReference('test.txt'));
 
         self::assertSame('test.txt', $image->path);
@@ -101,7 +83,7 @@ class FilesystemLoaderTest extends TestCase
 
     public function testLoadDoesNotReturnDimensionsDirectly(): void
     {
-        $loader = new FilesystemLoader([self::$fixturesDir]);
+        $loader = new FilesystemLoader(self::$fixturesDir);
         $image = $loader->load(new ImageReference('pixel.gif'), withMetadata: true);
 
         // Loaders no longer detect dimensions — MetadataGuesser in ImageComponent handles that
@@ -109,67 +91,5 @@ class FilesystemLoaderTest extends TestCase
         self::assertNull($image->height);
         self::assertNull($image->mimeType);
         self::assertInstanceOf(Closure::class, $image->stream);
-    }
-
-    public function testLoadSearchesMultiplePaths(): void
-    {
-        $tmpDir1 = sys_get_temp_dir() . '/picasso_test_' . uniqid();
-        $tmpDir2 = sys_get_temp_dir() . '/picasso_test_' . uniqid();
-        mkdir($tmpDir1, 0o777, true);
-        mkdir($tmpDir2, 0o777, true);
-        file_put_contents($tmpDir2 . '/photo.jpg', 'image-data');
-
-        try {
-            $loader = new FilesystemLoader([$tmpDir1, $tmpDir2]);
-            $image = $loader->load(new ImageReference('photo.jpg'));
-
-            self::assertSame('photo.jpg', $image->path);
-            self::assertInstanceOf(Closure::class, $image->stream);
-            self::assertSame($tmpDir2, $image->metadata['path']);
-        } finally {
-            @unlink($tmpDir2 . '/photo.jpg');
-            @rmdir($tmpDir1);
-            @rmdir($tmpDir2);
-        }
-    }
-
-    public function testSinglePathDoesNotSetPathMetadata(): void
-    {
-        $tmpDir = sys_get_temp_dir() . '/picasso_test_' . uniqid();
-        mkdir($tmpDir, 0o777, true);
-        file_put_contents($tmpDir . '/test.txt', 'hello');
-
-        try {
-            $loader = new FilesystemLoader([$tmpDir]);
-            $image = $loader->load(new ImageReference('test.txt'));
-
-            self::assertArrayNotHasKey('path', $image->metadata);
-        } finally {
-            @unlink($tmpDir . '/test.txt');
-            @rmdir($tmpDir);
-        }
-    }
-
-    public function testLoadFirstPathTakesPriority(): void
-    {
-        $tmpDir1 = sys_get_temp_dir() . '/picasso_test_' . uniqid();
-        $tmpDir2 = sys_get_temp_dir() . '/picasso_test_' . uniqid();
-        mkdir($tmpDir1, 0o777, true);
-        mkdir($tmpDir2, 0o777, true);
-        file_put_contents($tmpDir1 . '/photo.jpg', 'first');
-        file_put_contents($tmpDir2 . '/photo.jpg', 'second');
-
-        try {
-            $loader = new FilesystemLoader([$tmpDir1, $tmpDir2]);
-            $image = $loader->load(new ImageReference('photo.jpg'));
-
-            self::assertInstanceOf(Closure::class, $image->stream);
-            self::assertSame($tmpDir1, $image->metadata['path']);
-        } finally {
-            @unlink($tmpDir1 . '/photo.jpg');
-            @unlink($tmpDir2 . '/photo.jpg');
-            @rmdir($tmpDir1);
-            @rmdir($tmpDir2);
-        }
     }
 }

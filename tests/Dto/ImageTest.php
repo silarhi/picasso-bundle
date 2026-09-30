@@ -28,7 +28,6 @@ class ImageTest extends TestCase
         self::assertNull($image->width);
         self::assertNull($image->height);
         self::assertNull($image->mimeType);
-        self::assertSame([], $image->metadata);
     }
 
     public function testWithPath(): void
@@ -45,13 +44,6 @@ class ImageTest extends TestCase
         $image = new Image(path: 'photo.webp', mimeType: 'image/webp');
 
         self::assertSame('image/webp', $image->mimeType);
-    }
-
-    public function testWithMetadata(): void
-    {
-        $image = new Image(path: 'photo.jpg', metadata: ['upload_destination' => '/var/uploads']);
-
-        self::assertSame('/var/uploads', $image->metadata['upload_destination']);
     }
 
     public function testReadonlyProperties(): void

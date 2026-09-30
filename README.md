@@ -211,8 +211,7 @@ composer require league/glide league/glide-symfony
 picasso:
     loaders:
         filesystem:
-            paths:
-                - '%kernel.project_dir%/public/uploads'
+            path: '%kernel.project_dir%/public/uploads'
     transformers:
         glide:
             sign_key: '%env(PICASSO_SIGN_KEY)%'
@@ -254,8 +253,7 @@ automatically used as defaults — no need to set `default_loader` or
 picasso:
     loaders:
         filesystem:
-            paths:
-                - '%kernel.project_dir%/public/uploads'
+            path: '%kernel.project_dir%/public/uploads'
     transformers:
         glide:
             sign_key: '%env(PICASSO_SIGN_KEY)%'
@@ -319,8 +317,7 @@ picasso:
     loaders:
         filesystem:
             type: filesystem # inferred from key name
-            paths:
-                - '%kernel.project_dir%/public/uploads'
+            path: '%kernel.project_dir%/public/uploads' # one directory per loader
             # resolve_metadata: ~  # auto-set to true for filesystem loaders
 
         # my_flysystem:
@@ -328,8 +325,9 @@ picasso:
         #     storage: 'default.storage'
         #     resolve_metadata: ~  # inherits from global (false)
 
-        # vich:
+        # product_image:
         #     type: vich
+        #     mapping: ~  # VichUploader mapping; defaults to the loader name, or to the only mapping
 
         # url:
         #     type: url
@@ -611,9 +609,9 @@ All available parameters:
     fit: 'cover',
     blur: 10,
     dpr: 2,
-    loader: 'vich',
+    loader: 'product_image',
     transformer: 'imgix',
-    context: { entity: product, field: 'imageFile' }
+    context: { entity: product }
 ) }}
 ```
 
@@ -831,20 +829,26 @@ Loaders fetch image data from a source. Each loader implements `ImageLoaderInter
 
 ### Filesystem Loader
 
-Reads images from local directories. Supports multiple paths (searched in order).
+Reads images from a local directory. Each filesystem loader reads from exactly one `path`; declare one loader per directory:
 
 ```yaml
 picasso:
+    default_loader: uploads
     loaders:
-        filesystem:
-            paths:
-                - '%kernel.project_dir%/public/uploads'
-                - '%kernel.project_dir%/assets/images'
+        uploads:
+            type: filesystem
+            path: '%kernel.project_dir%/public/uploads'
+        assets:
+            type: filesystem
+            path: '%kernel.project_dir%/assets/images'
 ```
 
 ```twig
 <twig:Picasso:Image src="photos/landscape.jpg" width="800" height="600" alt="Landscape" />
+<twig:Picasso:Image src="logo.png" loader="assets" width="200" height="80" alt="Logo" />
 ```
+
+Paths escaping the directory (`../`) are treated as missing images.
 
 ### Flysystem Loader
 
@@ -876,23 +880,44 @@ composer require vich/uploader-bundle
 
 Both VichUploaderBundle `2.9+` and `3.0+` are supported. VichUploader v3 requires PHP `8.3+`, so Composer resolves to v2 on PHP 8.2.
 
+A vich loader serves **one VichUploader mapping**. Name the loader after the mapping, and that is all the configuration it needs:
+
 ```yaml
+vich_uploader:
+    mappings:
+        product_image:
+            upload_destination: '%kernel.project_dir%/public/uploads/products'
+            uri_prefix: /uploads/products
+        user_avatar:
+            upload_destination: avatars.storage # a Flysystem storage works too
+            uri_prefix: /uploads/avatars
+
 picasso:
     loaders:
-        vich: ~ # type inferred from key name
+        product_image: { type: vich } # serves the "product_image" mapping
+        avatars: { type: vich, mapping: user_avatar } # or pick the mapping explicitly
 ```
+
+When VichUploader has a single mapping, `vich: ~` is enough: the loader serves that mapping.
+
+Pass the entity as `context`. The upload field is found from the loader's mapping:
 
 ```twig
 <twig:Picasso:Image
-    src="product-photo.jpg"
-    :context="{ entity: product, field: 'imageFile' }"
+    loader="product_image"
+    :context="{ entity: product }"
     width="400"
     height="300"
     alt="Product image"
 />
 ```
 
-The `context` must include the `entity` (the Doctrine entity instance) and `field` (the VichUploader mapping field name).
+Only when an entity has several fields using the same mapping do you need to name one with `field` (e.g. `:context="{ entity: gallery, field: 'coverFile' }"`).
+
+Mistakes are reported with the fix:
+
+- At container build: a `mapping` that does not exist, or a vich loader that could serve several mappings, lists the available mappings.
+- At render time: an entity without a field using the loader's mapping, a `field` using another mapping, or an ambiguous field throws an `InvalidImageReferenceException` naming the entity, the field and the mappings involved.
 
 ### URL Loader
 
@@ -938,7 +963,7 @@ class S3Loader implements ImageLoaderInterface
 }
 ```
 
-If local transformers (like Glide) should serve your loader's images, implement `ServableLoaderInterface` instead. Its `getSource()` method returns an `ImageSourceInterface`, the read access used to fetch originals when a transformed image is requested. Two implementations ship with the bundle:
+If local transformers (like Glide) should serve your loader's images, implement `ServableLoaderInterface` instead. Its `getSource()` method returns the `ImageSourceInterface` all its originals are read from when a transformed image is requested: the loader name in the image URL is all that is needed to find the original again, so a servable loader reads from a single source. Two implementations ship with the bundle:
 
 - `LocalImageSource` reads from a local directory (paths escaping it via `..` are treated as missing).
 - `FlysystemImageSource` reads from a Flysystem storage.
@@ -981,7 +1006,7 @@ final class BlobLoader implements ServableLoaderInterface
         return new Image(path: $path, stream: fn () => $this->source->readStream($path));
     }
 
-    public function getSource(array $metadata): ImageSourceInterface
+    public function getSource(): ImageSourceInterface
     {
         return $this->source;
     }
@@ -1017,7 +1042,7 @@ picasso:
 
 > **Important:** When using Glide, you must [import the bundle routes](#routes) so that the image controller can serve transformed images.
 
-Glide URLs are stable: the same image and transformation always produce the same URL, including the signature and the encrypted `_metadata` parameter some loaders (e.g. Vich) add. A thumbnail used several times in a page, or across pages, is fetched once and caches cleanly in browsers and CDNs.
+Glide URLs are stable: the same image and transformation always produce the same URL and signature. A thumbnail used several times in a page, or across pages, is fetched once and caches cleanly in browsers and CDNs.
 
 #### Storing the Glide cache on Flysystem
 
@@ -1091,7 +1116,7 @@ The signature is only checked on a miss: that is all it needs to protect, since 
 On the CDN side:
 
 - Use the bucket as the origin, and fall back to the application on `403`/`404` (CloudFront origin groups, a Cloudflare Worker reading R2, Fastly, or a reverse proxy such as nginx with `proxy_intercept_errors` and `error_page 403 404 = @app`). S3 answers `403` for a missing key when the reader cannot list the bucket.
-- Leave the query string (`s`, `_metadata`) out of the cache key, but forward it to the application on a miss: it carries the signature.
+- Leave the query string (`s`) out of the cache key, but forward it to the application on a miss: it carries the signature.
 - Give hits served from the bucket a long lifetime in the CDN's cache policy (or response headers policy): the bundle does not set `Cache-Control` on the objects it stores.
 
 A variant URL never changes meaning, so its cache never needs revalidating. Changing the source file behind an unchanged path therefore needs a [purge](#cache-purge), which clears the bucket but not the CDN's edge caches. Uploads with unique file names (as VichUploaderBundle generates) never need either.
@@ -1165,7 +1190,7 @@ The image controller answers a `404 Not Found` whenever an image cannot be serve
 
 | Cause                                                                                   | Previous exception          |
 | --------------------------------------------------------------------------------------- | --------------------------- |
-| Source file missing, invalid signature or `_metadata`, malformed public-cache path      | `ImageNotFoundException`    |
+| Source file missing, invalid signature, malformed public-cache path                     | `ImageNotFoundException`    |
 | Source file exists but is not a decodable image (truncated upload, PDF named `.jpg`...) | `UndecodableImageException` |
 
 This lets a `kernel.exception` listener react to one case only. For instance, an application redirecting unservable image URLs to the original file should do so for `ImageNotFoundException` only: for an `UndecodableImageException` the original _is_ the broken file.

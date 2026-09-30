@@ -36,7 +36,7 @@ class PicassoTestKernel extends AbstractPicassoKernel
         $container->loadFromExtension('picasso', [
             'loaders' => [
                 'filesystem' => [
-                    'paths' => [dirname(__DIR__) . '/Fixtures'],
+                    'path' => dirname(__DIR__) . '/Fixtures',
                 ],
             ],
             'transformers' => [

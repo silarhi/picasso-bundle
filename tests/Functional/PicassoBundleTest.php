@@ -27,7 +27,6 @@ use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Service\MetadataGuesser;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
-use Silarhi\PicassoBundle\Service\UrlEncryption;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 use Silarhi\PicassoBundle\Twig\Extension\PicassoExtension;
 use Symfony\Component\HttpFoundation\Request;
@@ -110,14 +109,6 @@ class PicassoBundleTest extends TestCase
 
         self::assertTrue($container->has('picasso.metadata_guesser'));
         self::assertInstanceOf(MetadataGuesser::class, $container->get('picasso.metadata_guesser'));
-    }
-
-    public function testUrlEncryptionIsRegistered(): void
-    {
-        $container = $this->getTestContainer();
-
-        self::assertTrue($container->has('picasso.url_encryption'));
-        self::assertInstanceOf(UrlEncryption::class, $container->get('picasso.url_encryption'));
     }
 
     public function testSrcsetGeneratorIsRegistered(): void
@@ -225,19 +216,5 @@ class PicassoBundleTest extends TestCase
         self::assertNotEmpty($widths);
         self::assertContains(640, $widths);
         self::assertContains(1920, $widths);
-    }
-
-    public function testUrlEncryptionRoundTrip(): void
-    {
-        $container = $this->getTestContainer();
-        $encryption = $container->get('picasso.url_encryption');
-        self::assertInstanceOf(UrlEncryption::class, $encryption);
-
-        $original = '/var/uploads/images';
-        $encrypted = $encryption->encrypt($original);
-        $decrypted = $encryption->decrypt($encrypted);
-
-        self::assertSame($original, $decrypted);
-        self::assertNotSame($original, $encrypted);
     }
 }

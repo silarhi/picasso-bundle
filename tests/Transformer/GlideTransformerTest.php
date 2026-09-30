@@ -24,7 +24,6 @@ use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
-use Silarhi\PicassoBundle\Service\UrlEncryption;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
@@ -57,7 +56,6 @@ class GlideTransformerTest extends TestCase
 
         $this->transformer = new GlideTransformer(
             $this->router,
-            new UrlEncryption(self::SIGN_KEY),
             self::SIGN_KEY,
             '/tmp/cache',
             'gd',
@@ -172,36 +170,15 @@ class GlideTransformerTest extends TestCase
         self::assertStringContainsString('dpr=2', $url);
     }
 
-    public function testUrlIncludesEncryptedMetadata(): void
-    {
-        $image = new Image(path: 'photo.jpg', metadata: ['upload_destination' => '/var/uploads/images']);
-        $transformation = new ImageTransformation(width: 300);
-
-        $url = $this->transformer->url($image, $transformation, ['loader' => 'vich', 'transformer' => 'glide']);
-
-        self::assertStringContainsString('_metadata=', $url);
-        self::assertStringContainsString('/picasso/glide/vich/photo.jpg', $url);
-
-        // Extract the _metadata param and verify it decrypts to the original metadata
-        $queryString = parse_url($url, \PHP_URL_QUERY);
-        self::assertIsString($queryString);
-        parse_str($queryString, $query);
-        self::assertArrayHasKey('_metadata', $query);
-        $encryption = new UrlEncryption(self::SIGN_KEY);
-        self::assertIsString($query['_metadata']);
-        $decrypted = json_decode($encryption->decrypt($query['_metadata']), true, flags: \JSON_THROW_ON_ERROR);
-        self::assertSame(['upload_destination' => '/var/uploads/images'], $decrypted);
-    }
-
-    public function testUrlWithMetadataIsStable(): void
+    public function testUrlIsStable(): void
     {
         // The same thumb requested twice (twice in a page, or on another request)
         // must get the same URL so browsers and CDNs fetch it only once.
-        $image = new Image(path: 'photo.jpg', metadata: ['upload_destination' => '/var/uploads/images']);
+        $image = new Image(path: 'photo.jpg');
         $transformation = new ImageTransformation(width: 300, format: 'webp');
         $context = ['loader' => 'vich', 'transformer' => 'glide'];
 
-        $publicCacheTransformer = new GlideTransformer($this->router, new UrlEncryption(self::SIGN_KEY), self::SIGN_KEY, '/tmp/cache', 'gd', null, true);
+        $publicCacheTransformer = new GlideTransformer($this->router, self::SIGN_KEY, '/tmp/cache', 'gd', null, true);
 
         self::assertSame($this->transformer->url($image, $transformation, $context), $this->transformer->url($image, $transformation, $context));
         self::assertSame($publicCacheTransformer->url($image, $transformation, $context), $publicCacheTransformer->url($image, $transformation, $context));
@@ -214,8 +191,8 @@ class GlideTransformerTest extends TestCase
         $context = ['loader' => 'filesystem', 'transformer' => 'glide'];
 
         foreach ([false, true] as $publicCache) {
-            $relative = new GlideTransformer($this->router, new UrlEncryption(self::SIGN_KEY), self::SIGN_KEY, '/tmp/cache', 'gd', null, $publicCache);
-            $onCdn = new GlideTransformer($this->router, new UrlEncryption(self::SIGN_KEY), self::SIGN_KEY, '/tmp/cache', 'gd', null, $publicCache, null, 'https://cdn.example.com/');
+            $relative = new GlideTransformer($this->router, self::SIGN_KEY, '/tmp/cache', 'gd', null, $publicCache);
+            $onCdn = new GlideTransformer($this->router, self::SIGN_KEY, '/tmp/cache', 'gd', null, $publicCache, null, 'https://cdn.example.com/');
 
             self::assertSame('https://cdn.example.com' . $relative->url($image, $transformation, $context), $onCdn->url($image, $transformation, $context));
         }
@@ -224,20 +201,19 @@ class GlideTransformerTest extends TestCase
     public function testComputeCachePathAppliesTheCachePrefix(): void
     {
         $context = ['loader' => 'filesystem', 'transformer' => 'glide'];
-        $prefixed = new GlideTransformer($this->router, new UrlEncryption(self::SIGN_KEY), self::SIGN_KEY, '/tmp/cache', 'gd', null, true, null, null, '/image/');
+        $prefixed = new GlideTransformer($this->router, self::SIGN_KEY, '/tmp/cache', 'gd', null, true, null, null, '/image/');
 
         self::assertSame('glide/filesystem/uploads/photo.jpg/w_300.webp', $this->transformer->computeCachePath('uploads/photo.jpg', 'w_300.webp', $context));
         self::assertSame('image/glide/filesystem/uploads/photo.jpg/w_300.webp', $prefixed->computeCachePath('uploads/photo.jpg', 'w_300.webp', $context));
     }
 
-    public function testUrlOmitsMetadataWhenEmpty(): void
+    public function testUrlCarriesOnlyTransformationAndSignature(): void
     {
-        $image = new Image(path: 'photo.jpg');
-        $transformation = new ImageTransformation(width: 300);
+        // The loader name in the path is all serving needs to find the source again
+        $url = $this->transformer->url(new Image(path: 'photo.jpg'), new ImageTransformation(width: 300), ['loader' => 'vich', 'transformer' => 'glide']);
 
-        $url = $this->transformer->url($image, $transformation, ['loader' => 'filesystem', 'transformer' => 'glide']);
-
-        self::assertStringNotContainsString('_metadata=', $url);
+        parse_str((string) parse_url($url, \PHP_URL_QUERY), $query);
+        self::assertSame(['w', 's'], array_keys($query));
     }
 
     // --- Public cache URL generation ---
@@ -246,7 +222,6 @@ class GlideTransformerTest extends TestCase
     {
         $transformer = new GlideTransformer(
             $this->router,
-            new UrlEncryption(self::SIGN_KEY),
             self::SIGN_KEY,
             '/tmp/cache',
             'gd',
@@ -284,7 +259,6 @@ class GlideTransformerTest extends TestCase
     {
         $transformer = new GlideTransformer(
             $this->router,
-            new UrlEncryption(self::SIGN_KEY),
             self::SIGN_KEY,
             '/tmp/cache',
             'gd',
@@ -302,7 +276,6 @@ class GlideTransformerTest extends TestCase
     {
         $transformer = new GlideTransformer(
             $this->router,
-            new UrlEncryption(self::SIGN_KEY),
             self::SIGN_KEY,
             '/tmp/cache',
             'gd',
@@ -310,25 +283,22 @@ class GlideTransformerTest extends TestCase
             true,
         );
 
-        $image = new Image(path: 'photo.jpg', metadata: ['upload_destination' => '/var/uploads']);
+        $image = new Image(path: 'photo.jpg');
         $transformation = new ImageTransformation(width: 300, format: 'webp');
 
         $url = $transformer->url($image, $transformation, ['loader' => 'vich', 'transformer' => 'glide']);
 
-        // metadata should be in query string, not in path
+        // Transformation params go to the path, only the signature stays in the query string
         $parsedUrl = parse_url($url);
-        self::assertIsString($parsedUrl['query'] ?? null);
-        self::assertStringContainsString('_metadata=', $parsedUrl['query']);
-        // Path should only contain transformation params
         self::assertStringContainsString('w_300', $parsedUrl['path'] ?? '');
-        self::assertStringNotContainsString('_metadata', $parsedUrl['path'] ?? '');
+        parse_str($parsedUrl['query'] ?? '', $query);
+        self::assertSame(['s'], array_keys($query));
     }
 
     public function testPublicCacheUrlParamsAreSorted(): void
     {
         $transformer = new GlideTransformer(
             $this->router,
-            new UrlEncryption(self::SIGN_KEY),
             self::SIGN_KEY,
             '/tmp/cache',
             'gd',
@@ -367,7 +337,6 @@ class GlideTransformerTest extends TestCase
     {
         $transformer = new GlideTransformer(
             $this->router,
-            new UrlEncryption(self::SIGN_KEY),
             self::SIGN_KEY,
             '/tmp/cache',
             'gd',
@@ -467,7 +436,6 @@ class GlideTransformerTest extends TestCase
     {
         $transformer = new GlideTransformer(
             $this->router,
-            new UrlEncryption(self::SIGN_KEY),
             self::SIGN_KEY,
             '/tmp/cache',
             'gd',
