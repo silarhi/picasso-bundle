@@ -1077,6 +1077,8 @@ When two requests render the same variant at once and the cache storage rejects 
 
 Both built-in transformers support purging cached image variants via the `PurgableTransformerInterface`.
 
+A purge throws a `PurgeException` when the cache can't be cleared: the Glide cache storage fails to delete the variants, or the Imgix API rejects the request. With Glide, purging an image that was never cached is a no-op.
+
 ### Glide
 
 Glide cache is purged automatically — no extra configuration needed. In standard mode, `Server::deleteCache()` removes all cached variants. In public cache mode, the bundle deletes the cache directory for the specific transformer/loader/path combination.

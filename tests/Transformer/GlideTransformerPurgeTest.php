@@ -18,6 +18,7 @@ use function assert;
 use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemOperator;
 use League\Flysystem\Local\LocalFilesystemAdapter;
+use League\Flysystem\UnableToDeleteDirectory;
 use League\Glide\Server;
 use League\Glide\Signatures\SignatureFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -114,13 +115,40 @@ class GlideTransformerPurgeTest extends TestCase
         self::assertTrue($cacheFs->fileExists('glide/filesystem/uploads/other.jpg/w_300.webp'));
     }
 
-    public function testPurgeStandardModeHandlesNonExistentPath(): void
+    /**
+     * @return iterable<string, array{bool}>
+     */
+    public static function cacheModeProvider(): iterable
     {
-        $transformer = $this->createTransformer($this->tempDir, false);
+        yield 'standard cache' => [false];
+        yield 'public cache' => [true];
+    }
 
-        // deleteCache on a non-existent path returns false but does not throw
+    #[DataProvider('cacheModeProvider')]
+    public function testPurgeOfNeverCachedImageIsANoOp(bool $publicCache): void
+    {
+        $transformer = $this->createTransformer($this->tempDir, $publicCache);
+
+        // The storage reports a missing folder as nothing to delete, not as a failure
         $this->expectNotToPerformAssertions();
-        $transformer->purge('nonexistent/path.jpg');
+        $transformer->purge('nonexistent/path.jpg', ['transformer' => 'glide', 'loader' => 'filesystem']);
+    }
+
+    #[DataProvider('cacheModeProvider')]
+    public function testPurgeThrowsWhenCacheStorageCannotDeleteTheVariants(bool $publicCache): void
+    {
+        // Glide catches the storage's Flysystem exception and only returns false
+        $cache = self::createStub(FilesystemOperator::class);
+        $cache->method('deleteDirectory')->willThrowException(UnableToDeleteDirectory::atLocation('uploads/photo.jpg', 'Permission denied'));
+
+        $transformer = $this->createTransformerWithCacheStorage($cache, $publicCache);
+
+        try {
+            $transformer->purge('uploads/photo.jpg', ['transformer' => 'glide', 'loader' => 'filesystem']);
+            self::fail('The purge failure should have been reported.');
+        } catch (PurgeException $e) {
+            self::assertSame('Failed to purge cache for "uploads/photo.jpg": the cache storage could not delete it.', $e->getMessage());
+        }
     }
 
     /**
@@ -174,20 +202,12 @@ class GlideTransformerPurgeTest extends TestCase
 
     public function testPurgeWrapsCacheStorageFailureInPurgeException(): void
     {
+        // Not a Flysystem exception, so Glide lets it through
         $failure = new RuntimeException('Storage backend is unreachable.');
         $cache = self::createStub(FilesystemOperator::class);
         $cache->method('deleteDirectory')->willThrowException($failure);
 
-        $transformer = new GlideTransformer(
-            self::createStub(UrlGeneratorInterface::class),
-            new UrlEncryption(self::SIGN_KEY),
-            self::SIGN_KEY,
-            'thumbs.storage',
-            'gd',
-            null,
-            true,
-            new FlysystemRegistry(new ServiceLocator(['thumbs.storage' => static fn (): FilesystemOperator => $cache])),
-        );
+        $transformer = $this->createTransformerWithCacheStorage($cache, true);
 
         try {
             $transformer->purge('uploads/photo.jpg', ['transformer' => 'glide', 'loader' => 'filesystem']);
@@ -196,6 +216,20 @@ class GlideTransformerPurgeTest extends TestCase
             self::assertSame('Failed to purge cache for "uploads/photo.jpg".', $e->getMessage());
             self::assertSame($failure, $e->getPrevious());
         }
+    }
+
+    private function createTransformerWithCacheStorage(FilesystemOperator $cache, bool $publicCache): GlideTransformer
+    {
+        return new GlideTransformer(
+            self::createStub(UrlGeneratorInterface::class),
+            new UrlEncryption(self::SIGN_KEY),
+            self::SIGN_KEY,
+            'thumbs.storage',
+            'gd',
+            null,
+            $publicCache,
+            new FlysystemRegistry(new ServiceLocator(['thumbs.storage' => static fn (): FilesystemOperator => $cache])),
+        );
     }
 
     private function createTransformer(string $cacheDir, bool $publicCache): GlideTransformer
