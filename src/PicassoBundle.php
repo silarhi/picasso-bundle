@@ -29,6 +29,7 @@ use Silarhi\PicassoBundle\Controller\ImageController;
 use Silarhi\PicassoBundle\DataCollector\CollectingImageHelper;
 use Silarhi\PicassoBundle\DataCollector\CollectingMetadataGuesser;
 use Silarhi\PicassoBundle\DataCollector\PicassoDataCollector;
+use Silarhi\PicassoBundle\DependencyInjection\VichLoaderPass;
 use Silarhi\PicassoBundle\Loader\FilesystemLoader;
 use Silarhi\PicassoBundle\Loader\FlysystemLoader;
 use Silarhi\PicassoBundle\Loader\FlysystemRegistry;
@@ -48,7 +49,6 @@ use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
 use Silarhi\PicassoBundle\Service\PlaceholderRegistry;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
-use Silarhi\PicassoBundle\Service\UrlEncryption;
 use Silarhi\PicassoBundle\Transformer\DeferredCacheWriter;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
@@ -108,6 +108,8 @@ final class PicassoBundle extends AbstractBundle
                 $definition->addTag('picasso.placeholder', ['key' => $attribute->name]);
             },
         );
+
+        $container->addCompilerPass(new VichLoaderPass());
 
         // Merge per-loader defaults from attribute-tagged loaders into LoaderRegistry
         $container->addCompilerPass(new class implements CompilerPassInterface {
@@ -299,10 +301,17 @@ final class PicassoBundle extends AbstractBundle
                                 ->defaultNull()
                                 ->info('Loader type. Inferred from name when it matches a known type.')
                             ->end()
-                            ->arrayNode('paths')
-                                ->scalarPrototype()->end()
-                                ->defaultValue([])
-                                ->info('Base directories for filesystem loaders.')
+                            ->scalarNode('path')
+                                ->defaultNull()
+                                ->info('Directory a filesystem loader reads images from.')
+                            ->end()
+                            ->variableNode('paths')
+                                ->defaultNull()
+                                ->info('Removed in 2.0: declare one filesystem loader per directory, each with its own "path".')
+                            ->end()
+                            ->scalarNode('mapping')
+                                ->defaultNull()
+                                ->info('VichUploader mapping a vich loader serves. Defaults to the loader name when it is a mapping, or to the only mapping.')
                             ->end()
                             ->scalarNode('storage')
                                 ->defaultNull()
@@ -339,7 +348,11 @@ final class PicassoBundle extends AbstractBundle
                         ->end()
                         ->validate()
                             ->ifTrue(static fn (array $v): bool => 'filesystem' === $v['type'] && null !== $v['storage'])
-                            ->thenInvalid('The "storage" option is not supported for filesystem loaders. Use "paths" instead.')
+                            ->thenInvalid('The "storage" option is not supported for filesystem loaders. Use "path" instead.')
+                        ->end()
+                        ->validate()
+                            ->ifTrue(static fn (array $v): bool => null !== $v['paths'])
+                            ->thenInvalid('The "paths" option was removed in 2.0. Declare one filesystem loader per directory, each with its own "path" (e.g. "uploads: { type: filesystem, path: \'%%kernel.project_dir%%/public/uploads\' }"), and pick the loader in your templates.')
                         ->end()
                     ->end()
                 ->end()
@@ -407,7 +420,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_quality: int|null,
          *     default_fit: string,
          *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int|null, quality: int|null, fit: string|null, format: string|null, components_x: int, components_y: int, driver: string, service: string|null}>,
-         *     loaders: array<string, array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null, resolve_metadata: bool|null}>,
+         *     loaders: array<string, array{enabled: bool, type: string|null, path: string|null, paths: mixed, mapping: string|null, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null, resolve_metadata: bool|null}>,
          *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, api_key: string|null, http_client: string|null, request_factory: string|null, stream_factory: string|null, service: string|null, defer_cache_write: bool, public_cache: array{enabled: bool, prefix: string}}>
          * } $config
          */
@@ -454,7 +467,15 @@ final class PicassoBundle extends AbstractBundle
             $type = $loaderConfig['type'] ?? (in_array($name, $knownTypes, true) ? $name : null);
 
             if (null === $type) {
-                throw new Exception\InvalidConfigurationException(sprintf('Loader "%s" must specify a "type" (filesystem, flysystem, or vich).', $name));
+                throw new Exception\InvalidConfigurationException(sprintf('Loader "%s" must specify a "type" (%s).', $name, implode(', ', $knownTypes)));
+            }
+
+            if (null !== $loaderConfig['path'] && 'filesystem' !== $type) {
+                throw new Exception\InvalidConfigurationException(sprintf('Loader "%s": the "path" option is only supported by filesystem loaders.', $name));
+            }
+
+            if (null !== $loaderConfig['mapping'] && 'vich' !== $type) {
+                throw new Exception\InvalidConfigurationException(sprintf('Loader "%s": the "mapping" option is only supported by vich loaders.', $name));
             }
 
             $tag = ['key' => $name];
@@ -476,8 +497,12 @@ final class PicassoBundle extends AbstractBundle
 
             switch ($type) {
                 case 'filesystem':
+                    if (null === $loaderConfig['path'] || '' === $loaderConfig['path']) {
+                        throw new Exception\InvalidConfigurationException(sprintf('Loader "%s": a filesystem loader requires a "path", the directory it reads images from (e.g. "%%kernel.project_dir%%/public/uploads").', $name));
+                    }
+
                     $services->set('picasso.loader.' . $name, FilesystemLoader::class)
-                        ->args([$loaderConfig['paths']])
+                        ->args([$loaderConfig['path']])
                         ->tag('picasso.loader', $tag);
                     break;
 
@@ -508,17 +533,18 @@ final class PicassoBundle extends AbstractBundle
                             $vichHelperRegistered = true;
                         }
 
-                        $loaderArgs = [
-                            service(VichStorageInterface::class),
-                            service('.picasso.vich_mapping_helper'),
-                        ];
-                        if ($hasFlysystem) {
-                            $loaderArgs[] = service('.picasso.flysystem_registry');
-                        }
-
+                        // The mapping and its upload destination are resolved against the
+                        // VichUploader configuration by VichLoaderPass, once it is loaded.
                         $services->set('picasso.loader.' . $name, VichUploaderLoader::class)
-                            ->args($loaderArgs)
-                            ->tag('picasso.loader', $tag);
+                            ->args([
+                                service(VichStorageInterface::class),
+                                service('.picasso.vich_mapping_helper'),
+                                '',
+                                '',
+                                $hasFlysystem ? service('.picasso.flysystem_registry') : null,
+                            ])
+                            ->tag('picasso.loader', $tag)
+                            ->tag(VichLoaderPass::TAG, ['loader' => $name, 'mapping' => $loaderConfig['mapping']]);
                     }
                     break;
             }
@@ -549,7 +575,6 @@ final class PicassoBundle extends AbstractBundle
         // --- Transformers ---
 
         $knownTransformerTypes = ['glide', 'imgix', 'service'];
-        $urlEncryptionRegistered = false;
         $deferredCacheWriterRegistered = false;
 
         foreach ($config['transformers'] as $name => $transformerConfig) {
@@ -565,17 +590,9 @@ final class PicassoBundle extends AbstractBundle
 
             switch ($type) {
                 case 'glide':
-                    if (!$urlEncryptionRegistered) {
-                        $services->set('picasso.url_encryption', UrlEncryption::class)
-                            ->args([$transformerConfig['sign_key']]);
-                        $services->alias(UrlEncryption::class, 'picasso.url_encryption');
-                        $urlEncryptionRegistered = true;
-                    }
-
                     $services->set('picasso.transformer.' . $name, GlideTransformer::class)
                         ->args([
                             service('router'),
-                            service('picasso.url_encryption'),
                             $transformerConfig['sign_key'],
                             $transformerConfig['cache'] ?? '%kernel.project_dir%/var/glide-cache',
                             $transformerConfig['driver'],

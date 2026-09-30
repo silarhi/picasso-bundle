@@ -37,8 +37,7 @@ final readonly class FlysystemLoader implements ServableLoaderInterface
         return new Image(path: $path, stream: fn () => $this->source->readStream($path));
     }
 
-    /** @param array<string, mixed> $metadata */
-    public function getSource(array $metadata): FlysystemImageSource
+    public function getSource(): FlysystemImageSource
     {
         return $this->source;
     }

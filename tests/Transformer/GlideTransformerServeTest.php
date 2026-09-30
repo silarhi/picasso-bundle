@@ -17,7 +17,6 @@ use function assert;
 use function in_array;
 use function is_string;
 
-use JsonException;
 use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemAdapter;
 use League\Flysystem\FilesystemOperator;
@@ -29,12 +28,10 @@ use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
-use Silarhi\PicassoBundle\Exception\EncryptionException;
 use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
 use Silarhi\PicassoBundle\Exception\UndecodableImageException;
 use Silarhi\PicassoBundle\Loader\FlysystemRegistry;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
-use Silarhi\PicassoBundle\Service\UrlEncryption;
 use Silarhi\PicassoBundle\Source\FlysystemImageSource;
 use Silarhi\PicassoBundle\Source\ImageSourceInterface;
 use Silarhi\PicassoBundle\Source\LocalImageSource;
@@ -228,43 +225,19 @@ class GlideTransformerServeTest extends TestCase
         }
     }
 
-    /**
-     * @return iterable<string, array{bool, string, class-string}>
-     */
-    public static function invalidMetadataProvider(): iterable
+    public function testServeIgnoresPre2MetadataParam(): void
     {
-        $notJson = (new UrlEncryption(self::SIGN_KEY))->encrypt('not-json');
-        $foreignKey = (new UrlEncryption('another-secret-key'))->encrypt('{"field":"image"}');
+        // URLs minted before 2.0 carry an encrypted "_metadata" param, covered by
+        // their signature. The loader alone now locates the source.
+        $response = $this->createTransformer($this->tempDir . '/cache')->serve(
+            $this->createLoader(__DIR__ . '/../Fixtures'),
+            'photo.jpg',
+            $this->createSignedRequest('photo.jpg', ['w' => '10', 'fm' => 'webp', '_metadata' => 'pre-2.0-token']),
+            ['transformer' => 'glide', 'loader' => 'vich'],
+        );
 
-        yield 'standard: not encrypted' => [false, 'plain-text', EncryptionException::class];
-        yield 'standard: encrypted with another key' => [false, $foreignKey, EncryptionException::class];
-        yield 'standard: encrypted non-JSON' => [false, $notJson, JsonException::class];
-        // In public-cache mode, a query-string URL is a legacy one: its metadata is decoded to build the redirect
-        yield 'legacy redirect: not encrypted' => [true, 'plain-text', EncryptionException::class];
-        yield 'legacy redirect: encrypted non-JSON' => [true, $notJson, JsonException::class];
-    }
-
-    /**
-     * @param class-string $expectedPrevious
-     */
-    #[DataProvider('invalidMetadataProvider')]
-    public function testServeThrowsImageNotFoundOnInvalidMetadata(bool $publicCache, string $metadata, string $expectedPrevious): void
-    {
-        $transformer = $this->createTransformer($this->tempDir . '/cache', publicCache: $publicCache);
-
-        try {
-            // Signed with the tampered metadata: only the metadata itself is wrong
-            $transformer->serve(
-                $this->createLoader(__DIR__ . '/../Fixtures'),
-                'photo.jpg',
-                $this->createSignedRequest('photo.jpg', ['w' => '10', 'fm' => 'webp', '_metadata' => $metadata]),
-                ['transformer' => 'glide', 'loader' => 'vich'],
-            );
-            self::fail('Invalid metadata should have been rejected.');
-        } catch (ImageNotFoundException $e) {
-            self::assertSame('Invalid metadata parameter.', $e->getMessage());
-            self::assertInstanceOf($expectedPrevious, $e->getPrevious());
-        }
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('image/webp', $response->headers->get('Content-Type'));
     }
 
     public function testServeRejectsPublicCachePathWithoutSourcePath(): void
@@ -283,9 +256,8 @@ class GlideTransformerServeTest extends TestCase
         );
     }
 
-    public function testServeLegacyRedirectKeepsEncryptedMetadata(): void
+    public function testServeLegacyRedirectDropsPre2MetadataParam(): void
     {
-        $encryption = new UrlEncryption(self::SIGN_KEY);
         $transformer = $this->createTransformer($this->tempDir . '/cache', publicCache: true);
 
         $response = $transformer->serve(
@@ -294,7 +266,7 @@ class GlideTransformerServeTest extends TestCase
             $this->createSignedRequest('photo.jpg', [
                 'w' => '10',
                 'fm' => 'webp',
-                '_metadata' => $encryption->encrypt('{"class":"App\\\\Entity\\\\Product","field":"image"}'),
+                '_metadata' => 'pre-2.0-token',
             ]),
             ['transformer' => 'glide', 'loader' => 'vich'],
         );
@@ -305,12 +277,7 @@ class GlideTransformerServeTest extends TestCase
         self::assertSame('/picasso/glide/vich/photo.jpg/fm_webp%2Cw_10.webp', parse_url($location, \PHP_URL_PATH));
 
         parse_str((string) parse_url($location, \PHP_URL_QUERY), $query);
-        self::assertSame(['_metadata', 's'], array_keys($query), 'Only metadata and signature stay in the query string');
-        self::assertIsString($query['_metadata']);
-        self::assertSame(
-            '{"class":"App\\\\Entity\\\\Product","field":"image"}',
-            $encryption->decrypt($query['_metadata']),
-        );
+        self::assertSame(['s'], array_keys($query), 'Only the signature stays in the query string');
     }
 
     /**
@@ -489,7 +456,6 @@ class GlideTransformerServeTest extends TestCase
 
         return new GlideTransformer(
             $router,
-            new UrlEncryption(self::SIGN_KEY),
             self::SIGN_KEY,
             $cache,
             'gd',

@@ -13,31 +13,36 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Loader;
 
+use Silarhi\PicassoBundle\Exception\InvalidImageReferenceException;
+
 /**
  * @phpstan-type ImageDimensions array{0: int, 1: int}
  */
 interface VichMappingHelperInterface
 {
     /**
-     * Resolves the file property name for an entity, optionally given a field.
-     * When field is null, auto-detects from the entity's first VichUploader mapping.
+     * Resolves the upload field of an entity that uses the given mapping.
+     *
+     * Without a field, the entity's only field using the mapping is returned.
+     * A given field is checked to use the mapping.
+     *
+     * @return string The file property name (e.g. "imageFile")
+     *
+     * @throws InvalidImageReferenceException When the entity is not uploadable, has no field using the mapping,
+     *                                        several of them and no field was given, or when the given
+     *                                        field is not an upload field or uses another mapping
      */
-    public function getFilePropertyName(object $entity, ?string $field): ?string;
-
-    /**
-     * Returns the upload destination directory for an entity's mapping.
-     */
-    public function getUploadDestination(object $entity, ?string $field): ?string;
+    public function resolveField(object $entity, string $mapping, ?string $field): string;
 
     /**
      * Reads the mime type from the entity's mapped property.
      */
-    public function readMimeType(object $entity, ?string $field): ?string;
+    public function readMimeType(object $entity, string $field): ?string;
 
     /**
      * Reads the dimensions from the entity's mapped property.
      *
      * @return ImageDimensions|null [width, height] or null
      */
-    public function readDimensions(object $entity, ?string $field): ?array;
+    public function readDimensions(object $entity, string $field): ?array;
 }

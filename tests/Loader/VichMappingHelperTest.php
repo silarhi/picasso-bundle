@@ -16,10 +16,14 @@ namespace Silarhi\PicassoBundle\Tests\Loader;
 use Metadata\Driver\DriverChain;
 use Metadata\MetadataFactory;
 use PHPUnit\Framework\TestCase;
+use Silarhi\PicassoBundle\Exception\InvalidImageReferenceException;
 use Silarhi\PicassoBundle\Loader\VichMappingHelper;
+use Silarhi\PicassoBundle\Tests\Fixtures\Entity\GalleryEntity;
 use Silarhi\PicassoBundle\Tests\Fixtures\Entity\MinimalEntity;
 use Silarhi\PicassoBundle\Tests\Fixtures\Entity\MultiFieldEntity;
 use Silarhi\PicassoBundle\Tests\Fixtures\Entity\ProductEntity;
+use stdClass;
+use Vich\UploaderBundle\Exception\NotUploadableException;
 use Vich\UploaderBundle\Mapping\PropertyMappingFactory;
 use Vich\UploaderBundle\Mapping\PropertyMappingResolver;
 use Vich\UploaderBundle\Metadata\Driver\AttributeDriver;
@@ -65,32 +69,60 @@ class VichMappingHelperTest extends TestCase
         $this->helper = new VichMappingHelper($factory);
     }
 
-    public function testGetFilePropertyNameWithExplicitField(): void
+    public function testResolveFieldFindsTheOnlyFieldUsingTheMapping(): void
     {
-        $entity = new ProductEntity();
-
-        self::assertSame('imageFile', $this->helper->getFilePropertyName($entity, 'imageFile'));
+        self::assertSame('imageFile', $this->helper->resolveField(new ProductEntity(), 'product_image', null));
+        self::assertSame('avatarFile', $this->helper->resolveField(new MultiFieldEntity(), 'avatar_image', null));
+        self::assertSame('imageFile', $this->helper->resolveField(new MultiFieldEntity(), 'product_image', null));
     }
 
-    public function testGetFilePropertyNameWithNullFieldAutoDetects(): void
+    public function testResolveFieldAcceptsAFieldUsingTheMapping(): void
     {
-        $entity = new ProductEntity();
-
-        self::assertSame('imageFile', $this->helper->getFilePropertyName($entity, null));
+        self::assertSame('avatarFile', $this->helper->resolveField(new MultiFieldEntity(), 'avatar_image', 'avatarFile'));
+        self::assertSame('thumbnailFile', $this->helper->resolveField(new GalleryEntity(), 'product_image', 'thumbnailFile'));
     }
 
-    public function testGetUploadDestinationWithExplicitField(): void
+    public function testResolveFieldRejectsAFieldUsingAnotherMapping(): void
     {
-        $entity = new ProductEntity();
+        $this->expectException(InvalidImageReferenceException::class);
+        $this->expectExceptionMessage('"Silarhi\PicassoBundle\Tests\Fixtures\Entity\MultiFieldEntity::$avatarFile" uses the VichUploader mapping "avatar_image", but this loader serves the mapping "product_image". Use the loader configured for "avatar_image".');
 
-        self::assertSame('products.storage', $this->helper->getUploadDestination($entity, 'imageFile'));
+        $this->helper->resolveField(new MultiFieldEntity(), 'product_image', 'avatarFile');
     }
 
-    public function testGetUploadDestinationWithNullFieldAutoDetects(): void
+    public function testResolveFieldRejectsAnUnknownField(): void
     {
-        $entity = new ProductEntity();
+        $this->expectException(InvalidImageReferenceException::class);
+        $this->expectExceptionMessage('::$imageName" is not a VichUploader upload field.');
 
-        self::assertSame('products.storage', $this->helper->getUploadDestination($entity, null));
+        $this->helper->resolveField(new ProductEntity(), 'product_image', 'imageName');
+    }
+
+    public function testResolveFieldRejectsAnEntityWithoutTheMapping(): void
+    {
+        $this->expectException(InvalidImageReferenceException::class);
+        $this->expectExceptionMessage('ProductEntity" has no VichUploader field using the mapping "avatar_image".');
+
+        $this->helper->resolveField(new ProductEntity(), 'avatar_image', null);
+    }
+
+    public function testResolveFieldAsksForAFieldWhenSeveralUseTheMapping(): void
+    {
+        $this->expectException(InvalidImageReferenceException::class);
+        $this->expectExceptionMessage('GalleryEntity" has several fields using the VichUploader mapping "product_image" (coverFile, thumbnailFile). Pass the one to use as the "field" context key.');
+
+        $this->helper->resolveField(new GalleryEntity(), 'product_image', null);
+    }
+
+    public function testResolveFieldRejectsANonUploadableClass(): void
+    {
+        try {
+            $this->helper->resolveField(new stdClass(), 'product_image', null);
+            self::fail('A non-uploadable class must be rejected.');
+        } catch (InvalidImageReferenceException $e) {
+            self::assertSame('"stdClass" is not a VichUploader uploadable class.', $e->getMessage());
+            self::assertInstanceOf(NotUploadableException::class, $e->getPrevious());
+        }
     }
 
     public function testReadMimeTypeReturnsStringValue(): void
@@ -114,14 +146,6 @@ class VichMappingHelperTest extends TestCase
         $entity = new ProductEntity();
 
         self::assertNull($this->helper->readMimeType($entity, 'imageFile'));
-    }
-
-    public function testReadMimeTypeWithNullFieldUsesAutoDetect(): void
-    {
-        $entity = new ProductEntity();
-        $entity->mimeType = 'image/png';
-
-        self::assertSame('image/png', $this->helper->readMimeType($entity, null));
     }
 
     public function testReadDimensionsReturnsIntTuple(): void
@@ -169,31 +193,6 @@ class VichMappingHelperTest extends TestCase
         $entity = new ProductEntity();
 
         self::assertNull($this->helper->readDimensions($entity, 'imageFile'));
-    }
-
-    public function testReadDimensionsWithNullFieldUsesAutoDetect(): void
-    {
-        $entity = new ProductEntity();
-        $entity->dimensions = [640, 480];
-
-        self::assertSame([640, 480], $this->helper->readDimensions($entity, null));
-    }
-
-    public function testMultiFieldEntityWithExplicitField(): void
-    {
-        $entity = new MultiFieldEntity();
-
-        self::assertSame('avatarFile', $this->helper->getFilePropertyName($entity, 'avatarFile'));
-        self::assertSame('avatars.storage', $this->helper->getUploadDestination($entity, 'avatarFile'));
-    }
-
-    public function testMultiFieldEntityAutoDetectsFirstMapping(): void
-    {
-        $entity = new MultiFieldEntity();
-
-        $propertyName = $this->helper->getFilePropertyName($entity, null);
-        self::assertNotNull($propertyName);
-        self::assertContains($propertyName, ['imageFile', 'avatarFile']);
     }
 
     public function testEntityWithoutMimeTypeMapping(): void

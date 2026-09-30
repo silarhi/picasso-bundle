@@ -16,11 +16,12 @@ namespace Silarhi\PicassoBundle\Tests\Loader;
 use Closure;
 use League\Flysystem\FilesystemOperator;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use RuntimeException;
 use Silarhi\PicassoBundle\Dto\ImageReference;
-use Silarhi\PicassoBundle\Exception\InvalidMetadataException;
+use Silarhi\PicassoBundle\Exception\InvalidImageReferenceException;
 use Silarhi\PicassoBundle\Loader\FlysystemRegistry;
 use Silarhi\PicassoBundle\Loader\VichMappingHelperInterface;
 use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
@@ -31,11 +32,8 @@ use Vich\UploaderBundle\Storage\StorageInterface;
 
 class VichUploaderLoaderTest extends TestCase
 {
-    private VichUploaderLoader $loader;
-    private MockObject&StorageInterface $storage;
+    private Stub&StorageInterface $storage;
     private MockObject&VichMappingHelperInterface $mappingHelper;
-    private MockObject&ContainerInterface $storageContainer;
-    private FlysystemRegistry $flysystemRegistry;
 
     protected function setUp(): void
     {
@@ -43,125 +41,89 @@ class VichUploaderLoaderTest extends TestCase
             self::markTestSkipped('VichUploaderBundle is not installed.');
         }
 
-        $this->storage = $this->createMock(StorageInterface::class);
+        $this->storage = self::createStub(StorageInterface::class);
         $this->mappingHelper = $this->createMock(VichMappingHelperInterface::class);
-        $this->storageContainer = $this->createMock(ContainerInterface::class);
-        $this->flysystemRegistry = new FlysystemRegistry($this->storageContainer);
-        $this->loader = new VichUploaderLoader($this->storage, $this->mappingHelper, $this->flysystemRegistry);
     }
 
-    public function testLoadWithStringSource(): void
+    public function testLoadWithoutEntityKeepsThePath(): void
     {
-        $image = $this->loader->load(new ImageReference('/uploads/photo.jpg'));
+        $this->mappingHelper->expects(self::never())->method('resolveField');
+
+        $image = $this->createLoader()->load(new ImageReference('/uploads/photo.jpg'));
 
         self::assertSame('uploads/photo.jpg', $image->path);
         self::assertNull($image->stream);
-        self::assertSame([], $image->metadata);
     }
 
-    public function testLoadWithEntityAndFieldContext(): void
+    public function testLoadResolvesTheFieldFromTheLoaderMapping(): void
     {
         $entity = new stdClass();
 
-        $this->mappingHelper->expects(self::any())->method('getFilePropertyName')
-            ->with($entity, 'imageFile')
+        $this->mappingHelper->expects(self::once())->method('resolveField')
+            ->with($entity, 'product_image', null)
             ->willReturn('imageFile');
+        $this->storage->method('resolvePath')->willReturnMap([
+            [$entity, 'imageFile', null, true, '2024/february/photo.jpg'],
+        ]);
 
-        $this->mappingHelper->expects(self::any())->method('getUploadDestination')
-            ->with($entity, 'imageFile')
-            ->willReturn('/var/uploads/images');
-
-        $this->storage->expects(self::any())->method('resolvePath')
-            ->with($entity, 'imageFile', null, true)
-            ->willReturn('2024/february/photo.jpg');
-
-        $image = $this->loader->load(new ImageReference('photo.jpg', [
-            'entity' => $entity,
-            'field' => 'imageFile',
-        ]));
+        $image = $this->createLoader()->load(new ImageReference('photo.jpg', ['entity' => $entity]));
 
         self::assertSame('2024/february/photo.jpg', $image->path);
-        self::assertSame('/var/uploads/images', $image->metadata['upload_destination']);
     }
 
-    public function testLoadAutoDetectsFieldWhenNull(): void
+    public function testLoadPassesTheFieldContextKeyOn(): void
     {
         $entity = new stdClass();
 
-        $this->mappingHelper->expects(self::any())->method('getFilePropertyName')
-            ->with($entity, null)
+        $this->mappingHelper->expects(self::once())->method('resolveField')
+            ->with($entity, 'product_image', 'coverFile')
+            ->willReturn('coverFile');
+        $this->storage->method('resolvePath')->willReturnMap([
+            [$entity, 'coverFile', null, true, 'covers/photo.jpg'],
+        ]);
+
+        $image = $this->createLoader()->load(new ImageReference('photo.jpg', ['entity' => $entity, 'field' => 'coverFile']));
+
+        self::assertSame('covers/photo.jpg', $image->path);
+    }
+
+    public function testLoadIgnoresANonStringFieldContextKey(): void
+    {
+        $entity = new stdClass();
+
+        $this->mappingHelper->expects(self::once())->method('resolveField')
+            ->with($entity, 'product_image', null)
             ->willReturn('imageFile');
 
-        $this->mappingHelper->expects(self::any())->method('getUploadDestination')
-            ->with($entity, null)
-            ->willReturn('/var/uploads');
-
-        $this->storage->expects(self::any())->method('resolvePath')
-            ->with($entity, 'imageFile', null, true)
-            ->willReturn('auto/detected.jpg');
-
-        $image = $this->loader->load(new ImageReference('photo.jpg', [
-            'entity' => $entity,
-        ]));
-
-        self::assertSame('auto/detected.jpg', $image->path);
-        self::assertSame('/var/uploads', $image->metadata['upload_destination']);
+        $this->createLoader()->load(new ImageReference('photo.jpg', ['entity' => $entity, 'field' => 42]));
     }
 
-    public function testLoadFallsBackWhenNoMappingFound(): void
+    public function testLoadLetsFieldResolutionErrorsThrough(): void
     {
-        $entity = new stdClass();
+        $failure = new InvalidImageReferenceException('Wrong mapping.');
+        $this->mappingHelper->method('resolveField')->willThrowException($failure);
 
-        $this->mappingHelper->expects(self::any())->method('getFilePropertyName')
-            ->with($entity, null)
-            ->willReturn(null);
+        $this->expectExceptionObject($failure);
 
-        $image = $this->loader->load(new ImageReference('photo.jpg', [
-            'entity' => $entity,
-        ]));
+        $this->createLoader()->load(new ImageReference('photo.jpg', ['entity' => new stdClass()]));
+    }
+
+    public function testLoadStripsLeadingSlash(): void
+    {
+        $this->mappingHelper->method('resolveField')->willReturn('imageFile');
+        $this->storage->method('resolvePath')->willReturn('/photo.jpg');
+
+        $image = $this->createLoader()->load(new ImageReference('photo.jpg', ['entity' => new stdClass()]));
 
         self::assertSame('photo.jpg', $image->path);
     }
 
-    public function testLoadWithEntityStripsLeadingSlash(): void
+    public function testLoadWithoutUploadedFileHasEmptyPath(): void
     {
-        $entity = new stdClass();
+        $this->mappingHelper->method('resolveField')->willReturn('imageFile');
+        $this->storage->method('resolvePath')->willReturn(null);
 
-        $this->mappingHelper->method('getFilePropertyName')
-            ->willReturn('imageFile');
-
-        $this->mappingHelper->method('getUploadDestination')
-            ->willReturn(null);
-
-        $this->storage->expects(self::any())->method('resolvePath')
-            ->with($entity, 'imageFile', null, true)
-            ->willReturn('/photo.jpg');
-
-        $image = $this->loader->load(new ImageReference('photo.jpg', [
-            'entity' => $entity,
-            'field' => 'imageFile',
-        ]));
-
-        self::assertSame('photo.jpg', $image->path);
-    }
-
-    public function testLoadWithEntityReturnsEmptyOnNull(): void
-    {
-        $entity = new stdClass();
-
-        $this->mappingHelper->method('getFilePropertyName')
-            ->willReturn('imageFile');
-
-        $this->mappingHelper->method('getUploadDestination')
-            ->willReturn(null);
-
-        $this->storage->method('resolvePath')
-            ->willReturn(null);
-
-        $image = $this->loader->load(new ImageReference('photo.jpg', [
-            'entity' => $entity,
-            'field' => 'imageFile',
-        ]));
+        $image = $this->createLoader()->load(new ImageReference('photo.jpg', ['entity' => new stdClass()]));
 
         self::assertSame('', $image->path);
     }
@@ -172,161 +134,38 @@ class VichUploaderLoaderTest extends TestCase
         $stream = fopen('php://memory', 'r+');
         self::assertNotFalse($stream);
 
-        $this->mappingHelper->method('getFilePropertyName')
-            ->willReturn('imageFile');
-
-        $this->mappingHelper->method('getUploadDestination')
-            ->willReturn('/var/uploads');
-
+        $this->mappingHelper->method('resolveField')->willReturn('imageFile');
         $this->storage->method('resolvePath')->willReturn('photo.jpg');
-        $this->storage->method('resolveStream')->willReturn($stream);
+        $this->storage->method('resolveStream')->willReturnMap([[$entity, 'imageFile', null, $stream]]);
 
-        $image = $this->loader->load(new ImageReference('photo.jpg', [
-            'entity' => $entity,
-            'field' => 'imageFile',
-        ]));
+        $image = $this->createLoader()->load(new ImageReference('photo.jpg', ['entity' => $entity]));
 
         self::assertInstanceOf(Closure::class, $image->stream);
         self::assertSame($stream, ($image->stream)());
-        self::assertSame('/var/uploads', $image->metadata['upload_destination']);
     }
 
     public function testLazyStreamReturnsNullOnException(): void
     {
-        $entity = new stdClass();
-
-        $this->mappingHelper->method('getFilePropertyName')
-            ->willReturn('imageFile');
-
-        $this->mappingHelper->method('getUploadDestination')
-            ->willReturn('/var/uploads');
-
+        $this->mappingHelper->method('resolveField')->willReturn('imageFile');
         $this->storage->method('resolvePath')->willReturn('photo.jpg');
-        $this->storage->method('resolveStream')
-            ->willThrowException(new RuntimeException('Stream not available'));
+        $this->storage->method('resolveStream')->willThrowException(new RuntimeException('Stream not available'));
 
-        $image = $this->loader->load(new ImageReference('photo.jpg', [
-            'entity' => $entity,
-            'field' => 'imageFile',
-        ]));
+        $image = $this->createLoader()->load(new ImageReference('photo.jpg', ['entity' => new stdClass()]));
 
         self::assertInstanceOf(Closure::class, $image->stream);
         self::assertNull($image->resolveStream());
-        self::assertSame('/var/uploads', $image->metadata['upload_destination']);
-    }
-
-    public function testGetSourceThrowsWithoutUploadDestination(): void
-    {
-        $this->expectException(InvalidMetadataException::class);
-        $this->expectExceptionMessage('Upload destination is required');
-        $this->loader->getSource([]);
-    }
-
-    public function testGetSourceReturnsFlysystemSourceWhenRegistered(): void
-    {
-        $filesystem = $this->createMock(FilesystemOperator::class);
-
-        $this->storageContainer->expects(self::any())->method('has')
-            ->with('uploads.storage.public')
-            ->willReturn(true);
-
-        $this->storageContainer->expects(self::any())->method('get')
-            ->with('uploads.storage.public')
-            ->willReturn($filesystem);
-
-        $source = $this->loader->getSource(['upload_destination' => 'uploads.storage.public']);
-
-        self::assertInstanceOf(FlysystemImageSource::class, $source);
-        self::assertSame($filesystem, $source->getStorage());
-    }
-
-    public function testGetSourceReturnsLocalSourceWhenNotInRegistry(): void
-    {
-        $this->storageContainer->expects(self::any())->method('has')
-            ->with('/var/uploads/images')
-            ->willReturn(false);
-
-        $source = $this->loader->getSource(['upload_destination' => '/var/uploads/images']);
-
-        self::assertInstanceOf(LocalImageSource::class, $source);
-        self::assertSame('/var/uploads/images', $source->getRoot());
-    }
-
-    public function testGetSourceReturnsLocalSourceWhenNoFlysystemRegistry(): void
-    {
-        $loader = new VichUploaderLoader($this->storage, $this->mappingHelper);
-
-        $source = $loader->getSource(['upload_destination' => '/var/uploads/images']);
-
-        self::assertInstanceOf(LocalImageSource::class, $source);
-        self::assertSame('/var/uploads/images', $source->getRoot());
-    }
-
-    public function testLoadWithNullUploadDestinationReturnsEmptyMetadata(): void
-    {
-        $entity = new stdClass();
-
-        $this->mappingHelper->method('getFilePropertyName')
-            ->willReturn('imageFile');
-
-        $this->mappingHelper->method('getUploadDestination')
-            ->willReturn(null);
-
-        $this->storage->method('resolvePath')->willReturn('photo.jpg');
-
-        $image = $this->loader->load(new ImageReference('photo.jpg', [
-            'entity' => $entity,
-            'field' => 'imageFile',
-        ]));
-
-        self::assertSame([], $image->metadata);
-    }
-
-    public function testLoadWithMultipleMappingsUsesCorrectDestination(): void
-    {
-        $entity = new stdClass();
-
-        $this->mappingHelper->expects(self::once())
-            ->method('getFilePropertyName')
-            ->with($entity, 'avatarFile')
-            ->willReturn('avatarFile');
-
-        $this->mappingHelper->expects(self::once())
-            ->method('getUploadDestination')
-            ->with($entity, 'avatarFile')
-            ->willReturn('/var/uploads/avatars');
-
-        $this->storage->expects(self::any())->method('resolvePath')
-            ->with($entity, 'avatarFile', null, true)
-            ->willReturn('users/avatar.jpg');
-
-        $image = $this->loader->load(new ImageReference('avatar.jpg', [
-            'entity' => $entity,
-            'field' => 'avatarFile',
-        ]));
-
-        self::assertSame('users/avatar.jpg', $image->path);
-        self::assertSame('/var/uploads/avatars', $image->metadata['upload_destination']);
     }
 
     public function testLoadWithMetadataReadsDimensionsAndMimeType(): void
     {
         $entity = new stdClass();
 
-        $this->mappingHelper->method('getFilePropertyName')->willReturn('imageFile');
-        $this->mappingHelper->method('getUploadDestination')->willReturn('/var/uploads');
-        $this->mappingHelper->expects(self::any())->method('readDimensions')
-            ->with($entity, 'imageFile')
-            ->willReturn([1024, 768]);
-        $this->mappingHelper->expects(self::any())->method('readMimeType')
-            ->with($entity, 'imageFile')
-            ->willReturn('image/jpeg');
+        $this->mappingHelper->method('resolveField')->willReturn('imageFile');
+        $this->mappingHelper->expects(self::once())->method('readDimensions')->with($entity, 'imageFile')->willReturn([1024, 768]);
+        $this->mappingHelper->expects(self::once())->method('readMimeType')->with($entity, 'imageFile')->willReturn('image/jpeg');
         $this->storage->method('resolvePath')->willReturn('photo.jpg');
 
-        $image = $this->loader->load(new ImageReference('photo.jpg', [
-            'entity' => $entity,
-            'field' => 'imageFile',
-        ]), withMetadata: true);
+        $image = $this->createLoader()->load(new ImageReference('photo.jpg', ['entity' => $entity]), withMetadata: true);
 
         self::assertSame(1024, $image->width);
         self::assertSame(768, $image->height);
@@ -335,18 +174,12 @@ class VichUploaderLoaderTest extends TestCase
 
     public function testLoadWithMetadataReturnsNullWhenAttributesNotConfigured(): void
     {
-        $entity = new stdClass();
-
-        $this->mappingHelper->method('getFilePropertyName')->willReturn('imageFile');
-        $this->mappingHelper->method('getUploadDestination')->willReturn('/var/uploads');
+        $this->mappingHelper->method('resolveField')->willReturn('imageFile');
         $this->mappingHelper->method('readDimensions')->willReturn(null);
         $this->mappingHelper->method('readMimeType')->willReturn(null);
         $this->storage->method('resolvePath')->willReturn('photo.jpg');
 
-        $image = $this->loader->load(new ImageReference('photo.jpg', [
-            'entity' => $entity,
-            'field' => 'imageFile',
-        ]), withMetadata: true);
+        $image = $this->createLoader()->load(new ImageReference('photo.jpg', ['entity' => new stdClass()]), withMetadata: true);
 
         self::assertNull($image->width);
         self::assertNull($image->height);
@@ -355,20 +188,65 @@ class VichUploaderLoaderTest extends TestCase
 
     public function testLoadWithoutMetadataSkipsDimensionReading(): void
     {
-        $entity = new stdClass();
-
-        $this->mappingHelper->method('getFilePropertyName')->willReturn('imageFile');
-        $this->mappingHelper->method('getUploadDestination')->willReturn('/var/uploads');
+        $this->mappingHelper->method('resolveField')->willReturn('imageFile');
         $this->mappingHelper->expects(self::never())->method('readDimensions');
         $this->mappingHelper->expects(self::never())->method('readMimeType');
         $this->storage->method('resolvePath')->willReturn('photo.jpg');
 
-        $image = $this->loader->load(new ImageReference('photo.jpg', [
-            'entity' => $entity,
-            'field' => 'imageFile',
-        ]));
+        $image = $this->createLoader()->load(new ImageReference('photo.jpg', ['entity' => new stdClass()]));
 
         self::assertNull($image->width);
         self::assertNull($image->height);
+    }
+
+    public function testGetSourceReadsTheFlysystemStorageNamedByTheUploadDestination(): void
+    {
+        $filesystem = self::createStub(FilesystemOperator::class);
+        $storages = self::createStub(ContainerInterface::class);
+        $storages->method('has')->willReturnMap([['products.storage', true]]);
+        $storages->method('get')->willReturnMap([['products.storage', $filesystem]]);
+
+        $source = $this->createLoader('products.storage', new FlysystemRegistry($storages))->getSource();
+
+        self::assertInstanceOf(FlysystemImageSource::class, $source);
+        self::assertSame($filesystem, $source->getStorage());
+    }
+
+    public function testGetSourceReadsALocalUploadDestination(): void
+    {
+        $storages = self::createStub(ContainerInterface::class);
+        $storages->method('has')->willReturn(false);
+
+        $source = $this->createLoader('/var/uploads/products', new FlysystemRegistry($storages))->getSource();
+
+        self::assertInstanceOf(LocalImageSource::class, $source);
+        self::assertSame('/var/uploads/products', $source->getRoot());
+    }
+
+    public function testGetSourceReadsALocalUploadDestinationWithoutFlysystem(): void
+    {
+        $source = $this->createLoader('/var/uploads/products')->getSource();
+
+        self::assertInstanceOf(LocalImageSource::class, $source);
+        self::assertSame('/var/uploads/products', $source->getRoot());
+    }
+
+    public function testEachMappingReadsFromItsOwnUploadDestination(): void
+    {
+        $avatars = new VichUploaderLoader($this->storage, $this->mappingHelper, 'avatar_image', '/var/uploads/avatars');
+        $covers = new VichUploaderLoader($this->storage, $this->mappingHelper, 'cover_image', '/var/uploads/covers');
+
+        $avatarSource = $avatars->getSource();
+        $coverSource = $covers->getSource();
+
+        self::assertInstanceOf(LocalImageSource::class, $avatarSource);
+        self::assertInstanceOf(LocalImageSource::class, $coverSource);
+        self::assertSame('/var/uploads/avatars', $avatarSource->getRoot());
+        self::assertSame('/var/uploads/covers', $coverSource->getRoot());
+    }
+
+    private function createLoader(string $uploadDestination = '/var/uploads', ?FlysystemRegistry $flysystemRegistry = null): VichUploaderLoader
+    {
+        return new VichUploaderLoader($this->storage, $this->mappingHelper, 'product_image', $uploadDestination, $flysystemRegistry);
     }
 }

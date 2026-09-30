@@ -37,16 +37,16 @@ class MultiConfigKernel extends AbstractPicassoKernel
             'loaders' => [
                 'primary' => [
                     'type' => 'filesystem',
-                    'paths' => [dirname(__DIR__) . '/Fixtures'],
+                    'path' => dirname(__DIR__) . '/Fixtures',
                 ],
                 'secondary' => [
                     'type' => 'filesystem',
-                    'paths' => [dirname(__DIR__) . '/Fixtures'],
+                    'path' => dirname(__DIR__) . '/Fixtures',
                 ],
                 'disabled_loader' => [
                     'type' => 'filesystem',
                     'enabled' => false,
-                    'paths' => ['/nonexistent'],
+                    'path' => '/nonexistent',
                 ],
             ],
             'transformers' => [

@@ -24,7 +24,7 @@ use Symfony\Component\Config\FileLocator;
 
 /**
  * @phpstan-type PlaceholderConfig array{enabled: bool, type: string|null, size: int, blur: int, quality: int, components_x: int, components_y: int, service: string|null}
- * @phpstan-type LoaderConfig array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null}
+ * @phpstan-type LoaderConfig array{enabled: bool, type: string|null, path: string|null, paths: mixed, mapping: string|null, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null}
  * @phpstan-type PublicCacheConfig array{enabled: bool, prefix: string}
  * @phpstan-type TransformerConfig array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, defer_cache_write: bool, public_cache: PublicCacheConfig}
  * @phpstan-type PicassoConfig array{
@@ -417,13 +417,13 @@ class ConfigurationTest extends TestCase
             'loaders' => [
                 'my_fs' => [
                     'type' => 'filesystem',
-                    'paths' => ['/var/images', '/opt/assets'],
+                    'path' => '/var/images',
                 ],
             ],
         ]);
 
         self::assertSame('filesystem', $config['loaders']['my_fs']['type']);
-        self::assertSame(['/var/images', '/opt/assets'], $config['loaders']['my_fs']['paths']);
+        self::assertSame('/var/images', $config['loaders']['my_fs']['path']);
         self::assertTrue($config['loaders']['my_fs']['enabled']);
     }
 
@@ -433,7 +433,7 @@ class ConfigurationTest extends TestCase
             'loaders' => [
                 'my_fs' => [
                     'type' => 'filesystem',
-                    'paths' => ['/var/images'],
+                    'path' => '/var/images',
                     'default_placeholder' => 'blurhash',
                 ],
             ],
@@ -448,7 +448,7 @@ class ConfigurationTest extends TestCase
             'loaders' => [
                 'my_fs' => [
                     'type' => 'filesystem',
-                    'paths' => ['/var/images'],
+                    'path' => '/var/images',
                 ],
             ],
         ]);
@@ -462,7 +462,7 @@ class ConfigurationTest extends TestCase
             'loaders' => [
                 'my_fs' => [
                     'type' => 'filesystem',
-                    'paths' => ['/var/images'],
+                    'path' => '/var/images',
                     'default_transformer' => 'glide',
                 ],
             ],
@@ -477,7 +477,7 @@ class ConfigurationTest extends TestCase
             'loaders' => [
                 'my_fs' => [
                     'type' => 'filesystem',
-                    'paths' => ['/var/images'],
+                    'path' => '/var/images',
                 ],
             ],
         ]);
@@ -564,9 +564,11 @@ class ConfigurationTest extends TestCase
             'loaders' => [
                 'vich_products' => [
                     'type' => 'vich',
+                    'mapping' => 'product_image',
                 ],
                 'vich_avatars' => [
                     'type' => 'vich',
+                    'mapping' => 'avatar_image',
                 ],
             ],
         ]);
@@ -624,7 +626,7 @@ class ConfigurationTest extends TestCase
         $config = $this->processConfig([
             'loaders' => [
                 'filesystem' => [
-                    'paths' => ['/var/images'],
+                    'path' => '/var/images',
                 ],
             ],
         ]);
@@ -640,7 +642,7 @@ class ConfigurationTest extends TestCase
                 'unused' => [
                     'type' => 'filesystem',
                     'enabled' => false,
-                    'paths' => ['/nonexistent'],
+                    'path' => '/nonexistent',
                 ],
             ],
         ]);
@@ -654,37 +656,52 @@ class ConfigurationTest extends TestCase
             'loaders' => [
                 'images_a' => [
                     'type' => 'filesystem',
-                    'paths' => ['/var/images-a'],
+                    'path' => '/var/images-a',
                 ],
                 'images_b' => [
                     'type' => 'filesystem',
-                    'paths' => ['/var/images-b'],
+                    'path' => '/var/images-b',
                 ],
                 'images_c' => [
                     'type' => 'filesystem',
-                    'paths' => ['/var/images-c'],
+                    'path' => '/var/images-c',
                 ],
             ],
         ]);
 
         self::assertCount(3, $config['loaders']);
-        self::assertSame(['/var/images-a'], $config['loaders']['images_a']['paths']);
-        self::assertSame(['/var/images-b'], $config['loaders']['images_b']['paths']);
-        self::assertSame(['/var/images-c'], $config['loaders']['images_c']['paths']);
+        self::assertSame('/var/images-a', $config['loaders']['images_a']['path']);
+        self::assertSame('/var/images-b', $config['loaders']['images_b']['path']);
+        self::assertSame('/var/images-c', $config['loaders']['images_c']['path']);
     }
 
-    public function testMultiplePathsForFilesystemLoader(): void
+    public function testRemovedPathsOptionExplainsTheMigration(): void
     {
-        $config = $this->processConfig([
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('The "paths" option was removed in 2.0. Declare one filesystem loader per directory, each with its own "path"');
+
+        $this->processConfig([
             'loaders' => [
                 'multi_path' => [
                     'type' => 'filesystem',
-                    'paths' => ['/var/uploads', '/var/assets', '/opt/media'],
+                    'paths' => ['/var/uploads', '/var/assets'],
+                ],
+            ],
+        ]);
+    }
+
+    public function testVichLoaderMappingConfig(): void
+    {
+        $config = $this->processConfig([
+            'loaders' => [
+                'products' => [
+                    'type' => 'vich',
+                    'mapping' => 'product_image',
                 ],
             ],
         ]);
 
-        self::assertCount(3, $config['loaders']['multi_path']['paths']);
+        self::assertSame('product_image', $config['loaders']['products']['mapping']);
     }
 
     // --- Transformer configuration ---
@@ -960,7 +977,7 @@ class ConfigurationTest extends TestCase
             'loaders' => [
                 'local_fs' => [
                     'type' => 'filesystem',
-                    'paths' => ['/var/images'],
+                    'path' => '/var/images',
                 ],
                 'cloud' => [
                     'type' => 'flysystem',
@@ -1027,7 +1044,7 @@ class ConfigurationTest extends TestCase
             'loaders' => [
                 'uploads' => [
                     'type' => 'filesystem',
-                    'paths' => ['/var/www/uploads', '/var/www/assets'],
+                    'path' => '/var/www/uploads',
                 ],
                 'cloud_storage' => [
                     'type' => 'flysystem',
@@ -1046,7 +1063,7 @@ class ConfigurationTest extends TestCase
                 'legacy' => [
                     'type' => 'filesystem',
                     'enabled' => false,
-                    'paths' => ['/old/images'],
+                    'path' => '/old/images',
                 ],
             ],
             'transformers' => [

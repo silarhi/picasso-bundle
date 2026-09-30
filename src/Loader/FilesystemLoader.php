@@ -13,57 +13,35 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Loader;
 
-use function count;
-use function is_string;
-
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
-use Silarhi\PicassoBundle\Exception\InvalidMetadataException;
 use Silarhi\PicassoBundle\Source\LocalImageSource;
 
+/**
+ * Reads images from one local directory.
+ */
 final readonly class FilesystemLoader implements ServableLoaderInterface
 {
-    /**
-     * @param list<string> $paths
-     */
-    public function __construct(private array $paths)
+    private LocalImageSource $source;
+
+    public function __construct(string $path)
     {
+        $this->source = new LocalImageSource($path);
     }
 
     public function load(ImageReference $reference, bool $withMetadata = false): Image
     {
         $path = ltrim($reference->path ?? '', '/');
 
-        foreach ($this->paths as $basePath) {
-            $source = new LocalImageSource($basePath);
-
-            if (!$source->exists($path)) {
-                continue;
-            }
-
-            $metadata = [];
-
-            if (count($this->paths) > 1) {
-                $metadata['path'] = $basePath;
-            }
-
-            return new Image(path: $path, stream: static fn () => $source->readStream($path), metadata: $metadata);
+        if (!$this->source->exists($path)) {
+            return new Image(path: $path);
         }
 
-        return new Image(path: $path);
+        return new Image(path: $path, stream: fn () => $this->source->readStream($path));
     }
 
-    /** @param array<string, mixed> $metadata */
-    public function getSource(array $metadata): LocalImageSource
+    public function getSource(): LocalImageSource
     {
-        if (isset($metadata['path']) && is_string($metadata['path'])) {
-            return new LocalImageSource($metadata['path']);
-        }
-
-        if (1 === count($this->paths)) {
-            return new LocalImageSource($this->paths[0]);
-        }
-
-        throw new InvalidMetadataException('No path found in metadata and multiple paths configured.');
+        return $this->source;
     }
 }

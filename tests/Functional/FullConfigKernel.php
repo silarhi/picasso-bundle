@@ -59,20 +59,20 @@ class FullConfigKernel extends AbstractPicassoKernel
             'loaders' => [
                 'main' => [
                     'type' => 'filesystem',
-                    'paths' => [dirname(__DIR__) . '/Fixtures'],
+                    'path' => dirname(__DIR__) . '/Fixtures',
                 ],
                 'secondary_fs' => [
                     'type' => 'filesystem',
-                    'paths' => [dirname(__DIR__) . '/Fixtures'],
+                    'path' => dirname(__DIR__) . '/Fixtures',
                 ],
                 'third_fs' => [
                     'type' => 'filesystem',
-                    'paths' => [dirname(__DIR__) . '/Fixtures', dirname(__DIR__, 2) . '/templates'],
+                    'path' => dirname(__DIR__) . '/Fixtures',
                 ],
                 'disabled_loader' => [
                     'type' => 'filesystem',
                     'enabled' => false,
-                    'paths' => ['/nonexistent'],
+                    'path' => '/nonexistent',
                 ],
             ],
             'transformers' => [

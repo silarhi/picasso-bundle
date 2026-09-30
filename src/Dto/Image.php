@@ -18,9 +18,6 @@ use Throwable;
 
 final readonly class Image
 {
-    /**
-     * @param array<string, mixed> $metadata
-     */
     public function __construct(
         public ?string $path = null,
         /** @var (Closure(): (resource|null))|resource|null */
@@ -28,7 +25,6 @@ final readonly class Image
         public ?int $width = null,
         public ?int $height = null,
         public ?string $mimeType = null,
-        public array $metadata = [],
     ) {
     }
 
