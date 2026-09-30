@@ -953,6 +953,8 @@ picasso:
 
 > **Important:** When using Glide, you must [import the bundle routes](#routes) so that the image controller can serve transformed images.
 
+Glide URLs are stable: the same image and transformation always produce the same URL, including the signature and the encrypted `_metadata` parameter some loaders (e.g. Vich) add. A thumbnail used several times in a page, or across pages, is fetched once and caches cleanly in browsers and CDNs.
+
 #### Storing the Glide cache on Flysystem
 
 The `cache` option is polymorphic: pass a local path _or_ the name of a [Flysystem bundle](https://github.com/thephpleague/flysystem-bundle) storage. The bundle resolves the name at boot via its internal `FlysystemRegistry` (the same one used by the Vich loader) — if no storage matches, the value is treated as a path. This lets you keep sources and derivatives on different Flysystem instances:
