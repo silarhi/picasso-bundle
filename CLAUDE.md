@@ -27,6 +27,9 @@ src/
 │                       #   VichUploaderLoader, VichMappingHelper + interfaces
 │                       #   (ImageLoaderInterface, ServableLoaderInterface, VichMappingHelperInterface)
 ├── Placeholder/        # TransformerPlaceholder, BlurHashPlaceholder + PlaceholderInterface
+├── Source/             # ImageSourceInterface + LocalImageSource, FlysystemImageSource
+│                       #   (read access to originals for local transformers) and
+│                       #   ImageSourceFlysystemAdapter (read-only Flysystem bridge used by Glide)
 ├── Service/            # CacheKeyGenerator, ImageHelper, ImageHelperInterface, ImagePipeline,
 │                       #   LoaderRegistry, TransformerRegistry, PlaceholderRegistry,
 │                       #   SrcsetGenerator, MetadataGuesser, MetadataGuesserInterface, UrlEncryption
@@ -90,9 +93,13 @@ composer normalize
 ## Architecture Notes
 
 - **Loaders** fetch image data from a source (filesystem, Flysystem, URL, Vich). They implement `ImageLoaderInterface` and are registered via the `#[AsImageLoader('name')]` attribute or the `picasso.loader` service tag.
-    - `ServableLoaderInterface` extends `ImageLoaderInterface` for loaders that can provide direct filesystem access (used by local transformers like Glide).
+    - `ServableLoaderInterface` extends `ImageLoaderInterface` for loaders whose originals local transformers (like Glide) can serve. `getSource()` returns an `ImageSourceInterface` (see **Sources**), never a storage-library type, so loaders stay independent of what the transformer is built on.
     - `UrlLoader` loads images from remote URLs via Symfony HttpClient.
     - `FlysystemRegistry` manages multiple named Flysystem storage instances.
+- **Sources** (`src/Source/`) are the read access to originals behind a servable loader. `ImageSourceInterface` has two methods: `exists(path)` and `readStream(path)` (throws `ImageNotFoundException`). Paths are relative to the source root.
+    - `LocalImageSource` reads a local directory with no Flysystem dependency. It resolves `.`/`..` itself and treats paths escaping the root, empty paths and null bytes as missing. `FilesystemLoader::load()` uses it too, so rendering and serving share the same path handling.
+    - `FlysystemImageSource` wraps a `FilesystemOperator`. Flysystem failures are reported as missing (`exists()` → false, `readStream()` → `ImageNotFoundException`); other errors propagate unchanged.
+    - `ImageSourceFlysystemAdapter` is a read-only Flysystem `FilesystemAdapter` over any source, used by `GlideTransformer::serve()` (`new Filesystem(new ImageSourceFlysystemAdapter($loader->getSource(...)))`). It translates bundle exceptions to Flysystem ones (`UnableToReadFile`, `UnableToCheckFileExistence`) so Glide's own error mapping is unchanged, refuses writes and metadata lookups, and exposes no directories (`directoryExists()` → false, empty `listContents()`). It must only use exception factories that exist in Flysystem 2 (e.g. not `UnableToListContents`/`UnableToCheckDirectoryExistence`, both 3.x-only). Wrapping it in `League\Flysystem\Filesystem` keeps Flysystem's path-traversal check on the serve path.
 - **Transformers** generate URLs for on-demand image transformation (Glide locally, Imgix via CDN). They implement `ImageTransformerInterface` and are registered via the `#[AsImageTransformer('name')]` attribute or the `picasso.transformer` service tag.
     - `LocalTransformerInterface` extends `ImageTransformerInterface` for transformers that serve images locally (e.g., Glide) and need a loader to access source files.
     - `PurgableTransformerInterface` extends `ImageTransformerInterface` for transformers that support cache purging. GlideTransformer purges via `Server::deleteCache()` (standard mode) or Flysystem directory deletion (public cache mode). ImgixTransformer purges via the Imgix Management API (`POST /api/v1/purge`) when an `api_key` and PSR-18 HTTP client are configured.
@@ -202,7 +209,8 @@ When making API changes, update the following:
 
 ## Common Patterns
 
-- **Adding a new loader**: Create a class implementing `ImageLoaderInterface` (or `ServableLoaderInterface` if it provides filesystem access), add `#[AsImageLoader('name')]`, and it auto-registers.
+- **Adding a new loader**: Create a class implementing `ImageLoaderInterface` (or `ServableLoaderInterface` if local transformers should serve its images), add `#[AsImageLoader('name')]`, and it auto-registers.
+- **Adding a new source**: Implement `ImageSourceInterface` (`exists()` + `readStream()`) and return it from a servable loader's `getSource()`. Glide reads it through `ImageSourceFlysystemAdapter`, so no Flysystem adapter is needed.
 - **Adding a new transformer**: Create a class implementing `ImageTransformerInterface` (or `LocalTransformerInterface` for local serving, or `PurgableTransformerInterface` for cache purge support), add `#[AsImageTransformer('name')]`, and it auto-registers.
 - **Adding a new placeholder**: Create a class implementing `PlaceholderInterface`, add `#[AsPlaceholder('name')]`, and it auto-registers. Alternatively, configure via `type: service` in the `placeholders` config.
 - **Bundle configuration**: All config options are defined in `PicassoBundle::configure()` and wired in `PicassoBundle::loadExtension()`.

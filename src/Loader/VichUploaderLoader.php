@@ -16,10 +16,12 @@ namespace Silarhi\PicassoBundle\Loader;
 use function is_object;
 use function is_string;
 
-use League\Flysystem\FilesystemOperator;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Exception\InvalidMetadataException;
+use Silarhi\PicassoBundle\Source\FlysystemImageSource;
+use Silarhi\PicassoBundle\Source\ImageSourceInterface;
+use Silarhi\PicassoBundle\Source\LocalImageSource;
 use Vich\UploaderBundle\Storage\StorageInterface;
 
 final readonly class VichUploaderLoader implements ServableLoaderInterface
@@ -74,7 +76,7 @@ final readonly class VichUploaderLoader implements ServableLoaderInterface
     }
 
     /** @param array<string, mixed> $metadata */
-    public function getSource(array $metadata): FilesystemOperator|string
+    public function getSource(array $metadata): ImageSourceInterface
     {
         $uploadDestination = $metadata['upload_destination'] ?? null;
         if (!is_string($uploadDestination)) {
@@ -82,9 +84,9 @@ final readonly class VichUploaderLoader implements ServableLoaderInterface
         }
 
         if (null !== $this->flysystemRegistry && $this->flysystemRegistry->has($uploadDestination)) {
-            return $this->flysystemRegistry->get($uploadDestination);
+            return new FlysystemImageSource($this->flysystemRegistry->get($uploadDestination));
         }
 
-        return $uploadDestination;
+        return new LocalImageSource($uploadDestination);
     }
 }

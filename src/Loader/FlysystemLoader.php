@@ -16,12 +16,15 @@ namespace Silarhi\PicassoBundle\Loader;
 use League\Flysystem\FilesystemOperator;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
+use Silarhi\PicassoBundle\Source\FlysystemImageSource;
 
 final readonly class FlysystemLoader implements ServableLoaderInterface
 {
-    public function __construct(
-        private FilesystemOperator $storage,
-    ) {
+    private FlysystemImageSource $source;
+
+    public function __construct(FilesystemOperator $storage)
+    {
+        $this->source = new FlysystemImageSource($storage);
     }
 
     public function load(ImageReference $reference, bool $withMetadata = false): Image
@@ -31,12 +34,12 @@ final readonly class FlysystemLoader implements ServableLoaderInterface
             return new Image();
         }
 
-        return new Image(path: $path, stream: fn () => $this->storage->readStream($path));
+        return new Image(path: $path, stream: fn () => $this->source->readStream($path));
     }
 
     /** @param array<string, mixed> $metadata */
-    public function getSource(array $metadata): FilesystemOperator
+    public function getSource(array $metadata): FlysystemImageSource
     {
-        return $this->storage;
+        return $this->source;
     }
 }

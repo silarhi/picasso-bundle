@@ -22,8 +22,6 @@ use function is_scalar;
 
 use JsonException;
 use League\Flysystem\Filesystem;
-use League\Flysystem\FilesystemOperator;
-use League\Flysystem\Local\LocalFilesystemAdapter;
 use League\Glide\Filesystem\FileNotFoundException;
 use League\Glide\Filesystem\FilesystemException;
 use League\Glide\Responses\SymfonyResponseFactory;
@@ -43,6 +41,7 @@ use Silarhi\PicassoBundle\Exception\UndecodableImageException;
 use Silarhi\PicassoBundle\Loader\FlysystemRegistry;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
 use Silarhi\PicassoBundle\Service\UrlEncryption;
+use Silarhi\PicassoBundle\Source\ImageSourceFlysystemAdapter;
 
 use function sprintf;
 
@@ -232,14 +231,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
 
         /** @var array<string, mixed> $metadata */
         $source = $loader->getSource($metadata);
-        if ($source instanceof FilesystemOperator) {
-            $sourceFilesystem = $source;
-        } else {
-            /** @var string $source */
-            $sourceFilesystem = new Filesystem(new LocalFilesystemAdapter($source));
-        }
-
-        $this->server->setSource($sourceFilesystem);
+        $this->server->setSource(new Filesystem(new ImageSourceFlysystemAdapter($source)));
         $this->server->setResponseFactory(new SymfonyResponseFactory($request));
         $this->server->setCachePathCallable($cachePathCallable);
 

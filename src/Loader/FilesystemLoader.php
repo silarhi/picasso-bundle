@@ -19,6 +19,7 @@ use function is_string;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Exception\InvalidMetadataException;
+use Silarhi\PicassoBundle\Source\LocalImageSource;
 
 final readonly class FilesystemLoader implements ServableLoaderInterface
 {
@@ -34,9 +35,9 @@ final readonly class FilesystemLoader implements ServableLoaderInterface
         $path = ltrim($reference->path ?? '', '/');
 
         foreach ($this->paths as $basePath) {
-            $absolutePath = rtrim($basePath, '/') . '/' . $path;
+            $source = new LocalImageSource($basePath);
 
-            if (!is_file($absolutePath)) {
+            if (!$source->exists($path)) {
                 continue;
             }
 
@@ -46,27 +47,21 @@ final readonly class FilesystemLoader implements ServableLoaderInterface
                 $metadata['path'] = $basePath;
             }
 
-            $stream = static function () use ($absolutePath) {
-                $handle = @fopen($absolutePath, 'r');
-
-                return false !== $handle ? $handle : null;
-            };
-
-            return new Image(path: $path, stream: $stream, metadata: $metadata);
+            return new Image(path: $path, stream: static fn () => $source->readStream($path), metadata: $metadata);
         }
 
         return new Image(path: $path);
     }
 
     /** @param array<string, mixed> $metadata */
-    public function getSource(array $metadata): string
+    public function getSource(array $metadata): LocalImageSource
     {
         if (isset($metadata['path']) && is_string($metadata['path'])) {
-            return $metadata['path'];
+            return new LocalImageSource($metadata['path']);
         }
 
         if (1 === count($this->paths)) {
-            return $this->paths[0];
+            return new LocalImageSource($this->paths[0]);
         }
 
         throw new InvalidMetadataException('No path found in metadata and multiple paths configured.');

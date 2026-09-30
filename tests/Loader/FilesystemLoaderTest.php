@@ -48,12 +48,20 @@ class FilesystemLoaderTest extends TestCase
         self::assertNull($image->stream);
     }
 
+    public function testLoadDoesNotResolvePathsOutsideTheBaseDirectory(): void
+    {
+        $loader = new FilesystemLoader([self::$fixturesDir . '/Entity']);
+        $image = $loader->load(new ImageReference('../photo.jpg'));
+
+        self::assertNull($image->stream);
+    }
+
     public function testGetSourceReturnsPathFromMetadata(): void
     {
         $loader = new FilesystemLoader(['/var/www/uploads', '/var/www/images']);
         $source = $loader->getSource(['path' => '/var/www/images']);
 
-        self::assertSame('/var/www/images', $source);
+        self::assertSame('/var/www/images', $source->getRoot());
     }
 
     public function testGetSourceReturnsSinglePath(): void
@@ -61,7 +69,7 @@ class FilesystemLoaderTest extends TestCase
         $loader = new FilesystemLoader(['/var/www/uploads']);
         $source = $loader->getSource([]);
 
-        self::assertSame('/var/www/uploads', $source);
+        self::assertSame('/var/www/uploads', $source->getRoot());
     }
 
     public function testGetSourceThrowsOnMultiplePathsWithoutMetadata(): void

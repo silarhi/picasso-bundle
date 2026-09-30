@@ -925,7 +925,55 @@ class S3Loader implements ImageLoaderInterface
 }
 ```
 
-If your loader provides direct filesystem access for local transformers (like Glide), implement `ServableLoaderInterface` instead.
+If local transformers (like Glide) should serve your loader's images, implement `ServableLoaderInterface` instead. Its `getSource()` method returns an `ImageSourceInterface`, the read access used to fetch originals when a transformed image is requested. Two implementations ship with the bundle:
+
+- `LocalImageSource` reads from a local directory (paths escaping it via `..` are treated as missing).
+- `FlysystemImageSource` reads from a Flysystem storage.
+
+Any other storage works by implementing the two methods of `ImageSourceInterface` yourself, without writing a Flysystem adapter:
+
+```php
+use Silarhi\PicassoBundle\Attribute\AsImageLoader;
+use Silarhi\PicassoBundle\Dto\Image;
+use Silarhi\PicassoBundle\Dto\ImageReference;
+use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
+use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
+use Silarhi\PicassoBundle\Source\ImageSourceInterface;
+
+final class BlobImageSource implements ImageSourceInterface
+{
+    public function __construct(private BlobRepository $blobs) {}
+
+    public function exists(string $path): bool
+    {
+        return $this->blobs->has($path);
+    }
+
+    public function readStream(string $path)
+    {
+        return $this->blobs->openStream($path)
+            ?? throw new ImageNotFoundException(sprintf('Blob "%s" not found.', $path));
+    }
+}
+
+#[AsImageLoader('blob')]
+final class BlobLoader implements ServableLoaderInterface
+{
+    public function __construct(private BlobImageSource $source) {}
+
+    public function load(ImageReference $reference, bool $withMetadata = false): Image
+    {
+        $path = $reference->path ?? '';
+
+        return new Image(path: $path, stream: fn () => $this->source->readStream($path));
+    }
+
+    public function getSource(array $metadata): ImageSourceInterface
+    {
+        return $this->source;
+    }
+}
+```
 
 ## Transformers
 

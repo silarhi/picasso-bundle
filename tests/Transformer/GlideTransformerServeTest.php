@@ -35,6 +35,9 @@ use Silarhi\PicassoBundle\Exception\UndecodableImageException;
 use Silarhi\PicassoBundle\Loader\FlysystemRegistry;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
 use Silarhi\PicassoBundle\Service\UrlEncryption;
+use Silarhi\PicassoBundle\Source\FlysystemImageSource;
+use Silarhi\PicassoBundle\Source\ImageSourceInterface;
+use Silarhi\PicassoBundle\Source\LocalImageSource;
 use Silarhi\PicassoBundle\Tests\Transformer\Stub\RacyCacheAdapter;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 
@@ -134,7 +137,7 @@ class GlideTransformerServeTest extends TestCase
         $transformer = $this->createTransformer($this->tempDir . '/cache');
 
         $loader = self::createStub(ServableLoaderInterface::class);
-        $loader->method('getSource')->willReturn(new Filesystem(new LocalFilesystemAdapter(__DIR__ . '/../Fixtures')));
+        $loader->method('getSource')->willReturn(new FlysystemImageSource(new Filesystem(new LocalFilesystemAdapter(__DIR__ . '/../Fixtures'))));
 
         $response = $transformer->serve(
             $loader,
@@ -147,6 +150,58 @@ class GlideTransformerServeTest extends TestCase
         self::assertSame('image/webp', $response->headers->get('Content-Type'));
     }
 
+    public function testServeReadsSourceFromCustomImageSource(): void
+    {
+        $contents = (string) file_get_contents(__DIR__ . '/../Fixtures/photo.jpg');
+        $source = new class($contents) implements ImageSourceInterface {
+            public function __construct(private readonly string $contents)
+            {
+            }
+
+            public function exists(string $path): bool
+            {
+                return 'db/42.jpg' === $path;
+            }
+
+            public function readStream(string $path)
+            {
+                $stream = fopen('php://memory', 'r+');
+                assert(false !== $stream);
+                fwrite($stream, $this->contents);
+                rewind($stream);
+
+                return $stream;
+            }
+        };
+
+        $loader = self::createStub(ServableLoaderInterface::class);
+        $loader->method('getSource')->willReturn($source);
+
+        $response = $this->createTransformer($this->tempDir . '/cache')->serve(
+            $loader,
+            'db/42.jpg',
+            $this->createSignedRequest('db/42.jpg', ['w' => '10', 'fm' => 'webp']),
+            ['transformer' => 'glide', 'loader' => 'custom'],
+        );
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('image/webp', $response->headers->get('Content-Type'));
+    }
+
+    public function testServeThrowsImageNotFoundForPathEscapingTheSource(): void
+    {
+        $transformer = $this->createTransformer($this->tempDir . '/cache');
+
+        $this->expectException(ImageNotFoundException::class);
+
+        $transformer->serve(
+            $this->createLoader(__DIR__ . '/../Fixtures/Entity'),
+            '../photo.jpg',
+            $this->createSignedRequest('../photo.jpg', ['w' => '10']),
+            ['transformer' => 'glide', 'loader' => 'filesystem'],
+        );
+    }
+
     public function testServeRethrowsUnexpectedErrorsUnchanged(): void
     {
         // Not a Flysystem exception, so Glide lets it through untouched
@@ -155,7 +210,7 @@ class GlideTransformerServeTest extends TestCase
         $source->method('fileExists')->willThrowException($failure);
 
         $loader = self::createStub(ServableLoaderInterface::class);
-        $loader->method('getSource')->willReturn($source);
+        $loader->method('getSource')->willReturn(new FlysystemImageSource($source));
 
         $transformer = $this->createTransformer($this->tempDir . '/cache');
 
@@ -386,7 +441,7 @@ class GlideTransformerServeTest extends TestCase
     private function createLoader(string $sourceDir): ServableLoaderInterface
     {
         $loader = self::createStub(ServableLoaderInterface::class);
-        $loader->method('getSource')->willReturn($sourceDir);
+        $loader->method('getSource')->willReturn(new LocalImageSource($sourceDir));
 
         return $loader;
     }
