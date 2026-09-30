@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Tests\Service;
 
+use Closure;
 use InvalidArgumentException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -20,11 +21,14 @@ use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
+use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
 use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
+use Silarhi\PicassoBundle\Transformer\PurgableTransformerInterface;
+use Symfony\Component\DependencyInjection\ServiceLocator;
 
 class ImagePipelineTest extends TestCase
 {
@@ -37,14 +41,14 @@ class ImagePipelineTest extends TestCase
         $this->loader = $this->createMock(ImageLoaderInterface::class);
         $this->transformer = $this->createMock(ImageTransformerInterface::class);
 
-        $loaderLocator = $this->createMock(ContainerInterface::class);
+        $loaderLocator = self::createStub(ContainerInterface::class);
         $loaderLocator->method('has')->willReturnCallback(static fn (string $key): bool => 'filesystem' === $key);
         $loaderLocator->method('get')->willReturnCallback(fn (string $key): MockObject => match ($key) {
             'filesystem' => $this->loader,
             default => throw new InvalidArgumentException("Unknown loader: $key"),
         });
 
-        $transformerLocator = $this->createMock(ContainerInterface::class);
+        $transformerLocator = self::createStub(ContainerInterface::class);
         $transformerLocator->method('has')->willReturnCallback(static fn (string $key): bool => 'glide' === $key);
         $transformerLocator->method('get')->willReturnCallback(fn (string $key): MockObject => match ($key) {
             'glide' => $this->transformer,
@@ -109,5 +113,62 @@ class ImagePipelineTest extends TestCase
 
         self::assertSame(800, $result->width);
         self::assertSame(600, $result->height);
+    }
+
+    public function testPurgeDelegatesToTransformerWithDefaultNames(): void
+    {
+        $transformer = $this->createMock(PurgableTransformerInterface::class);
+        $transformer->expects(self::once())
+            ->method('purge')
+            ->with('uploads/photo.jpg', ['loader' => 'filesystem', 'transformer' => 'glide']);
+
+        $this->expectNoLoadOrUrlOnSetUpMocks();
+
+        $this->createPurgePipeline(['glide' => $transformer])->purge('uploads/photo.jpg');
+    }
+
+    public function testPurgeUsesExplicitLoaderAndTransformerNames(): void
+    {
+        $transformer = $this->createMock(PurgableTransformerInterface::class);
+        $transformer->expects(self::once())
+            ->method('purge')
+            ->with('products/1.jpg', ['loader' => 'vich', 'transformer' => 'imgix']);
+
+        $this->expectNoLoadOrUrlOnSetUpMocks();
+
+        $this->createPurgePipeline(['imgix' => $transformer])->purge('products/1.jpg', 'vich', 'imgix');
+    }
+
+    public function testPurgeThrowsWhenTransformerDoesNotSupportPurging(): void
+    {
+        // Purging never loads the source image nor builds a URL
+        $this->expectNoLoadOrUrlOnSetUpMocks();
+
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('Transformer "glide" does not support cache purging.');
+
+        $this->pipeline->purge('uploads/photo.jpg');
+    }
+
+    private function expectNoLoadOrUrlOnSetUpMocks(): void
+    {
+        $this->loader->expects(self::never())->method('load');
+        $this->transformer->expects(self::never())->method('url');
+    }
+
+    /**
+     * @param array<string, ImageTransformerInterface> $transformers
+     */
+    private function createPurgePipeline(array $transformers): ImagePipeline
+    {
+        return new ImagePipeline(
+            new LoaderRegistry(new ServiceLocator([])),
+            new TransformerRegistry(new ServiceLocator(array_map(
+                static fn (ImageTransformerInterface $transformer): Closure => static fn (): ImageTransformerInterface => $transformer,
+                $transformers,
+            ))),
+            'filesystem',
+            'glide',
+        );
     }
 }

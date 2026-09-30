@@ -716,7 +716,7 @@ class ImageHelperTest extends TestCase
         self::assertNull($data->fetchPriority);
     }
 
-    public function testGetMimeTypeForGifAndUnknownFormats(): void
+    public function testGetMimeTypeForEachSourceFormat(): void
     {
         $this->pipeline->method('load')
             ->willReturn(new Image(path: 'animation.gif'));
@@ -742,16 +742,18 @@ class ImageHelperTest extends TestCase
             metadataGuesser: $this->metadataGuesser,
             placeholderRegistry: $this->placeholderRegistry,
             loaderRegistry: $this->loaderRegistry,
-            formats: ['gif', 'tiff', 'bmp'],
+            // The last format is the <img> fallback; every other one becomes a <source>
+            formats: ['gif', 'jpg', 'jpeg', 'pjpg', 'png', 'tiff', 'bmp'],
             defaultQuality: 75,
             defaultFit: 'contain',
         );
 
         $data = $helper->imageData(src: 'animation.gif', width: 640, sizes: '100vw');
 
-        self::assertCount(2, $data->sources);
-        self::assertSame('image/gif', $data->sources[0]->type);
-        self::assertSame('image/tiff', $data->sources[1]->type);
+        self::assertSame(
+            ['image/gif', 'image/jpeg', 'image/jpeg', 'image/jpeg', 'image/png', 'image/tiff'],
+            array_map(static fn (ImageSource $source): string => $source->type, $data->sources),
+        );
     }
 
     public function testSkipsStreamResolutionWhenBothDisplayDimensionsProvided(): void

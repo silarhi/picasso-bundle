@@ -13,13 +13,18 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Tests\Functional;
 
+use function array_slice;
 use function assert;
 use function dirname;
 
 use League\FlysystemBundle\FlysystemBundle;
 use LogicException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
+use Silarhi\PicassoBundle\DataCollector\CollectingImageHelper;
+use Silarhi\PicassoBundle\DataCollector\CollectingMetadataGuesser;
+use Silarhi\PicassoBundle\DataCollector\PicassoDataCollector;
 use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
 use Silarhi\PicassoBundle\Loader\FlysystemLoader;
 use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
@@ -28,7 +33,14 @@ use Silarhi\PicassoBundle\PicassoBundle;
 use Silarhi\PicassoBundle\Placeholder\BlurHashPlaceholder;
 use Silarhi\PicassoBundle\Placeholder\PlaceholderInterface;
 use Silarhi\PicassoBundle\Placeholder\TransformerPlaceholder;
+use Silarhi\PicassoBundle\Service\ImageHelper;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
+use Silarhi\PicassoBundle\Service\MetadataGuesser;
+use Silarhi\PicassoBundle\Service\PlaceholderRegistry;
+use Silarhi\PicassoBundle\Service\TransformerRegistry;
+use Silarhi\PicassoBundle\Tests\Functional\Stub\StubAttributePlaceholder;
+use Silarhi\PicassoBundle\Tests\Functional\Stub\StubAttributeTransformer;
+use Silarhi\PicassoBundle\Tests\Functional\Stub\StubConfiguredAttributeLoader;
 use Silarhi\PicassoBundle\Tests\Functional\Stub\StubServicePlaceholder;
 use Silarhi\PicassoBundle\Tests\Functional\Stub\StubServiceTransformer;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
@@ -38,6 +50,9 @@ use Symfony\Bundle\TwigBundle\TwigBundle;
 use Symfony\Component\Config\Loader\LoaderInterface;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
+use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
+use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\HttpKernel\Kernel;
 use Vich\UploaderBundle\VichUploaderBundle;
 
@@ -829,6 +844,189 @@ class BundleWiringTest extends TestCase
         ]);
     }
 
+    // --- Attribute autoconfiguration ---
+
+    public function testAttributeTaggedServicesAreRegisteredWithTheirLoaderDefaults(): void
+    {
+        $container = $this->bootKernel([
+            'loaders' => [
+                'filesystem' => [
+                    'paths' => [__DIR__ . '/../Fixtures'],
+                ],
+            ],
+            'transformers' => [
+                'glide' => [
+                    'sign_key' => 'test',
+                ],
+            ],
+        ], withServices: [StubConfiguredAttributeLoader::class, StubAttributeTransformer::class, StubAttributePlaceholder::class]);
+
+        $loaders = $container->get('picasso.loader_registry');
+        self::assertInstanceOf(LoaderRegistry::class, $loaders);
+        self::assertInstanceOf(StubConfiguredAttributeLoader::class, $loaders->get('configured'));
+        self::assertSame('stub', $loaders->getDefaultPlaceholder('configured'));
+        self::assertSame('stub', $loaders->getDefaultTransformer('configured'));
+        self::assertFalse($loaders->getResolveMetadata('configured'));
+
+        $transformers = $container->get('picasso.transformer_registry');
+        self::assertInstanceOf(TransformerRegistry::class, $transformers);
+        self::assertInstanceOf(StubAttributeTransformer::class, $transformers->get('stub'));
+
+        $placeholders = $container->get('picasso.placeholder_registry');
+        self::assertInstanceOf(PlaceholderRegistry::class, $placeholders);
+        self::assertInstanceOf(StubAttributePlaceholder::class, $placeholders->get('stub'));
+    }
+
+    public function testBuildDoesNotRequireTheExtensionToBeLoaded(): void
+    {
+        $container = new ContainerBuilder();
+        (new PicassoBundle())->build($container);
+
+        // The loader-defaults compiler pass must skip, not fail, without the registry
+        $container->compile();
+
+        self::assertFalse($container->hasDefinition('picasso.loader_registry'));
+    }
+
+    // --- Data collector ---
+
+    public function testCollectorIsDisabledByDefault(): void
+    {
+        $container = $this->bootKernel([
+            'loaders' => [
+                'filesystem' => [
+                    'paths' => [__DIR__ . '/../Fixtures'],
+                ],
+            ],
+            'transformers' => [
+                'glide' => [
+                    'sign_key' => 'test',
+                ],
+            ],
+        ]);
+
+        self::assertFalse($container->has('picasso.data_collector'));
+        self::assertInstanceOf(ImageHelper::class, $container->get('picasso.image_helper'));
+        self::assertInstanceOf(MetadataGuesser::class, $container->get('picasso.metadata_guesser'));
+    }
+
+    public function testCollectorDecoratesImageHelperAndMetadataGuesserWhenEnabled(): void
+    {
+        $container = $this->bootKernel([
+            'collector' => true,
+            'loaders' => [
+                'filesystem' => [
+                    'paths' => [__DIR__ . '/../Fixtures'],
+                ],
+            ],
+            'transformers' => [
+                'glide' => [
+                    'sign_key' => 'test',
+                ],
+            ],
+        ]);
+
+        self::assertInstanceOf(PicassoDataCollector::class, $container->get('picasso.data_collector'));
+        self::assertInstanceOf(CollectingImageHelper::class, $container->get('picasso.image_helper'));
+        self::assertInstanceOf(CollectingMetadataGuesser::class, $container->get('picasso.metadata_guesser'));
+    }
+
+    // --- Definitions of services that cannot be instantiated everywhere ---
+
+    /**
+     * @return iterable<string, array{array<string, string>, string, string, string}>
+     */
+    public static function imgixPurgeServicesProvider(): iterable
+    {
+        yield 'default PSR-18 client' => [[], 'psr18.http_client', 'psr18.http_client', 'psr18.http_client'];
+        yield 'factories default to the client' => [
+            ['http_client' => 'app.http_client'],
+            'app.http_client',
+            'app.http_client',
+            'app.http_client',
+        ];
+        yield 'dedicated factories' => [
+            ['http_client' => 'app.http_client', 'request_factory' => 'app.request_factory', 'stream_factory' => 'app.stream_factory'],
+            'app.http_client',
+            'app.request_factory',
+            'app.stream_factory',
+        ];
+    }
+
+    /**
+     * @param array<string, string> $purgeServices
+     */
+    #[DataProvider('imgixPurgeServicesProvider')]
+    public function testImgixTransformerWithApiKeyIsWiredForPurging(array $purgeServices, string $httpClient, string $requestFactory, string $streamFactory): void
+    {
+        $container = $this->loadExtension([
+            'transformers' => [
+                'imgix' => [
+                    'base_url' => 'https://example.imgix.net',
+                    'sign_key' => 'secret',
+                    'api_key' => 'imgix-api-key',
+                    ...$purgeServices,
+                ],
+            ],
+        ]);
+
+        $arguments = $container->getDefinition('picasso.transformer.imgix')->getArguments();
+
+        self::assertCount(6, $arguments);
+        self::assertSame(['https://example.imgix.net', 'secret', 'imgix-api-key'], array_slice($arguments, 0, 3));
+        self::assertEquals(new Reference($httpClient), $arguments[3]);
+        self::assertEquals(new Reference($requestFactory), $arguments[4]);
+        self::assertEquals(new Reference($streamFactory), $arguments[5]);
+    }
+
+    public function testImgixTransformerWithoutApiKeyHasNoPurgeServices(): void
+    {
+        $container = $this->loadExtension([
+            'transformers' => [
+                'imgix' => [
+                    'base_url' => 'https://example.imgix.net',
+                    'http_client' => 'app.http_client',
+                ],
+            ],
+        ]);
+
+        self::assertSame(
+            ['https://example.imgix.net', null],
+            $container->getDefinition('picasso.transformer.imgix')->getArguments(),
+        );
+    }
+
+    public function testBlurhashPlaceholderWithImagickDriverUsesImagick(): void
+    {
+        // Imagick may not be installed: only the definitions are checked
+        $container = $this->loadExtension([
+            'placeholders' => [
+                'hash' => [
+                    'type' => 'blurhash',
+                    'driver' => 'imagick',
+                ],
+            ],
+        ]);
+
+        self::assertSame(\Imagine\Imagick\Imagine::class, $container->getDefinition('picasso.imagine.hash')->getClass());
+        self::assertEquals(new Reference('picasso.imagine.hash'), $container->getDefinition('picasso.placeholder.hash')->getArgument(0));
+    }
+
+    public function testBlurhashPlaceholderGetsNoCachePoolWhenCacheIsDisabled(): void
+    {
+        $container = $this->loadExtension([
+            'cache' => false,
+            'placeholders' => [
+                'hash' => [
+                    'type' => 'blurhash',
+                ],
+            ],
+        ]);
+
+        self::assertSame(\Imagine\Gd\Imagine::class, $container->getDefinition('picasso.imagine.hash')->getClass());
+        self::assertNull($container->getDefinition('picasso.placeholder.hash')->getArgument(4));
+    }
+
     /**
      * @param array<string, mixed> $picassoConfig
      * @param list<class-string>   $withServices
@@ -848,6 +1046,33 @@ class BundleWiringTest extends TestCase
 
         $container = $kernel->getContainer()->get('test.service_container');
         assert($container instanceof ContainerInterface);
+
+        return $container;
+    }
+
+    /**
+     * Load the bundle extension into a bare container builder, without compiling
+     * it, to check definitions whose services cannot be built in every
+     * environment (optional PHP extensions, PSR-17 implementations).
+     *
+     * @param array<string, mixed> $picassoConfig
+     */
+    private function loadExtension(array $picassoConfig): ContainerBuilder
+    {
+        $container = new ContainerBuilder(new ParameterBag([
+            'kernel.environment' => 'test',
+            'kernel.debug' => false,
+            'kernel.project_dir' => dirname(__DIR__, 2),
+            'kernel.build_dir' => sys_get_temp_dir(),
+            'kernel.cache_dir' => sys_get_temp_dir(),
+        ]));
+
+        $bundle = new PicassoBundle();
+        $bundle->build($container);
+
+        $extension = $bundle->getContainerExtension();
+        assert($extension instanceof ExtensionInterface);
+        $extension->load([$picassoConfig], $container);
 
         return $container;
     }
@@ -923,7 +1148,8 @@ class BundleWiringTestKernel extends Kernel
             $container->loadFromExtension('picasso', $picassoConfig);
 
             foreach ($withServices as $serviceClass) {
-                $container->register($serviceClass, $serviceClass);
+                // Autoconfigured like in an application, so #[As*] attributes apply
+                $container->register($serviceClass, $serviceClass)->setAutoconfigured(true);
             }
 
             if ($withFlysystemStorage) {

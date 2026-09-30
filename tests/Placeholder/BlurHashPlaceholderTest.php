@@ -80,6 +80,19 @@ class BlurHashPlaceholderTest extends TestCase
         $placeholder->generate($image, new ImageTransformation(width: 100, height: 100));
     }
 
+    public function testGenerateThrowsWithEmptyStream(): void
+    {
+        $placeholder = new BlurHashPlaceholder($this->imagine, componentsX: 4, componentsY: 3, size: 32);
+
+        $stream = fopen('php://memory', 'r+');
+        self::assertNotFalse($stream);
+        $image = new Image(path: 'empty.jpg', stream: $stream);
+
+        $this->expectException(ImageProcessingException::class);
+        $this->expectExceptionMessage('Cannot read image stream for BlurHash encoding.');
+        $placeholder->generate($image, new ImageTransformation(width: 100, height: 100));
+    }
+
     public function testGenerateProducesValidPng(): void
     {
         $placeholder = new BlurHashPlaceholder($this->imagine, componentsX: 4, componentsY: 3, size: 8);
