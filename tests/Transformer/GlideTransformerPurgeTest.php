@@ -19,6 +19,8 @@ use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemOperator;
 use League\Flysystem\Local\LocalFilesystemAdapter;
 use League\Glide\Server;
+use League\Glide\Signatures\SignatureFactory;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use RuntimeException;
@@ -26,10 +28,12 @@ use Silarhi\PicassoBundle\Exception\LoaderNotFoundException;
 use Silarhi\PicassoBundle\Exception\PurgeException;
 use Silarhi\PicassoBundle\Exception\TransformerNotFoundException;
 use Silarhi\PicassoBundle\Loader\FlysystemRegistry;
+use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
 use Silarhi\PicassoBundle\Service\UrlEncryption;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\Filesystem\Filesystem as SymfonyFilesystem;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
 class GlideTransformerPurgeTest extends TestCase
@@ -119,6 +123,55 @@ class GlideTransformerPurgeTest extends TestCase
         $transformer->purge('nonexistent/path.jpg');
     }
 
+    /**
+     * @return iterable<string, array{bool, string, array<string, string>, string}>
+     */
+    public static function servedVariantProvider(): iterable
+    {
+        yield 'public cache' => [true, 'photo.jpg/fm_webp,w_10.webp', [], 'glide/filesystem/photo.jpg'];
+        yield 'standard cache' => [false, 'photo.jpg', ['w' => '10', 'fm' => 'webp'], 'photo.jpg'];
+    }
+
+    /**
+     * @param array<string, string> $params
+     */
+    #[DataProvider('servedVariantProvider')]
+    public function testPurgeAfterServeDeletesTheServedVariant(bool $publicCache, string $servedPath, array $params, string $variantDir): void
+    {
+        // One instance for both calls, as in a long-running worker
+        $transformer = $this->createTransformer($this->tempDir, $publicCache);
+
+        $this->serve($transformer, $servedPath, $params);
+        self::assertDirectoryExists($this->tempDir . '/' . $variantDir);
+
+        $transformer->purge('photo.jpg', ['transformer' => 'glide', 'loader' => 'filesystem']);
+
+        self::assertDirectoryDoesNotExist($this->tempDir . '/' . $variantDir);
+    }
+
+    public function testPurgeAndServeInterleavedOnOneInstance(): void
+    {
+        $transformer = $this->createTransformer($this->tempDir, true);
+        $context = ['transformer' => 'glide', 'loader' => 'filesystem'];
+
+        $this->serve($transformer, 'photo.jpg/w_10.jpg', []);
+        $this->serve($transformer, 'pixel.gif/w_1.gif', []);
+
+        $transformer->purge('photo.jpg', $context);
+
+        self::assertFileDoesNotExist($this->tempDir . '/glide/filesystem/photo.jpg/w_10.jpg');
+        self::assertFileExists($this->tempDir . '/glide/filesystem/pixel.gif/w_1.gif');
+
+        // Serving after a purge still caches at the public path
+        $this->serve($transformer, 'photo.jpg/w_10.jpg', []);
+        self::assertFileExists($this->tempDir . '/glide/filesystem/photo.jpg/w_10.jpg');
+
+        $transformer->purge('pixel.gif', $context);
+
+        self::assertFileDoesNotExist($this->tempDir . '/glide/filesystem/pixel.gif/w_1.gif');
+        self::assertFileExists($this->tempDir . '/glide/filesystem/photo.jpg/w_10.jpg');
+    }
+
     public function testPurgeWrapsCacheStorageFailureInPurgeException(): void
     {
         $failure = new RuntimeException('Storage backend is unreachable.');
@@ -158,6 +211,24 @@ class GlideTransformerPurgeTest extends TestCase
             null,
             $publicCache,
         );
+    }
+
+    /**
+     * @param array<string, string> $params
+     */
+    private function serve(GlideTransformer $transformer, string $path, array $params): void
+    {
+        $loader = self::createStub(ServableLoaderInterface::class);
+        $loader->method('getSource')->willReturn(__DIR__ . '/../Fixtures');
+
+        $response = $transformer->serve(
+            $loader,
+            $path,
+            new Request(SignatureFactory::create(self::SIGN_KEY)->addSignature($path, $params)),
+            ['transformer' => 'glide', 'loader' => 'filesystem'],
+        );
+
+        self::assertSame(200, $response->getStatusCode());
     }
 
     private function createPublicCacheTransformerWithFilesystem(Filesystem $cacheFs): GlideTransformer
