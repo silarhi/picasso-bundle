@@ -306,9 +306,16 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         $this->server->setCachePathCallable(null);
 
         try {
-            $this->server->deleteCache($cachePath);
+            $purged = $this->server->deleteCache($cachePath);
         } catch (Throwable $e) {
             throw new PurgeException(sprintf('Failed to purge cache for "%s".', $path), $e->getCode(), previous: $e);
+        }
+
+        // Glide turns the storage's Flysystem exception into false, so there is
+        // no previous exception to chain. A never-cached image is not a failure:
+        // deleting a missing folder succeeds.
+        if (!$purged) {
+            throw new PurgeException(sprintf('Failed to purge cache for "%s": the cache storage could not delete it.', $path));
         }
     }
 
