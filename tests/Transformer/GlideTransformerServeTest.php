@@ -27,6 +27,8 @@ use League\Glide\Signatures\SignatureFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Silarhi\PicassoBundle\Dto\Image;
+use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Exception\EncryptionException;
 use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
 use Silarhi\PicassoBundle\Exception\UndecodableImageException;
@@ -256,29 +258,96 @@ class GlideTransformerServeTest extends TestCase
     }
 
     /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function untransformedImagePathProvider(): iterable
+    {
+        yield 'filename with extension' => ['uploads/photo.jpg', '_untransformed.jpg'];
+        yield 'filename without extension' => ['uploads/photo', '_untransformed.'];
+    }
+
+    #[DataProvider('untransformedImagePathProvider')]
+    public function testServeServesUntransformedPublicCacheUrl(string $path, string $expectedCacheFilename): void
+    {
+        $this->copyFixtureToSource($path);
+        $transformer = $this->createTransformer($this->tempDir . '/cache', publicCache: true);
+        $context = ['transformer' => 'glide', 'loader' => 'filesystem'];
+
+        $url = $transformer->url(new Image(path: $path), new ImageTransformation(), $context);
+        $response = $this->serveUrl($transformer, $url);
+
+        self::assertSame(Response::HTTP_OK, $response->getStatusCode(), 'A URL minted by url() must be served, not redirected.');
+        self::assertSame('image/jpeg', $response->headers->get('Content-Type'));
+
+        // Cached like any other variant, inside the image's folder, so purging the image removes it
+        $variantDir = $this->tempDir . '/cache/glide/filesystem/' . $path;
+        self::assertFileExists($variantDir . '/' . $expectedCacheFilename);
+
+        // Purge from a fresh instance, as a separate request would
+        $this->createTransformer($this->tempDir . '/cache', publicCache: true)->purge($path, $context);
+
+        self::assertDirectoryDoesNotExist($variantDir);
+    }
+
+    /**
      * @return iterable<string, array{string}>
+     */
+    public static function emptyParamsSegmentPathProvider(): iterable
+    {
+        yield 'dotfile params filename' => ['photo.jpg/.jpg'];
+        yield 'dot-segment' => ['photo/.'];
+    }
+
+    #[DataProvider('emptyParamsSegmentPathProvider')]
+    public function testServeRejectsEmptyParamsSegment(string $path): void
+    {
+        // Neither a params segment nor an image filename: redirecting would loop
+        // (each hop appends a segment), serving would cache outside the variant folder.
+        $transformer = $this->createTransformer($this->tempDir . '/cache', publicCache: true);
+
+        $this->expectException(ImageNotFoundException::class);
+        $this->expectExceptionMessage('Invalid cached image filename.');
+
+        $transformer->serve(
+            $this->createLoader(__DIR__ . '/../Fixtures'),
+            $path,
+            $this->createSignedRequest($path, []),
+            ['transformer' => 'glide', 'loader' => 'filesystem'],
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
      */
     public static function untransformedLegacyPathProvider(): iterable
     {
         // "my" is not a transformation param, so this is an image filename, not a params segment
-        yield 'underscore in filename' => ['uploads/my_photo.jpg'];
-        yield 'filename without extension' => ['uploads/photo'];
+        yield 'underscore in filename' => ['uploads/my_photo.jpg', 'uploads/my_photo.jpg/_untransformed.jpg'];
+        yield 'filename without extension' => ['uploads/photo', 'uploads/photo/_untransformed.'];
     }
 
     #[DataProvider('untransformedLegacyPathProvider')]
-    public function testServeRedirectsUntransformedLegacyUrl(string $path): void
+    public function testServeRedirectsUntransformedLegacyUrl(string $path, string $canonicalPath): void
     {
+        $this->copyFixtureToSource($path);
         $transformer = $this->createTransformer($this->tempDir . '/cache', publicCache: true);
 
         $response = $transformer->serve(
-            $this->createLoader(__DIR__ . '/../Fixtures'),
+            $this->createLoader($this->tempDir . '/source'),
             $path,
             $this->createSignedRequest($path, []),
             ['transformer' => 'glide', 'loader' => 'filesystem'],
         );
 
         self::assertSame(Response::HTTP_MOVED_PERMANENTLY, $response->getStatusCode());
-        self::assertStringStartsWith('/picasso/glide/filesystem/' . $path . '/', (string) $response->headers->get('Location'));
+
+        $location = (string) $response->headers->get('Location');
+        $signature = SignatureFactory::create(self::SIGN_KEY)->generateSignature($canonicalPath, []);
+        self::assertSame('/picasso/glide/filesystem/' . $canonicalPath . '?s=' . $signature, $location);
+
+        // The redirect target must be served, or clients would loop through redirects
+        $followed = $this->serveUrl($transformer, $location);
+        self::assertSame(Response::HTTP_OK, $followed->getStatusCode(), 'A legacy redirect must not lead to another redirect.');
     }
 
     private function createTransformer(string $cache, ?FlysystemRegistry $flysystemRegistry = null, bool $publicCache = false): GlideTransformer
@@ -320,6 +389,29 @@ class GlideTransformerServeTest extends TestCase
         $loader->method('getSource')->willReturn($sourceDir);
 
         return $loader;
+    }
+
+    private function copyFixtureToSource(string $path): void
+    {
+        (new SymfonyFilesystem())->copy(__DIR__ . '/../Fixtures/photo.jpg', $this->tempDir . '/source/' . $path);
+    }
+
+    /**
+     * Serve a URL minted by the transformer, as the image controller would route it.
+     */
+    private function serveUrl(GlideTransformer $transformer, string $url): Response
+    {
+        $prefix = '/picasso/glide/filesystem/';
+        $urlPath = (string) parse_url($url, \PHP_URL_PATH);
+        self::assertStringStartsWith($prefix, $urlPath);
+        parse_str((string) parse_url($url, \PHP_URL_QUERY), $query);
+
+        return $transformer->serve(
+            $this->createLoader($this->tempDir . '/source'),
+            rawurldecode(substr($urlPath, strlen($prefix))),
+            new Request($query),
+            ['transformer' => 'glide', 'loader' => 'filesystem'],
+        );
     }
 
     /**

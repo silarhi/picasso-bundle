@@ -19,6 +19,7 @@ use function is_string;
 
 use League\Glide\Signatures\SignatureFactory;
 use LogicException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\Image;
@@ -246,6 +247,34 @@ class GlideTransformerTest extends TestCase
         self::assertStringNotContainsString('fm=webp', $url);
     }
 
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function untransformedImagePathProvider(): iterable
+    {
+        yield 'filename with extension' => ['uploads/photo.jpg', 'uploads/photo.jpg/_untransformed.jpg'];
+        yield 'filename without extension' => ['uploads/photo', 'uploads/photo/_untransformed.'];
+    }
+
+    #[DataProvider('untransformedImagePathProvider')]
+    public function testPublicCacheUrlNeverHasEmptyParamsSegment(string $path, string $expectedPath): void
+    {
+        $transformer = new GlideTransformer(
+            $this->router,
+            new UrlEncryption(self::SIGN_KEY),
+            self::SIGN_KEY,
+            '/tmp/cache',
+            'gd',
+            null,
+            true,
+        );
+
+        $url = $transformer->url(new Image(path: $path), new ImageTransformation(), ['loader' => 'filesystem', 'transformer' => 'glide']);
+
+        $signature = SignatureFactory::create(self::SIGN_KEY)->generateSignature($expectedPath, []);
+        self::assertSame('/picasso/glide/filesystem/' . $expectedPath . '?s=' . $signature, $url);
+    }
+
     public function testPublicCacheUrlPassesMetadataAsQueryParam(): void
     {
         $transformer = new GlideTransformer(
@@ -355,6 +384,45 @@ class GlideTransformerTest extends TestCase
         self::assertSame(['fit' => 'contain', 'fm' => 'webp', 'h' => '200', 'q' => '75', 'w' => '300'], $result['params']);
         self::assertSame('fit_contain,fm_webp,h_200,q_75,w_300', $result['paramsSegment']);
         self::assertSame('webp', $result['format']);
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function untransformedParamsFilenameProvider(): iterable
+    {
+        yield 'with extension' => ['_untransformed.jpg', 'jpg'];
+        yield 'without extension' => ['_untransformed.', ''];
+    }
+
+    #[DataProvider('untransformedParamsFilenameProvider')]
+    public function testParseParamsFilenameParsesUntransformedSegment(string $filename, string $expectedFormat): void
+    {
+        $result = GlideTransformer::parseParamsFilename($filename);
+
+        self::assertSame([], $result['params']);
+        self::assertSame('_untransformed', $result['paramsSegment']);
+        self::assertSame($expectedFormat, $result['format']);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function invalidParamsFilenameProvider(): iterable
+    {
+        yield 'empty params segment' => ['.jpg'];
+        yield 'untransformed segment combined with params' => ['_untransformed,w_300.jpg'];
+        yield 'param without key' => ['_300.jpg'];
+        yield 'params with a keyless pair' => ['w_300,_80.jpg'];
+    }
+
+    #[DataProvider('invalidParamsFilenameProvider')]
+    public function testParseParamsFilenameRejectsInvalidSegment(string $filename): void
+    {
+        $this->expectException(\Silarhi\PicassoBundle\Exception\ImageNotFoundException::class);
+        $this->expectExceptionMessage('Invalid cached image param format.');
+
+        GlideTransformer::parseParamsFilename($filename);
     }
 
     public function testParseParamsFilenameThrowsWithoutExtension(): void

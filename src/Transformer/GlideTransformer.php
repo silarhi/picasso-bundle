@@ -64,6 +64,15 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
     private const TRANSFORMATION_PARAMS = ['w', 'h', 'fm', 'q', 'fit', 'blur', 'dpr'];
 
     /**
+     * Reserved params segment of an untransformed image in public-cache mode.
+     * There, the source path is a directory holding the variants: a file cannot
+     * live at that same path, and web servers treat a directory path specially
+     * (Apache's DirectorySlash redirects, nginx tries "$uri/"). So an untransformed
+     * image still needs a filename inside that folder: "photo.jpg/_untransformed.jpg".
+     */
+    private const UNTRANSFORMED_PARAMS_SEGMENT = '_untransformed';
+
+    /**
      * How long clients and CDNs may cache the redirect away from a legacy URL.
      * Deliberately not a year: the redirect target embeds the current URL scheme,
      * so a shorter window keeps a future scheme change from being pinned.
@@ -130,6 +139,9 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         if ($this->isPublicCacheEnabled()) {
             // Move transformation params into the path, keep only _metadata as query param
             $paramsSegment = $this->buildParamsSegment($glideParams);
+            if ('' === $paramsSegment) {
+                $paramsSegment = self::UNTRANSFORMED_PARAMS_SEGMENT;
+            }
             $format = isset($glideParams['fm']) ? (string) $glideParams['fm'] : pathinfo($path, \PATHINFO_EXTENSION);
             $path = $path . '/' . $paramsSegment . '.' . $format;
             $glideParams = array_filter(
@@ -329,6 +341,8 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
      * i.e. one carrying its transformation params in the query string.
      *
      * @param array<string, mixed> $params
+     *
+     * @throws ImageNotFoundException when the path ends with a dot-leading filename
      */
     private function isLegacyRequest(string $path, array $params): bool
     {
@@ -343,20 +357,32 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         // An untransformed legacy URL carries no params at all, and then ends with
         // the image filename where a params segment would otherwise sit.
         $lastSlash = strrpos($path, '/');
+        $filename = false === $lastSlash ? $path : substr($path, $lastSlash + 1);
 
-        return !$this->looksLikeParamsFilename(false === $lastSlash ? $path : substr($path, $lastSlash + 1));
+        // A dot-leading name (".jpg", or "." without extension) is what url() used
+        // to emit for an untransformed image. It is neither: redirecting it would
+        // loop, as each hop appends one more segment.
+        if (str_starts_with($filename, '.')) {
+            throw new ImageNotFoundException('Invalid cached image filename.');
+        }
+
+        return !$this->looksLikeParamsFilename($filename);
     }
 
     /**
      * Whether a filename parses as a params segment whose every key is a known
-     * transformation param. The key check is what keeps an ordinary filename such
-     * as "my_photo.jpg" from being mistaken for one.
+     * transformation param, or as the untransformed one. The key check is what
+     * keeps an ordinary filename such as "my_photo.jpg" from being mistaken for one.
      */
     private function looksLikeParamsFilename(string $filename): bool
     {
         $dotPos = strrpos($filename, '.');
         if (false === $dotPos || 0 === $dotPos) {
             return false;
+        }
+
+        if (self::UNTRANSFORMED_PARAMS_SEGMENT === substr($filename, 0, $dotPos)) {
+            return true;
         }
 
         foreach (explode(',', substr($filename, 0, $dotPos)) as $pair) {
@@ -449,7 +475,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
 
     /**
      * Parse a params filename like "fit_contain,fm_webp,q_75,w_300.webp"
-     * into its component parts.
+     * into its component parts. "_untransformed.jpg" carries no params.
      *
      * @return array{params: array<string, string>, paramsSegment: string, format: string}
      */
@@ -463,12 +489,14 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         $format = substr($filename, $dotPos + 1);
         $paramsString = substr($filename, 0, $dotPos);
 
-        $pairs = explode(',', $paramsString);
+        $pairs = self::UNTRANSFORMED_PARAMS_SEGMENT === $paramsString ? [] : explode(',', $paramsString);
         $paramPairs = [];
 
         foreach ($pairs as $pair) {
             $separatorPos = strpos($pair, '_');
-            if (false === $separatorPos) {
+            // A pair needs a key: "_300", or the reserved "_untransformed" segment
+            // combined with other params, is not a valid params segment
+            if (false === $separatorPos || 0 === $separatorPos) {
                 throw new ImageNotFoundException('Invalid cached image param format.');
             }
 

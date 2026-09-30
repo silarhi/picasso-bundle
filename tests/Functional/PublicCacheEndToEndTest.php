@@ -124,6 +124,23 @@ class PublicCacheEndToEndTest extends KernelTestCase
         $response = $this->handleRequest($legacyUrl);
 
         self::assertSame(301, $response->getStatusCode(), 'Untransformed legacy URL should redirect: ' . $response->getContent());
+
+        $target = (string) $response->headers->get('Location');
+        self::assertSame('/image/glide/filesystem/photo.jpg/_untransformed.jpg', parse_url($target, \PHP_URL_PATH));
+
+        // The target must be served, not redirected again.
+        self::assertSame(200, $this->handleRequest($target)->getStatusCode());
+    }
+
+    public function testUrlWithEmptyParamsSegmentReturns404(): void
+    {
+        self::bootKernel();
+
+        // Untransformed images used to get an empty params segment ("photo.jpg/.jpg"),
+        // which redirected to itself plus one more segment, endlessly.
+        $response = $this->handleRequest($this->buildLegacyUrl('photo.jpg/.jpg', []));
+
+        self::assertSame(404, $response->getStatusCode(), 'An empty params segment must be rejected, not redirected: ' . $response->getContent());
     }
 
     public function testLegacyUrlWithTamperedSignatureReturns404(): void
