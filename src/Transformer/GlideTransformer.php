@@ -299,6 +299,12 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
             $cachePath = $transformerName . '/' . $loaderName . '/' . ltrim($path, '/');
         }
 
+        // deleteCache() removes the folder of Glide's default cache path for
+        // $cachePath. A public-cache serve() leaves its own cache path callable on
+        // the shared server: in a long-running process, it would send the purge to
+        // the folder of whatever variant was served last instead.
+        $this->server->setCachePathCallable(null);
+
         try {
             $this->server->deleteCache($cachePath);
         } catch (Throwable $e) {
