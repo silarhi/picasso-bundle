@@ -13,17 +13,17 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Loader;
 
+use Silarhi\PicassoBundle\Source\ImageSourceInterface;
+
 /**
- * A loader that can provide its source filesystem for local transformers.
+ * A loader that can provide read access to its original images for local transformers.
  */
 interface ServableLoaderInterface extends ImageLoaderInterface
 {
     /**
-     * Get the filesystem source for serving images.
+     * Get the source the original images are read from when serving them.
      *
      * @param array<string, mixed> $metadata
-     *
-     * @return object|string Local path (string) or FilesystemOperator
      */
-    public function getSource(array $metadata): object|string;
+    public function getSource(array $metadata): ImageSourceInterface;
 }

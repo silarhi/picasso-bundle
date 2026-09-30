@@ -31,6 +31,7 @@ use Silarhi\PicassoBundle\Exception\TransformerNotFoundException;
 use Silarhi\PicassoBundle\Loader\FlysystemRegistry;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
 use Silarhi\PicassoBundle\Service\UrlEncryption;
+use Silarhi\PicassoBundle\Source\LocalImageSource;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\Filesystem\Filesystem as SymfonyFilesystem;
@@ -253,7 +254,7 @@ class GlideTransformerPurgeTest extends TestCase
     private function serve(GlideTransformer $transformer, string $path, array $params): void
     {
         $loader = self::createStub(ServableLoaderInterface::class);
-        $loader->method('getSource')->willReturn(__DIR__ . '/../Fixtures');
+        $loader->method('getSource')->willReturn(new LocalImageSource(__DIR__ . '/../Fixtures'));
 
         $response = $transformer->serve(
             $loader,

@@ -24,6 +24,8 @@ use Silarhi\PicassoBundle\Exception\InvalidMetadataException;
 use Silarhi\PicassoBundle\Loader\FlysystemRegistry;
 use Silarhi\PicassoBundle\Loader\VichMappingHelperInterface;
 use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
+use Silarhi\PicassoBundle\Source\FlysystemImageSource;
+use Silarhi\PicassoBundle\Source\LocalImageSource;
 use stdClass;
 use Vich\UploaderBundle\Storage\StorageInterface;
 
@@ -220,7 +222,7 @@ class VichUploaderLoaderTest extends TestCase
         $this->loader->getSource([]);
     }
 
-    public function testGetSourceReturnsFlysystemStorageWhenRegistered(): void
+    public function testGetSourceReturnsFlysystemSourceWhenRegistered(): void
     {
         $filesystem = $this->createMock(FilesystemOperator::class);
 
@@ -234,10 +236,11 @@ class VichUploaderLoaderTest extends TestCase
 
         $source = $this->loader->getSource(['upload_destination' => 'uploads.storage.public']);
 
-        self::assertSame($filesystem, $source);
+        self::assertInstanceOf(FlysystemImageSource::class, $source);
+        self::assertSame($filesystem, $source->getStorage());
     }
 
-    public function testGetSourceReturnsStringWhenNotInRegistry(): void
+    public function testGetSourceReturnsLocalSourceWhenNotInRegistry(): void
     {
         $this->storageContainer->expects(self::any())->method('has')
             ->with('/var/uploads/images')
@@ -245,16 +248,18 @@ class VichUploaderLoaderTest extends TestCase
 
         $source = $this->loader->getSource(['upload_destination' => '/var/uploads/images']);
 
-        self::assertSame('/var/uploads/images', $source);
+        self::assertInstanceOf(LocalImageSource::class, $source);
+        self::assertSame('/var/uploads/images', $source->getRoot());
     }
 
-    public function testGetSourceReturnsStringWhenNoFlysystemRegistry(): void
+    public function testGetSourceReturnsLocalSourceWhenNoFlysystemRegistry(): void
     {
         $loader = new VichUploaderLoader($this->storage, $this->mappingHelper);
 
         $source = $loader->getSource(['upload_destination' => '/var/uploads/images']);
 
-        self::assertSame('/var/uploads/images', $source);
+        self::assertInstanceOf(LocalImageSource::class, $source);
+        self::assertSame('/var/uploads/images', $source->getRoot());
     }
 
     public function testLoadWithNullUploadDestinationReturnsEmptyMetadata(): void

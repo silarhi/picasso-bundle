@@ -76,13 +76,12 @@ class FlysystemLoaderTest extends TestCase
         self::assertNull($image->stream);
     }
 
-    public function testGetSourceReturnsFilesystemOperator(): void
+    public function testGetSourceWrapsTheStorage(): void
     {
         $storage = $this->createMock(FilesystemOperator::class);
         $loader = new FlysystemLoader($storage);
         $source = $loader->getSource([]);
 
-        self::assertSame($storage, $source);
-        self::assertInstanceOf(FilesystemOperator::class, $source);
+        self::assertSame($storage, $source->getStorage());
     }
 }
