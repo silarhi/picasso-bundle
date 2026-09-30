@@ -256,6 +256,23 @@ class MetadataGuesserTest extends TestCase
         self::assertNull($result['mimeType']);
     }
 
+    public function testGuessWithCacheAndClosureReturningNullDoesNotCacheNulls(): void
+    {
+        $cache = new ArrayAdapter();
+        $guesser = new MetadataGuesser($cache);
+
+        // Stream not available yet (e.g. file not uploaded): nothing is known
+        $result = $guesser->guess(static fn (): null => null, 'pending.gif');
+        self::assertSame(['width' => null, 'height' => null, 'mimeType' => null], $result);
+
+        // Once the stream becomes available, it is read: the miss was not cached
+        $gif = file_get_contents(__DIR__ . '/../Fixtures/pixel.gif');
+        self::assertNotFalse($gif);
+
+        $resolved = $guesser->guess(fn () => $this->createStream($gif), 'pending.gif');
+        self::assertSame(['width' => 1, 'height' => 1, 'mimeType' => 'image/gif'], $resolved);
+    }
+
     /**
      * @return resource
      */

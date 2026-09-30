@@ -19,6 +19,7 @@ use function is_string;
 
 use League\Glide\Signatures\SignatureFactory;
 use LogicException;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
@@ -31,11 +32,11 @@ class GlideTransformerTest extends TestCase
     private const SIGN_KEY = 'test-secret-key';
 
     private GlideTransformer $transformer;
-    private \PHPUnit\Framework\MockObject\MockObject&UrlGeneratorInterface $router;
+    private Stub&UrlGeneratorInterface $router;
 
     protected function setUp(): void
     {
-        $this->router = $this->createMock(UrlGeneratorInterface::class);
+        $this->router = self::createStub(UrlGeneratorInterface::class);
         $this->router->method('generate')
             ->willReturnCallback(static function (string $name, array $params): string {
                 assert(is_string($params['transformer']));
@@ -347,6 +348,14 @@ class GlideTransformerTest extends TestCase
         $this->expectException(\Silarhi\PicassoBundle\Exception\ImageNotFoundException::class);
 
         GlideTransformer::parseParamsFilename('no-extension');
+    }
+
+    public function testParseParamsFilenameThrowsOnPairWithoutSeparator(): void
+    {
+        $this->expectException(\Silarhi\PicassoBundle\Exception\ImageNotFoundException::class);
+        $this->expectExceptionMessage('Invalid cached image param format.');
+
+        GlideTransformer::parseParamsFilename('w_300,webp.webp');
     }
 
     public function testRoundTripBuildAndParseParams(): void

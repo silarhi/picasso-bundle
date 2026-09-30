@@ -16,14 +16,19 @@ namespace Silarhi\PicassoBundle\Tests\Transformer;
 use function assert;
 
 use League\Flysystem\Filesystem;
+use League\Flysystem\FilesystemOperator;
 use League\Flysystem\Local\LocalFilesystemAdapter;
 use League\Glide\Server;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
+use RuntimeException;
 use Silarhi\PicassoBundle\Exception\LoaderNotFoundException;
+use Silarhi\PicassoBundle\Exception\PurgeException;
 use Silarhi\PicassoBundle\Exception\TransformerNotFoundException;
+use Silarhi\PicassoBundle\Loader\FlysystemRegistry;
 use Silarhi\PicassoBundle\Service\UrlEncryption;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
+use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\Filesystem\Filesystem as SymfonyFilesystem;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
@@ -114,9 +119,35 @@ class GlideTransformerPurgeTest extends TestCase
         $transformer->purge('nonexistent/path.jpg');
     }
 
+    public function testPurgeWrapsCacheStorageFailureInPurgeException(): void
+    {
+        $failure = new RuntimeException('Storage backend is unreachable.');
+        $cache = self::createStub(FilesystemOperator::class);
+        $cache->method('deleteDirectory')->willThrowException($failure);
+
+        $transformer = new GlideTransformer(
+            self::createStub(UrlGeneratorInterface::class),
+            new UrlEncryption(self::SIGN_KEY),
+            self::SIGN_KEY,
+            'thumbs.storage',
+            'gd',
+            null,
+            true,
+            new FlysystemRegistry(new ServiceLocator(['thumbs.storage' => static fn (): FilesystemOperator => $cache])),
+        );
+
+        try {
+            $transformer->purge('uploads/photo.jpg', ['transformer' => 'glide', 'loader' => 'filesystem']);
+            self::fail('The storage failure should have been reported.');
+        } catch (PurgeException $e) {
+            self::assertSame('Failed to purge cache for "uploads/photo.jpg".', $e->getMessage());
+            self::assertSame($failure, $e->getPrevious());
+        }
+    }
+
     private function createTransformer(string $cacheDir, bool $publicCache): GlideTransformer
     {
-        $router = $this->createMock(UrlGeneratorInterface::class);
+        $router = self::createStub(UrlGeneratorInterface::class);
 
         return new GlideTransformer(
             $router,
@@ -131,7 +162,7 @@ class GlideTransformerPurgeTest extends TestCase
 
     private function createPublicCacheTransformerWithFilesystem(Filesystem $cacheFs): GlideTransformer
     {
-        $router = $this->createMock(UrlGeneratorInterface::class);
+        $router = self::createStub(UrlGeneratorInterface::class);
 
         $transformer = new GlideTransformer(
             $router,
