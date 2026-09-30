@@ -128,6 +128,7 @@ PicassoBundle solves this the same way Next.js Image did for React:
     - [Imgix (CDN)](#imgix-cdn)
     - [Custom Transformer](#custom-transformer)
 - [Routes](#routes)
+    - [Error Responses](#error-responses)
 - [Cache Purge](#cache-purge)
 - [How It Works](#how-it-works)
 - [Testing & Quality](#testing--quality)
@@ -1049,6 +1050,24 @@ picasso:
 > **Note:** Routes are only required when using a local transformer
 > like Glide. CDN-based transformers (Imgix) generate external URLs
 > and do not need this route.
+
+### Error Responses
+
+The image controller answers a `404 Not Found` whenever an image cannot be served, and wraps the reason in a `NotFoundHttpException` whose previous exception tells the cases apart:
+
+| Cause                                                                                   | Previous exception          |
+| --------------------------------------------------------------------------------------- | --------------------------- |
+| Source file missing, invalid signature or `_metadata`, malformed public-cache path      | `ImageNotFoundException`    |
+| Source file exists but is not a decodable image (truncated upload, PDF named `.jpg`...) | `UndecodableImageException` |
+
+This lets a `kernel.exception` listener react to one case only. For instance, an application redirecting unservable image URLs to the original file should do so for `ImageNotFoundException` only: for an `UndecodableImageException` the original _is_ the broken file.
+
+```php
+if ($throwable instanceof NotFoundHttpException
+    && $throwable->getPrevious() instanceof ImageNotFoundException) {
+    // Safe to redirect to the original file
+}
+```
 
 ## Cache Purge
 

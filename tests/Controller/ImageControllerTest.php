@@ -16,6 +16,8 @@ namespace Silarhi\PicassoBundle\Tests\Controller;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Controller\ImageController;
+use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
+use Silarhi\PicassoBundle\Exception\UndecodableImageException;
 use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
@@ -25,6 +27,7 @@ use Silarhi\PicassoBundle\Transformer\LocalTransformerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Throwable;
 
 class ImageControllerTest extends TestCase
 {
@@ -109,6 +112,47 @@ class ImageControllerTest extends TestCase
         $this->expectException(NotFoundHttpException::class);
         $this->expectExceptionMessage('does not support serving');
         $controller->__invoke('glide', 'remote', 'photo.jpg', new Request());
+    }
+
+    public function testInvokeThrowsNotFoundForMissingImage(): void
+    {
+        $exception = new ImageNotFoundException('Image not found.');
+        $controller = $this->createControllerThrowing($exception);
+
+        try {
+            $controller->__invoke('glide', 'filesystem', 'photo.jpg', new Request());
+            self::fail('Expected a NotFoundHttpException.');
+        } catch (NotFoundHttpException $e) {
+            self::assertSame($exception, $e->getPrevious());
+        }
+    }
+
+    public function testInvokeThrowsNotFoundForUndecodableImage(): void
+    {
+        $exception = new UndecodableImageException('Source image could not be decoded.');
+        $controller = $this->createControllerThrowing($exception);
+
+        try {
+            $controller->__invoke('glide', 'filesystem', 'photo.jpg', new Request());
+            self::fail('Expected a NotFoundHttpException.');
+        } catch (NotFoundHttpException $e) {
+            // Consumers tell the two 404s apart through the previous exception:
+            // a missing source may be recovered from, a broken one may not.
+            self::assertSame($exception, $e->getPrevious());
+            self::assertNotInstanceOf(ImageNotFoundException::class, $e->getPrevious());
+        }
+    }
+
+    private function createControllerThrowing(Throwable $exception): ImageController
+    {
+        $loader = self::createStub(ServableLoaderInterface::class);
+        $transformer = self::createStub(LocalTransformerInterface::class);
+        $transformer->method('serve')->willThrowException($exception);
+
+        return new ImageController(
+            $this->createRegistry(TransformerRegistry::class, 'glide', $transformer),
+            $this->createRegistry(LoaderRegistry::class, 'filesystem', $loader),
+        );
     }
 
     /**
