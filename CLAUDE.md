@@ -198,12 +198,12 @@ When making API changes, update the following:
     - **Common Patterns** — Update or add patterns for new extension points.
 3. **PHPDoc blocks** — Ensure all public and protected methods on interfaces and services have accurate `@param`, `@return`, and `@throws` annotations.
 4. **Bundle configuration** — When adding or changing config options in `PicassoBundle::configure()`, document the new options in both `README.md` and the Architecture Notes.
-5. **`CHANGELOG.md`** — Add an entry under `[Unreleased]` ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/) sections: Added, Changed, Deprecated, Removed, Fixed, Security). Prefix breaking changes with **BC break:** and say what consumers must change. Skip dependency bumps, CI and tooling changes.
+5. **`CHANGELOG.md`** — Add an entry to the top section, the next release (currently `[2.0.0] - Unreleased`), following [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) sections (Added, Changed, Deprecated, Removed, Fixed, Security). When tagging the release, replace `Unreleased` with the release date and `HEAD` in its compare link with the tag. Prefix breaking changes with **BC break:** and say what consumers must change. Skip dependency bumps, CI and tooling changes.
 
 **Checklist for API changes:**
 
 - [ ] `README.md` reflects the current public API and configuration
-- [ ] `CHANGELOG.md` has an `[Unreleased]` entry for every user-facing change
+- [ ] `CHANGELOG.md` has an entry in the next release section for every user-facing change
 - [ ] `CLAUDE.md` sections are up to date (structure, architecture, exceptions, types, patterns)
 - [ ] PHPDoc annotations are accurate on all affected interfaces and classes
 - [ ] New extension points (loaders, transformers, placeholders) have a corresponding entry in Common Patterns
