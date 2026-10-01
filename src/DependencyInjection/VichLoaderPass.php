@@ -13,11 +13,13 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\DependencyInjection;
 
+use function assert;
 use function count;
 use function is_array;
 use function is_string;
 
 use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
+use Silarhi\PicassoBundle\Service\LegacyMetadataResolver;
 
 use function sprintf;
 
@@ -68,8 +70,26 @@ final class VichLoaderPass implements CompilerPassInterface
                 $container->getDefinition($id)
                     ->replaceArgument(2, $mapping)
                     ->replaceArgument(3, $uploadDestination);
+
+                $this->addLoaderRoot($container, $uploadDestination, $loader);
             }
         }
+    }
+
+    /**
+     * Lets 1.x URLs whose "_metadata" names this upload destination redirect to the loader.
+     */
+    private function addLoaderRoot(ContainerBuilder $container, string $root, string $loader): void
+    {
+        if (!$container->hasDefinition(LegacyMetadataResolver::SERVICE)) {
+            return;
+        }
+
+        $resolver = $container->getDefinition(LegacyMetadataResolver::SERVICE);
+        $roots = $resolver->getArgument(1);
+        assert(is_array($roots));
+        $roots[$root] ??= $loader;
+        $resolver->replaceArgument(1, $roots);
     }
 
     /**

@@ -14,6 +14,14 @@ declare(strict_types=1);
 namespace Silarhi\PicassoBundle\Tests\Functional;
 
 use function assert;
+use function dirname;
+
+use League\Glide\Signatures\SignatureFactory;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Silarhi\PicassoBundle\Tests\Fixtures\CollectsDeprecationsTrait;
+use Silarhi\PicassoBundle\Tests\Fixtures\LegacyMetadataToken;
+
+use function sprintf;
 
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\HttpFoundation\Request;
@@ -28,6 +36,7 @@ use Symfony\UX\TwigComponent\Test\InteractsWithTwigComponents;
  */
 class EndToEndImageServingTest extends KernelTestCase
 {
+    use CollectsDeprecationsTrait;
     use InteractsWithTwigComponents;
 
     protected static function getKernelClass(): string
@@ -252,6 +261,58 @@ class EndToEndImageServingTest extends KernelTestCase
         }
 
         self::assertGreaterThan(0, $tested, 'No srcset entries were tested');
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function loaderOf1xUrlProvider(): iterable
+    {
+        yield 'loader now a chain' => ['chained'];
+        yield 'loader now reading another root' => ['entities_fs'];
+        yield 'loader no longer declared' => ['legacy'];
+    }
+
+    #[DataProvider('loaderOf1xUrlProvider')]
+    public function test1xUrlRedirectsToTheLoaderReadingItsRoot(string $loader): void
+    {
+        self::bootKernel();
+        $token = LegacyMetadataToken::mint('full-test-key', ['path' => dirname(__DIR__) . '/Fixtures']);
+
+        [$response, $deprecations] = self::collectDeprecations(fn (): Response => $this->handleRequest($this->sign1xUrl($loader, 'photo.jpg', ['w' => '10', '_metadata' => $token])));
+
+        self::assertSame(Response::HTTP_MOVED_PERMANENTLY, $response->getStatusCode());
+        // "main" is the first loader reading the fixtures ("secondary_fs" and "third_fs" do too)
+        $location = (string) $response->headers->get('Location');
+        self::assertStringStartsWith('/image/local_glide/main/photo.jpg?', $location);
+        self::assertContains(sprintf('Since silarhi/picasso-bundle 2.0: A 1.x image URL of loader "%s" was redirected to loader "main". Support for 1.x URLs will be removed in 3.0.', $loader), $deprecations);
+        self::assertSame(200, $this->handleRequest($location)->getStatusCode());
+    }
+
+    public function test1xUrlWhoseRootNoLoaderReadsIsNotFound(): void
+    {
+        self::bootKernel();
+        $token = LegacyMetadataToken::mint('full-test-key', ['path' => '/srv/removed']);
+
+        self::assertSame(404, $this->handleRequest($this->sign1xUrl('main', 'photo.jpg', ['w' => '10', '_metadata' => $token]))->getStatusCode());
+    }
+
+    public function test1xUrlWithAForgedSignatureIsNotFound(): void
+    {
+        self::bootKernel();
+        $token = LegacyMetadataToken::mint('full-test-key', ['path' => dirname(__DIR__) . '/Fixtures']);
+
+        self::assertSame(404, $this->handleRequest('/image/local_glide/main/photo.jpg?' . http_build_query(['w' => '10', '_metadata' => $token, 's' => 'forged']))->getStatusCode());
+    }
+
+    /**
+     * @param array<string, string> $params
+     */
+    private function sign1xUrl(string $loader, string $path, array $params): string
+    {
+        $params['s'] = SignatureFactory::create('full-test-key')->generateSignature($path, $params);
+
+        return '/image/local_glide/' . $loader . '/' . $path . '?' . http_build_query($params);
     }
 
     private function handleRequest(string $url): Response

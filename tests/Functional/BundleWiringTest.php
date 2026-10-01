@@ -22,6 +22,7 @@ use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
+use Silarhi\PicassoBundle\Controller\LegacyUrlController;
 use Silarhi\PicassoBundle\DataCollector\CollectingImageHelper;
 use Silarhi\PicassoBundle\DataCollector\CollectingMetadataGuesser;
 use Silarhi\PicassoBundle\DataCollector\PicassoDataCollector;
@@ -35,6 +36,7 @@ use Silarhi\PicassoBundle\Placeholder\BlurHashPlaceholder;
 use Silarhi\PicassoBundle\Placeholder\PlaceholderInterface;
 use Silarhi\PicassoBundle\Placeholder\TransformerPlaceholder;
 use Silarhi\PicassoBundle\Service\ImageHelper;
+use Silarhi\PicassoBundle\Service\LegacyMetadataResolver;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Service\MetadataGuesser;
 use Silarhi\PicassoBundle\Service\PlaceholderRegistry;
@@ -171,6 +173,41 @@ class BundleWiringTest extends TestCase
         $this->expectExceptionMessage($message);
 
         $this->loadExtension(['loaders' => $loaders]);
+    }
+
+    public function testLegacyUrlControllerDecoratesTheImageControllerWithGlide(): void
+    {
+        $container = $this->loadExtension([
+            'cache_control' => ['error_max_age' => 60],
+            'loaders' => [
+                'uploads' => ['type' => 'filesystem', 'path' => '/uploads'],
+                'uploads_again' => ['type' => 'filesystem', 'path' => '/uploads'],
+                'assets' => ['type' => 'filesystem', 'path' => '/assets'],
+            ],
+            'transformers' => [
+                'imgix' => ['base_url' => 'https://example.imgix.net'],
+                'glide' => ['sign_key' => 'first-glide-key'],
+                'other_glide' => ['type' => 'glide', 'sign_key' => 'other-key'],
+            ],
+        ]);
+
+        $controller = $container->getDefinition('.picasso.controller.legacy_url');
+        self::assertSame(LegacyUrlController::class, $controller->getClass());
+        self::assertSame(['picasso.controller.image', null, 0], $controller->getDecoratedService());
+        self::assertSame(60, $controller->getArgument(3));
+
+        // 1.x encrypted "_metadata" with the first Glide sign key; the first loader reading a root serves it
+        $resolver = $container->getDefinition(LegacyMetadataResolver::SERVICE);
+        self::assertSame('first-glide-key', $resolver->getArgument(0));
+        self::assertSame(['/uploads' => 'uploads', '/assets' => 'assets'], $resolver->getArgument(1));
+    }
+
+    public function testImageControllerIsNotDecoratedWithoutGlide(): void
+    {
+        $container = $this->loadExtension(['transformers' => ['imgix' => ['base_url' => 'https://example.imgix.net']]]);
+
+        self::assertFalse($container->hasDefinition('.picasso.controller.legacy_url'));
+        self::assertFalse($container->hasDefinition(LegacyMetadataResolver::SERVICE));
     }
 
     public function testTransformerWithUnknownTypeThrowsLogicException(): void

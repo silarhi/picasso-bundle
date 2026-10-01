@@ -358,9 +358,9 @@ class GlideTransformerTest extends TestCase
         self::assertSame('fit_contain,fm_webp,h_200,q_75,w_300', $segment);
     }
 
-    public function testBuildParamsSegmentExcludesMetadataAndSignature(): void
+    public function testBuildParamsSegmentExcludesSignature(): void
     {
-        $params = ['w' => 300, '_metadata' => 'encrypted_data', 's' => 'signature', 'fm' => 'webp'];
+        $params = ['w' => 300, 's' => 'signature', 'fm' => 'webp'];
 
         $segment = $this->transformer->buildParamsSegment($params);
 

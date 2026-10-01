@@ -78,12 +78,6 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
     private const LEGACY_REDIRECT_MAX_AGE = 2592000;
 
     /**
-     * Query param pre-2.0 URLs used to carry encrypted loader metadata in.
-     * Ignored when serving; see {@see serve()}.
-     */
-    private const LEGACY_METADATA_PARAM = '_metadata';
-
-    /**
      * What Glide lets through when the source bytes are not a decodable image
      * (truncated upload, PDF saved under an image name...). Matched with
      * instanceof rather than caught: each supported league/glide major pulls a
@@ -208,14 +202,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
             // params in the query string. Their signature still validates, but they
             // can never be served straight from the cache bucket, so point clients
             // at the canonical path-based URL instead of 404ing on them.
-            $response = new RedirectResponse(
-                $this->buildCanonicalUrl($path, $params, $context),
-                Response::HTTP_MOVED_PERMANENTLY,
-            );
-            $response->setPublic();
-            $response->setMaxAge(self::LEGACY_REDIRECT_MAX_AGE);
-
-            return $response;
+            return $this->permanentRedirect($this->buildCanonicalUrl($path, $params, $context));
         }
 
         if ($this->isPublicCacheEnabled()) {
@@ -237,11 +224,6 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
                 return $transformer->computeCachePath($path, $cacheFilename, $context);
             };
         }
-
-        // URLs minted before 2.0 may carry an encrypted "_metadata" param locating
-        // the source. Their signature (checked above) still covers it, but each
-        // loader now reads from a single source, so it is no longer needed.
-        unset($params[self::LEGACY_METADATA_PARAM]);
 
         $this->server->setSource(new Filesystem(new ImageSourceFlysystemAdapter($loader->getSource())));
         $this->server->setResponseFactory(new SymfonyResponseFactory($request));
@@ -429,6 +411,52 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
     }
 
     /**
+     * Redirects a signed request to the same image and transformation under another loader.
+     *
+     * Any query param the signature covers is accepted, and only the transformation
+     * is carried over: the target URL is generated anew, signed and in the current
+     * URL scheme (path-based params in public-cache mode).
+     *
+     * @param TransformerContext $context The context of the request; its "loader" is replaced
+     *
+     * @throws ImageNotFoundException When the signature is invalid
+     *
+     * @internal Used to redirect 1.x URLs, see LegacyUrlController
+     */
+    public function redirectToLoader(string $loader, string $path, Request $request, array $context = []): RedirectResponse
+    {
+        $params = $request->query->all();
+
+        try {
+            $this->signature->validateRequest($path, $params);
+        } catch (SignatureException $e) {
+            throw new ImageNotFoundException('Invalid image signature.', $e->getCode(), previous: $e);
+        }
+
+        if ($this->isPublicCacheEnabled() && !$this->isLegacyRequest($path, $params)) {
+            $lastSlash = strrpos($path, '/');
+            if (false === $lastSlash) {
+                throw new ImageNotFoundException('Invalid cached image path.');
+            }
+
+            ['params' => $cachedParams] = self::parseParamsFilename(substr($path, $lastSlash + 1));
+            $params = [...$params, ...$cachedParams];
+            $path = substr($path, 0, $lastSlash);
+        }
+
+        return $this->permanentRedirect($this->buildCanonicalUrl($path, $params, [...$context, 'loader' => $loader]));
+    }
+
+    private function permanentRedirect(string $url): RedirectResponse
+    {
+        $response = new RedirectResponse($url, Response::HTTP_MOVED_PERMANENTLY);
+        $response->setPublic();
+        $response->setMaxAge(self::LEGACY_REDIRECT_MAX_AGE);
+
+        return $response;
+    }
+
+    /**
      * Rebuild the current-scheme URL for a legacy request, so it can be redirected.
      *
      * @param array<string, mixed> $params
@@ -468,7 +496,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
     }
 
     /**
-     * Build the params segment from Glide params (excluding the signature and pre-2.0 "_metadata").
+     * Build the params segment from Glide params (excluding the signature).
      *
      * @param TransformerParams $glideParams
      */
@@ -476,7 +504,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
     {
         $filtered = array_filter(
             $glideParams,
-            static fn (string $key): bool => self::LEGACY_METADATA_PARAM !== $key && 's' !== $key,
+            static fn (string $key): bool => 's' !== $key,
             \ARRAY_FILTER_USE_KEY,
         );
 
