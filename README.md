@@ -346,6 +346,7 @@ picasso:
             driver: gd # gd | imagick
             max_image_size: ~ # optional max pixel count
             base_url: ~ # optional scheme + host prepended to image URLs, e.g. a CDN
+            defer_cache_write: false # store a cache miss after the response is sent
             public_cache:
                 enabled: false # serve transformed images from public directory
                 prefix: '' # path prepended to cache keys so they mirror the URL path
@@ -1008,6 +1009,7 @@ picasso:
             driver: gd # gd | imagick
             max_image_size: ~ # optional: max pixel count (width x height)
             base_url: ~ # optional: e.g. https://img.example.com to point image URLs at a CDN
+            defer_cache_write: false # store a cache miss after the response is sent
             public_cache:
                 enabled: false # serve from public dir for better performance
                 prefix: '' # optional: path prepended to cache keys (see "Serving thumbnails from a CDN")
@@ -1072,6 +1074,7 @@ picasso:
             sign_key: '%env(PICASSO_SIGN_KEY)%'
             cache: 'thumbs.storage' # Flysystem storage of the bucket
             base_url: 'https://img.example.com' # the CDN host
+            defer_cache_write: true # upload a miss after the response is sent
             public_cache:
                 enabled: true
                 prefix: 'image' # the URL path before the transformer name (/image/glide/…)
@@ -1080,6 +1083,7 @@ picasso:
 - **`base_url`** makes every generated image URL point at the CDN: `https://img.example.com/image/glide/…`.
 - **`public_cache.prefix`** makes the cache key equal the URL path: the variant served at `/image/glide/flysystem/photo.jpg/fm_webp%2Cw_640.webp` is stored under the key `image/glide/flysystem/photo.jpg/fm_webp,w_640.webp`, which is exactly what the CDN looks up in the bucket. Set it to what comes before the transformer name in the URL path: `image` with the default [routes](#routes), or e.g. `media/image` when they are imported with a `/media` prefix.
 - **On a miss**, the application renders the variant, stores it in the bucket and returns it with `Cache-Control: public, max-age=31536000, immutable` (the `cache_control` defaults). The next request is a hit.
+- **`defer_cache_write`** keeps the upload out of the client's wait: a miss is rendered to a local temporary directory, answered from there, and moved to the bucket on `kernel.terminate`, after the client has been released (`fastcgi_finish_request()` under PHP-FPM and FrankenPHP, after the request in FrankenPHP worker mode). Only the variants of requests in flight are on local disk. A failed upload is logged, not thrown: the next request renders the variant again. The upload still occupies the PHP worker until it completes, so size the worker pool for bursts of misses.
 - **`cache_control.error_max_age`** makes the image controller's 404s cacheable (`Cache-Control: public, max-age=…`), so a CDN does not send every request for a missing image to the application. Without it, 404s stay uncacheable.
 
 The signature is only checked on a miss: that is all it needs to protect, since it guards the rendering, and a variant that already exists is public anyway.

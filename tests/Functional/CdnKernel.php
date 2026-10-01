@@ -19,7 +19,8 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 /**
  * Glide set up to sit behind a CDN whose origin is the cache bucket: URLs on the
- * CDN host, cache keys mirroring the URL path and 404s cacheable for a minute.
+ * CDN host, cache keys mirroring the URL path, misses stored after the response
+ * is sent and 404s cacheable for a minute.
  */
 class CdnKernel extends AbstractPicassoKernel
 {
@@ -39,6 +40,7 @@ class CdnKernel extends AbstractPicassoKernel
                     'sign_key' => 'cdn-key',
                     'cache' => '%kernel.cache_dir%/bucket',
                     'base_url' => 'https://cdn.example.com',
+                    'defer_cache_write' => true,
                     'public_cache' => [
                         'enabled' => true,
                         'prefix' => 'image',

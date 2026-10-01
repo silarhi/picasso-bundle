@@ -22,6 +22,8 @@ use function is_scalar;
 
 use JsonException;
 use League\Flysystem\Filesystem;
+use League\Flysystem\FilesystemOperator;
+use League\Flysystem\Local\LocalFilesystemAdapter;
 use League\Glide\Filesystem\FileNotFoundException;
 use League\Glide\Filesystem\FilesystemException;
 use League\Glide\Responses\SymfonyResponseFactory;
@@ -94,11 +96,19 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
     private Server $server;
     private ?string $baseUrl;
     private string $cachePrefix;
+    private FilesystemOperator $cacheStorage;
 
     /**
-     * @param string|null $baseUrl     Scheme and host (e.g. a CDN) prepended to generated URLs; null keeps them host-relative
-     * @param string      $cachePrefix Public-cache mode only: path prepended to every cache key, so keys can mirror the
-     *                                 URL path (e.g. "image" when the bundle routes are served under /image)
+     * Local directory a miss is rendered to when cache writes are deferred.
+     */
+    private ?FilesystemOperator $renderStorage;
+
+    /**
+     * @param string|null              $baseUrl             Scheme and host (e.g. a CDN) prepended to generated URLs; null keeps them host-relative
+     * @param string                   $cachePrefix         Public-cache mode only: path prepended to every cache key, so keys can mirror the
+     *                                                      URL path (e.g. "image" when the bundle routes are served under /image)
+     * @param DeferredCacheWriter|null $deferredCacheWriter When set, a miss is rendered to local disk and moved to the
+     *                                                      cache storage after the response has been sent
      */
     public function __construct(
         private UrlGeneratorInterface $router,
@@ -111,6 +121,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         ?FlysystemRegistry $flysystemRegistry = null,
         ?string $baseUrl = null,
         string $cachePrefix = '',
+        private ?DeferredCacheWriter $deferredCacheWriter = null,
     ) {
         $this->signature = SignatureFactory::create($signKey);
         $this->baseUrl = null !== $baseUrl && '' !== $baseUrl ? rtrim($baseUrl, '/') : null;
@@ -131,6 +142,10 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         }
 
         $this->server = ServerFactory::create($serverConfig);
+        $this->cacheStorage = $this->server->getCache();
+        $this->renderStorage = null !== $deferredCacheWriter
+            ? new Filesystem(new LocalFilesystemAdapter(sys_get_temp_dir() . '/picasso-glide-' . bin2hex(random_bytes(8))))
+            : null;
     }
 
     public function url(Image $image, ImageTransformation $transformation, array $context = []): string
@@ -248,9 +263,23 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         $this->server->setResponseFactory(new SymfonyResponseFactory($request));
         $this->server->setCachePathCallable($cachePathCallable);
 
+        // The server is shared by every request of a long-running process, so
+        // each request picks its cache storage. With deferred writes, a miss is
+        // rendered to local disk and moved to the cache storage on kernel.terminate.
+        $this->server->setCache($this->cacheStorage);
+        $renderStorage = null;
+        if (null !== $this->renderStorage && !$this->server->cacheFileExists($path, $params)) {
+            $renderStorage = $this->renderStorage;
+            $this->server->setCache($renderStorage);
+        }
+
         try {
             /** @var Response $response */
             $response = $this->server->getImageResponse($path, $params);
+
+            if (null !== $renderStorage) {
+                $this->deferredCacheWriter?->defer($renderStorage, $this->cacheStorage, $this->server->getCachePath($path, $params));
+            }
 
             return $response;
         } catch (FileNotFoundException|InvalidArgumentException $e) {
@@ -328,8 +357,10 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         // deleteCache() removes the folder of Glide's default cache path for
         // $cachePath. A public-cache serve() leaves its own cache path callable on
         // the shared server: in a long-running process, it would send the purge to
-        // the folder of whatever variant was served last instead.
+        // the folder of whatever variant was served last instead. A deferred-write
+        // serve() leaves the local render directory as the cache for the same reason.
         $this->server->setCachePathCallable(null);
+        $this->server->setCache($this->cacheStorage);
 
         try {
             $purged = $this->server->deleteCache($cachePath);

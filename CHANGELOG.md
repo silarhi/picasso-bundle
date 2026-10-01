@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `ImageSourceInterface` (`exists()` + `readStream()`) in the new `Silarhi\PicassoBundle\Source` namespace: read access to the originals behind a servable loader, with `LocalImageSource` (local directory, no Flysystem dependency) and `FlysystemImageSource` (Flysystem storage). Custom storages can back a servable loader by implementing the two methods, without writing a Flysystem adapter.
 - `ImageSourceFlysystemAdapter`, a read-only Flysystem adapter that lets Glide read any `ImageSourceInterface`.
-- Glide options to serve thumbnails from a CDN whose origin is the cache bucket, so PHP only runs on cache misses: `base_url` (image URLs on the CDN host) and `public_cache.prefix` (cache keys equal to the URL path).
+- Glide options to serve thumbnails from a CDN whose origin is the cache bucket, so PHP only runs on cache misses: `base_url` (image URLs on the CDN host), `public_cache.prefix` (cache keys equal to the URL path) and `defer_cache_write` (a miss is rendered to local disk and moved to the cache storage on `kernel.terminate`, after the response has been sent).
 - `cache_control` option: HTTP cache headers of the images served by the bundle controller, set by the controller instead of the transformer. `max_age` (default one year; `null` keeps the transformer's headers), `immutable` (default `true`) and `error_max_age` (cacheable 404s, default off).
 
 ### Changed

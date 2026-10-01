@@ -26,7 +26,7 @@ use Symfony\Component\HttpKernel\Kernel;
 /**
  * The CDN setup end to end: a URL minted for the CDN host misses, falls back to
  * the application, and the variant lands in the cache storage under the exact
- * key the CDN looks up (the URL path).
+ * key the CDN looks up (the URL path), once the response has been sent.
  */
 class CdnEndToEndTest extends KernelTestCase
 {
@@ -50,13 +50,19 @@ class CdnEndToEndTest extends KernelTestCase
         self::assertStringStartsWith('https://cdn.example.com/image/glide/filesystem/photo.jpg/', $url);
 
         $kernel = $this->kernel();
-        $response = $kernel->handle(Request::create($url));
+        $request = Request::create($url);
+        $response = $kernel->handle($request);
         $key = rawurldecode(ltrim((string) parse_url($url, \PHP_URL_PATH), '/'));
+        $stored = $kernel->getCacheDir() . '/bucket/' . $key;
 
         self::assertSame(200, $response->getStatusCode());
         self::assertSame('image/webp', $response->headers->get('Content-Type'));
         self::assertTrue($response->headers->hasCacheControlDirective('immutable'));
-        self::assertFileExists($kernel->getCacheDir() . '/bucket/' . $key, 'The cache key must be the URL path, so the CDN finds the variant in the bucket.');
+        self::assertFileDoesNotExist($stored, 'The variant must be stored after the response is sent, not before.');
+
+        $kernel->terminate($request, $response);
+
+        self::assertFileExists($stored, 'The cache key must be the URL path, so the CDN finds the variant in the bucket.');
     }
 
     public function testAMissingImageIsACacheable404(): void

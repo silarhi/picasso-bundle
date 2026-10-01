@@ -39,6 +39,7 @@ use Silarhi\PicassoBundle\Source\FlysystemImageSource;
 use Silarhi\PicassoBundle\Source\ImageSourceInterface;
 use Silarhi\PicassoBundle\Source\LocalImageSource;
 use Silarhi\PicassoBundle\Tests\Transformer\Stub\RacyCacheAdapter;
+use Silarhi\PicassoBundle\Transformer\DeferredCacheWriter;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 
 use function strlen;
@@ -419,7 +420,60 @@ class GlideTransformerServeTest extends TestCase
         self::assertFileExists($this->tempDir . '/cache/image/glide/filesystem/photo.jpg/fm_webp,w_10.webp');
     }
 
-    private function createTransformer(string $cache, ?FlysystemRegistry $flysystemRegistry = null, bool $publicCache = false, string $cachePrefix = ''): GlideTransformer
+    public function testServeMovesADeferredMissToTheCacheOnlyWhenFlushed(): void
+    {
+        $writer = new DeferredCacheWriter();
+        $transformer = $this->createTransformer($this->tempDir . '/cache', publicCache: true, deferredCacheWriter: $writer);
+        $variant = $this->tempDir . '/cache/glide/filesystem/photo.jpg/fm_webp,w_10.webp';
+
+        $response = $this->servePublicCacheFixture($transformer);
+        $body = $this->responseBody($response);
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('image/webp', $response->headers->get('Content-Type'));
+        self::assertFileDoesNotExist($variant, 'The variant must be stored after the response is sent, not before.');
+
+        $writer->flush();
+
+        self::assertSame($body, file_get_contents($variant));
+    }
+
+    public function testServeAnswersAHitFromTheCacheStorageWithDeferredWrites(): void
+    {
+        $writer = new DeferredCacheWriter();
+        $transformer = $this->createTransformer($this->tempDir . '/cache', publicCache: true, deferredCacheWriter: $writer);
+        $variant = $this->tempDir . '/cache/glide/filesystem/photo.jpg/fm_webp,w_10.webp';
+        $this->servePublicCacheFixture($transformer);
+        $writer->flush();
+        // Marks the stored copy, to tell it apart from a fresh render
+        file_put_contents($variant, 'stored');
+
+        $response = $this->servePublicCacheFixture($transformer);
+        $writer->flush();
+
+        self::assertSame('stored', $this->responseBody($response));
+        self::assertSame('stored', file_get_contents($variant), 'A hit must not be rendered and uploaded again.');
+    }
+
+    private function servePublicCacheFixture(GlideTransformer $transformer): Response
+    {
+        return $transformer->serve(
+            $this->createLoader(__DIR__ . '/../Fixtures'),
+            'photo.jpg/fm_webp,w_10.webp',
+            $this->createSignedRequest('photo.jpg/fm_webp,w_10.webp', []),
+            ['transformer' => 'glide', 'loader' => 'filesystem'],
+        );
+    }
+
+    private function responseBody(Response $response): string
+    {
+        ob_start();
+        $response->sendContent();
+
+        return (string) ob_get_clean();
+    }
+
+    private function createTransformer(string $cache, ?FlysystemRegistry $flysystemRegistry = null, bool $publicCache = false, string $cachePrefix = '', ?DeferredCacheWriter $deferredCacheWriter = null): GlideTransformer
     {
         $router = self::createStub(UrlGeneratorInterface::class);
         $router->method('generate')->willReturnCallback(static function (string $name, array $params): string {
@@ -444,6 +498,7 @@ class GlideTransformerServeTest extends TestCase
             $flysystemRegistry,
             null,
             $cachePrefix,
+            $deferredCacheWriter,
         );
     }
 
