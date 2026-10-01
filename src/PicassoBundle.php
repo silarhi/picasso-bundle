@@ -395,7 +395,7 @@ final class PicassoBundle extends AbstractBundle
          *     resolve_metadata: bool,
          *     collector: bool,
          *     cache: bool|string,
-         *     cache_control: array{max_age: int|null, immutable: bool, error_max_age: int|null},
+         *     cache_control: CacheControlConfig,
          *     device_sizes: list<int>,
          *     image_sizes: list<int>,
          *     formats: list<string>,
@@ -703,9 +703,7 @@ final class PicassoBundle extends AbstractBundle
                 service('picasso.transformer_registry'),
                 service('picasso.loader_registry'),
                 service('debug.stopwatch')->nullOnInvalid(),
-                $config['cache_control']['max_age'],
-                $config['cache_control']['immutable'],
-                $config['cache_control']['error_max_age'],
+                $config['cache_control'],
             ])
             ->tag('controller.service_arguments')
             ->public();

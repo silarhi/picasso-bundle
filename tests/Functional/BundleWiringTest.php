@@ -241,10 +241,10 @@ class BundleWiringTest extends TestCase
         $transformer = $container->getDefinition('picasso.transformer.glide');
         self::assertSame('https://cdn.example.com', $transformer->getArgument(8));
         self::assertSame('image', $transformer->getArgument(9));
-        $controller = $container->getDefinition('picasso.controller.image');
-        self::assertSame(600, $controller->getArgument(3));
-        self::assertFalse($controller->getArgument(4));
-        self::assertSame(60, $controller->getArgument(5));
+        self::assertSame(
+            ['max_age' => 600, 'immutable' => false, 'error_max_age' => 60],
+            $container->getDefinition('picasso.controller.image')->getArgument(3),
+        );
     }
 
     public function testGlideCdnOptionsAreOffByDefault(): void
@@ -258,10 +258,10 @@ class BundleWiringTest extends TestCase
         $transformer = $container->getDefinition('picasso.transformer.glide');
         self::assertNull($transformer->getArgument(8));
         self::assertSame('', $transformer->getArgument(9));
-        $controller = $container->getDefinition('picasso.controller.image');
-        self::assertSame(31536000, $controller->getArgument(3));
-        self::assertTrue($controller->getArgument(4));
-        self::assertNull($controller->getArgument(5));
+        self::assertSame(
+            ['max_age' => 31536000, 'immutable' => true, 'error_max_age' => null],
+            $container->getDefinition('picasso.controller.image')->getArgument(3),
+        );
     }
 
     public function testImgixTransformerIsRegistered(): void
