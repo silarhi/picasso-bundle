@@ -38,16 +38,15 @@ use Throwable;
 final readonly class ImageController
 {
     /**
-     * @param CacheControlConfig $cacheControl The bundle's cache_control config: max_age (seconds a served image may be
+     * @param CacheControlConfig $cacheControl the bundle's cache_control config: max_age (seconds a served image may be
      *                                         cached; null keeps the transformer's headers), immutable, and
-     *                                         error_max_age (seconds a 404 may be cached; null keeps it uncacheable).
-     *                                         The default leaves every header alone.
+     *                                         error_max_age (seconds a 404 may be cached; null keeps it uncacheable)
      */
     public function __construct(
         private TransformerRegistry $transformerRegistry,
         private LoaderRegistry $loaderRegistry,
+        private array $cacheControl,
         private ?Stopwatch $stopwatch = null,
-        private array $cacheControl = ['max_age' => null, 'immutable' => false, 'error_max_age' => null],
     ) {
     }
 

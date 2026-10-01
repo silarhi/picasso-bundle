@@ -769,8 +769,8 @@ final class PicassoBundle extends AbstractBundle
             ->args([
                 service('picasso.transformer_registry'),
                 service('picasso.loader_registry'),
-                service('debug.stopwatch')->nullOnInvalid(),
                 $config['cache_control'],
+                service('debug.stopwatch')->nullOnInvalid(),
             ])
             ->tag('controller.service_arguments')
             ->public();
