@@ -26,6 +26,9 @@ class CdnKernel extends AbstractPicassoKernel
     protected function configureContainer(ContainerBuilder $container): void
     {
         $container->loadFromExtension('picasso', [
+            'cache_control' => [
+                'error_max_age' => 60,
+            ],
             'loaders' => [
                 'filesystem' => [
                     'paths' => [dirname(__DIR__) . '/Fixtures'],
@@ -36,7 +39,6 @@ class CdnKernel extends AbstractPicassoKernel
                     'sign_key' => 'cdn-key',
                     'cache' => '%kernel.cache_dir%/bucket',
                     'base_url' => 'https://cdn.example.com',
-                    'error_max_age' => 60,
                     'public_cache' => [
                         'enabled' => true,
                         'prefix' => 'image',

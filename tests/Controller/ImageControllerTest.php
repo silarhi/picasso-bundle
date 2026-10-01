@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Tests\Controller;
 
+use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Controller\ImageController;
@@ -24,6 +25,7 @@ use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 use Silarhi\PicassoBundle\Transformer\LocalTransformerInterface;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -143,9 +145,65 @@ class ImageControllerTest extends TestCase
         }
     }
 
-    public function testNotFoundIsCacheableForTheTransformerErrorMaxAge(): void
+    public function testServedImageGetsTheConfiguredCacheHeaders(): void
     {
-        $controller = $this->createControllerThrowing(new ImageNotFoundException('Image not found.'), ['glide' => 60]);
+        $controller = $this->createControllerServing($this->glideLikeResponse(), maxAge: 3600, immutable: true);
+
+        $response = $controller->__invoke('glide', 'filesystem', 'photo.jpg', new Request());
+
+        self::assertTrue($response->headers->hasCacheControlDirective('public'));
+        self::assertSame('3600', $response->headers->getCacheControlDirective('max-age'));
+        self::assertTrue($response->headers->hasCacheControlDirective('immutable'));
+        self::assertFalse($response->headers->has('Expires'), 'A transformer Expires must not contradict the configured max-age.');
+    }
+
+    public function testServedImageIsNotMarkedImmutableWhenDisabled(): void
+    {
+        $controller = $this->createControllerServing($this->glideLikeResponse(), maxAge: 600, immutable: false);
+
+        $response = $controller->__invoke('glide', 'filesystem', 'photo.jpg', new Request());
+
+        self::assertSame('600', $response->headers->getCacheControlDirective('max-age'));
+        self::assertFalse($response->headers->hasCacheControlDirective('immutable'));
+    }
+
+    public function testServedImageKeepsTheTransformerHeadersWithoutMaxAge(): void
+    {
+        $controller = $this->createControllerServing($this->glideLikeResponse(), maxAge: null, immutable: true);
+
+        $response = $controller->__invoke('glide', 'filesystem', 'photo.jpg', new Request());
+
+        self::assertSame('31536000', $response->headers->getCacheControlDirective('max-age'));
+        self::assertFalse($response->headers->hasCacheControlDirective('immutable'));
+        self::assertTrue($response->headers->has('Expires'));
+    }
+
+    public function testNotModifiedResponseGetsTheConfiguredCacheHeaders(): void
+    {
+        $controller = $this->createControllerServing(new Response('', Response::HTTP_NOT_MODIFIED), maxAge: 3600, immutable: true);
+
+        $response = $controller->__invoke('glide', 'filesystem', 'photo.jpg', new Request());
+
+        self::assertSame('3600', $response->headers->getCacheControlDirective('max-age'));
+        self::assertTrue($response->headers->hasCacheControlDirective('immutable'));
+    }
+
+    public function testRedirectKeepsTheTransformerHeaders(): void
+    {
+        $redirect = new RedirectResponse('/image/glide/filesystem/photo.jpg/w_10.jpg', Response::HTTP_MOVED_PERMANENTLY);
+        $redirect->setPublic();
+        $redirect->setMaxAge(2592000);
+        $controller = $this->createControllerServing($redirect, maxAge: 3600, immutable: true);
+
+        $response = $controller->__invoke('glide', 'filesystem', 'photo.jpg', new Request());
+
+        self::assertSame('2592000', $response->headers->getCacheControlDirective('max-age'));
+        self::assertFalse($response->headers->hasCacheControlDirective('immutable'));
+    }
+
+    public function testNotFoundIsCacheableForTheErrorMaxAge(): void
+    {
+        $controller = $this->createControllerThrowing(new ImageNotFoundException('Image not found.'), 60);
 
         try {
             $controller->__invoke('glide', 'filesystem', 'photo.jpg', new Request());
@@ -155,29 +213,28 @@ class ImageControllerTest extends TestCase
         }
     }
 
-    public function testNotFoundForAnUnknownLoaderIsCacheableForTheTransformerErrorMaxAge(): void
+    public function testNotFoundForAnUnknownTransformerOrLoaderIsCacheableForTheErrorMaxAge(): void
     {
+        $missing = self::createStub(ContainerInterface::class);
+        $missing->method('has')->willReturn(false);
         $transformer = self::createStub(LocalTransformerInterface::class);
-        $loaderContainer = self::createStub(ContainerInterface::class);
-        $loaderContainer->method('has')->willReturn(false);
-        $controller = new ImageController(
-            $this->createRegistry(TransformerRegistry::class, 'glide', $transformer),
-            new LoaderRegistry($loaderContainer),
-            null,
-            ['glide' => 0],
-        );
 
-        try {
-            $controller->__invoke('glide', 'unknown', 'photo.jpg', new Request());
-            self::fail('Expected a NotFoundHttpException.');
-        } catch (NotFoundHttpException $e) {
-            self::assertSame(['Cache-Control' => 'public, max-age=0'], $e->getHeaders());
+        foreach ([
+            'transformer' => new ImageController(new TransformerRegistry($missing), new LoaderRegistry($missing), null, null, false, 0),
+            'loader' => new ImageController($this->createRegistry(TransformerRegistry::class, 'glide', $transformer), new LoaderRegistry($missing), null, null, false, 0),
+        ] as $case => $controller) {
+            try {
+                $controller->__invoke('glide', 'unknown', 'photo.jpg', new Request());
+                self::fail('Expected a NotFoundHttpException.');
+            } catch (NotFoundHttpException $e) {
+                self::assertSame(['Cache-Control' => 'public, max-age=0'], $e->getHeaders(), $case);
+            }
         }
     }
 
     public function testNotFoundStaysUncacheableWithoutErrorMaxAge(): void
     {
-        $controller = $this->createControllerThrowing(new ImageNotFoundException('Image not found.'), ['other' => 60]);
+        $controller = $this->createControllerThrowing(new ImageNotFoundException('Image not found.'));
 
         try {
             $controller->__invoke('glide', 'filesystem', 'photo.jpg', new Request());
@@ -188,9 +245,34 @@ class ImageControllerTest extends TestCase
     }
 
     /**
-     * @param array<string, int> $errorMaxAges
+     * Headers as Glide's Symfony response factory sets them.
      */
-    private function createControllerThrowing(Throwable $exception, array $errorMaxAges = []): ImageController
+    private function glideLikeResponse(): Response
+    {
+        $response = new Response('image-data', Response::HTTP_OK, ['Content-Type' => 'image/webp']);
+        $response->setPublic();
+        $response->setMaxAge(31536000);
+        $response->setExpires(new DateTimeImmutable('+1 year'));
+
+        return $response;
+    }
+
+    private function createControllerServing(Response $response, ?int $maxAge, bool $immutable): ImageController
+    {
+        $loader = self::createStub(ServableLoaderInterface::class);
+        $transformer = self::createStub(LocalTransformerInterface::class);
+        $transformer->method('serve')->willReturn($response);
+
+        return new ImageController(
+            $this->createRegistry(TransformerRegistry::class, 'glide', $transformer),
+            $this->createRegistry(LoaderRegistry::class, 'filesystem', $loader),
+            null,
+            $maxAge,
+            $immutable,
+        );
+    }
+
+    private function createControllerThrowing(Throwable $exception, ?int $errorMaxAge = null): ImageController
     {
         $loader = self::createStub(ServableLoaderInterface::class);
         $transformer = self::createStub(LocalTransformerInterface::class);
@@ -200,7 +282,9 @@ class ImageControllerTest extends TestCase
             $this->createRegistry(TransformerRegistry::class, 'glide', $transformer),
             $this->createRegistry(LoaderRegistry::class, 'filesystem', $loader),
             null,
-            $errorMaxAges,
+            null,
+            false,
+            $errorMaxAge,
         );
     }
 

@@ -90,12 +90,6 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         'Intervention\\Image\\Exception\\NotReadableException', // intervention/image 2
     ];
 
-    /**
-     * Cache-Control of a rendered variant: a variant URL never changes meaning,
-     * so caches need not revalidate it.
-     */
-    private const CACHE_CONTROL = 'public, max-age=31536000, immutable';
-
     private Signature $signature;
     private Server $server;
     private ?string $baseUrl;
@@ -258,7 +252,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
             /** @var Response $response */
             $response = $this->server->getImageResponse($path, $params);
 
-            return $this->markImmutable($response);
+            return $response;
         } catch (FileNotFoundException|InvalidArgumentException $e) {
             throw new ImageNotFoundException('Image not found.', $e->getCode(), previous: $e);
         } catch (FilesystemException $e) {
@@ -273,7 +267,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
             /** @var Response $response */
             $response = $this->server->getImageResponse($path, $params);
 
-            return $this->markImmutable($response);
+            return $response;
         } catch (Throwable $e) {
             if (!$this->isDecodingFailure($e)) {
                 throw $e;
@@ -281,13 +275,6 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
 
             throw new UndecodableImageException('Source image could not be decoded.', $e->getCode(), previous: $e);
         }
-    }
-
-    private function markImmutable(Response $response): Response
-    {
-        $response->headers->set('Cache-Control', self::CACHE_CONTROL);
-
-        return $response;
     }
 
     private function isDecodingFailure(Throwable $e): bool

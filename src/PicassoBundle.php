@@ -196,6 +196,32 @@ final class PicassoBundle extends AbstractBundle
                         ->thenInvalid('The "cache" option must be true, false, or a cache pool service ID string.')
                     ->end()
                 ->end()
+                ->arrayNode('cache_control')
+                    ->info('HTTP cache headers of the images served by the bundle controller (local transformers such as Glide).')
+                    ->addDefaultsIfNotSet()
+                    ->children()
+                        ->scalarNode('max_age')
+                            ->defaultValue(31536000)
+                            ->info('Seconds clients and CDNs may cache a served image. Null keeps the headers set by the transformer.')
+                            ->validate()
+                                ->ifTrue(static fn (mixed $v): bool => null !== $v && (!is_int($v) || $v < 0))
+                                ->thenInvalid('The "max_age" option must be null or a non-negative integer.')
+                            ->end()
+                        ->end()
+                        ->booleanNode('immutable')
+                            ->defaultTrue()
+                            ->info('Mark served images immutable: a variant URL never changes meaning, so caches need not revalidate it.')
+                        ->end()
+                        ->scalarNode('error_max_age')
+                            ->defaultNull()
+                            ->info('Seconds clients and CDNs may cache a 404. Null keeps 404s uncacheable.')
+                            ->validate()
+                                ->ifTrue(static fn (mixed $v): bool => null !== $v && (!is_int($v) || $v < 0))
+                                ->thenInvalid('The "error_max_age" option must be null or a non-negative integer.')
+                            ->end()
+                        ->end()
+                    ->end()
+                ->end()
                 ->booleanNode('resolve_metadata')
                     ->defaultFalse()
                     ->info('Whether to resolve image metadata (dimensions) from the source by default. Filesystem loaders default to true.')
@@ -343,11 +369,6 @@ final class PicassoBundle extends AbstractBundle
                             ->scalarNode('request_factory')->defaultNull()->info('PSR-17 request factory service ID for imgix purge.')->end()
                             ->scalarNode('stream_factory')->defaultNull()->info('PSR-17 stream factory service ID for imgix purge.')->end()
                             ->scalarNode('service')->defaultNull()->info('Service ID for custom transformers (type: service).')->end()
-                            ->integerNode('error_max_age')
-                                ->defaultNull()
-                                ->min(0)
-                                ->info('Glide: seconds clients and CDNs may cache a 404 from the image controller. Null keeps 404s uncacheable.')
-                            ->end()
                             ->arrayNode('public_cache')
                                 ->canBeEnabled()
                                 ->children()
@@ -374,6 +395,7 @@ final class PicassoBundle extends AbstractBundle
          *     resolve_metadata: bool,
          *     collector: bool,
          *     cache: bool|string,
+         *     cache_control: array{max_age: int|null, immutable: bool, error_max_age: int|null},
          *     device_sizes: list<int>,
          *     image_sizes: list<int>,
          *     formats: list<string>,
@@ -381,7 +403,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_fit: string,
          *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int|null, quality: int|null, fit: string|null, format: string|null, components_x: int, components_y: int, driver: string, service: string|null}>,
          *     loaders: array<string, array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null, resolve_metadata: bool|null}>,
-         *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, api_key: string|null, http_client: string|null, request_factory: string|null, stream_factory: string|null, service: string|null, error_max_age: int|null, public_cache: array{enabled: bool, prefix: string}}>
+         *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, api_key: string|null, http_client: string|null, request_factory: string|null, stream_factory: string|null, service: string|null, public_cache: array{enabled: bool, prefix: string}}>
          * } $config
          */
         $services = $container->services();
@@ -523,8 +545,6 @@ final class PicassoBundle extends AbstractBundle
 
         $knownTransformerTypes = ['glide', 'imgix', 'service'];
         $urlEncryptionRegistered = false;
-        /** @var array<string, int> $errorMaxAges */
-        $errorMaxAges = [];
 
         foreach ($config['transformers'] as $name => $transformerConfig) {
             if (!$transformerConfig['enabled']) {
@@ -560,10 +580,6 @@ final class PicassoBundle extends AbstractBundle
                             $transformerConfig['public_cache']['prefix'],
                         ])
                         ->tag('picasso.transformer', ['key' => $name]);
-
-                    if (null !== $transformerConfig['error_max_age']) {
-                        $errorMaxAges[$name] = $transformerConfig['error_max_age'];
-                    }
                     break;
 
                 case 'imgix':
@@ -687,7 +703,9 @@ final class PicassoBundle extends AbstractBundle
                 service('picasso.transformer_registry'),
                 service('picasso.loader_registry'),
                 service('debug.stopwatch')->nullOnInvalid(),
-                $errorMaxAges,
+                $config['cache_control']['max_age'],
+                $config['cache_control']['immutable'],
+                $config['cache_control']['error_max_age'],
             ])
             ->tag('controller.service_arguments')
             ->public();
