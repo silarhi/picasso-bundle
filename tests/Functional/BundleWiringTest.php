@@ -373,7 +373,7 @@ class BundleWiringTest extends TestCase
 
         self::assertSame(
             ['max_age' => 600, 'immutable' => false, 'error_max_age' => 60],
-            $container->getDefinition('picasso.controller.image')->getArgument(3),
+            $container->getDefinition('picasso.controller.image')->getArgument(2),
         );
     }
 
@@ -392,7 +392,7 @@ class BundleWiringTest extends TestCase
         self::assertFalse($container->hasDefinition('picasso.deferred_cache_writer'));
         self::assertSame(
             ['max_age' => 31536000, 'immutable' => true, 'error_max_age' => null],
-            $container->getDefinition('picasso.controller.image')->getArgument(3),
+            $container->getDefinition('picasso.controller.image')->getArgument(2),
         );
     }
 

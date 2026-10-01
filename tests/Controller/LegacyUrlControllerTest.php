@@ -43,6 +43,7 @@ class LegacyUrlControllerTest extends TestCase
 
     private const SIGN_KEY = 'test-sign-key';
     private const FIXTURES = __DIR__ . '/../Fixtures';
+    private const CACHE_CONTROL = ['max_age' => null, 'immutable' => false, 'error_max_age' => null];
 
     public function testRequestsWithoutMetadataGoToTheImageController(): void
     {
@@ -92,7 +93,7 @@ class LegacyUrlControllerTest extends TestCase
         $empty = new ServiceLocator([]);
 
         return new LegacyUrlController(
-            $imageController ?? new ImageController(new TransformerRegistry($empty), new LoaderRegistry($empty)),
+            $imageController ?? new ImageController(new TransformerRegistry($empty), new LoaderRegistry($empty), self::CACHE_CONTROL),
             new ServiceLocator(['glide' => $this->createGlideTransformer(...)]),
             new LegacyMetadataResolver(self::SIGN_KEY, [self::FIXTURES => 'fixtures'], '/app'),
             $errorMaxAge,
@@ -108,6 +109,7 @@ class LegacyUrlControllerTest extends TestCase
         return new ImageController(
             new TransformerRegistry(new ServiceLocator([$transformerName => static fn (): LocalTransformerInterface => $transformer])),
             new LoaderRegistry(new ServiceLocator(['fixtures' => static fn (): ServableLoaderInterface => $loader])),
+            self::CACHE_CONTROL,
         );
     }
 
