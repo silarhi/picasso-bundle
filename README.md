@@ -21,6 +21,10 @@
         <img src="https://img.shields.io/github/actions/workflow/status/silarhi/picasso-bundle/continuous-integration.yml?style=for-the-badge&label=CI&color=20c997"
             alt="CI Status">
     </picture>
+    <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fsilarhi%2Fpicasso-bundle%2Fbadges%2Fcoverage.json&style=for-the-badge&labelColor=1a1a2e">
+        <img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fsilarhi%2Fpicasso-bundle%2Fbadges%2Fcoverage.json&style=for-the-badge" alt="Coverage">
+    </picture>
 </p>
 
 <h1 align="center">PicassoBundle</h1>
