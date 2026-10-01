@@ -20,7 +20,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **BC break:** `ServableLoaderInterface::getSource()` takes no argument and returns `ImageSourceInterface` instead of `FilesystemOperator|string`. A servable loader now reads from a single source. Custom servable loaders must drop the `$metadata` parameter, and wrap a local path in `LocalImageSource` and a Flysystem storage in `FlysystemImageSource`.
+- **BC break:** `ServableLoaderInterface::getSource()` takes no argument and returns `ImageSourceInterface` instead of `FilesystemOperator|string`. A servable loader now reads from a single source. Custom servable loaders must drop the `$metadata` parameter, and wrap a local path in `LocalImageSource` and a Flysystem storage in `FlysystemImageSource`:
+    ```php
+    // before
+    public function getSource(array $metadata): FilesystemOperator|string
+    {
+        return $this->storage; // or a local path
+    }
+    // after
+    public function getSource(): ImageSourceInterface
+    {
+        return new FlysystemImageSource($this->storage); // or new LocalImageSource($path)
+    }
+    ```
 - **BC break:** a filesystem loader reads one directory, set with `path`; the `paths` list is removed. Declare one filesystem loader per directory, and keep the former loader name as a chain of them so templates do not change:
     ```yaml
     # before
@@ -33,12 +45,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
         assets: { type: filesystem, path: '%kernel.project_dir%/assets' }
         filesystem: { type: chain, loaders: [uploads, assets] }
     ```
-- **BC break:** a vich loader serves one VichUploader mapping. With several mappings, declare one vich loader per mapping (named after it, or with `mapping`), and keep the former loader name as a chain of them (`vich: { type: chain, loaders: [product_image, user_avatar] }`) so templates do not change. The upload field is now found from the mapping, so the `field` context key is only needed when several fields of an entity share it; before, an omitted `field` picked the entity's first mapping.
-- **BC break:** Glide URLs no longer carry the encrypted `_metadata` query param, and `Image::$metadata`, `UrlEncryption` (`picasso.url_encryption`) and `EncryptionException` are removed. 1.x URLs carrying it are redirected (301) to the same image under the loader now reading their source, whatever their loader name has become; a deprecation is triggered on each redirect. 1.x URLs without it keep working as long as their loader name still exists.
+- **BC break:** a vich loader serves one VichUploader mapping. With several mappings, declare one vich loader per mapping (named after it, or with `mapping`), and keep the former loader name as a chain of them so templates do not change. The upload field is now found from the mapping, so the `field` context key is only needed when several fields of an entity share it; before, an omitted `field` picked the entity's first mapping:
+    ```yaml
+    # before
+    loaders:
+        vich: ~ # every VichUploader mapping
+    # after
+    loaders:
+        product_image: { type: vich }
+        user_avatar: { type: vich }
+        vich: { type: chain, loaders: [product_image, user_avatar] }
+    ```
+- **BC break:** Glide URLs no longer carry the encrypted `_metadata` query param, and `Image::$metadata`, `UrlEncryption` (`picasso.url_encryption`) and `EncryptionException` are removed. A custom loader that told roots apart with `metadata` must be split into one loader per root, chained if they share a name. 1.x URLs carrying it are redirected (301) to the same image under the loader now reading their source, whatever their loader name has become; a deprecation is triggered on each redirect. 1.x URLs without it keep working as long as their loader name still exists:
+    ```
+    # before
+    /image/glide/filesystem/photo.jpg?w=640&fm=webp&_metadata=<encrypted root>&s=…
+    # after (the 1.x URL above answers 301 to it)
+    /image/glide/uploads/photo.jpg?w=640&fm=webp&s=…
+    ```
 - `FilesystemLoader::load()` now treats paths escaping its base directory (`..`) as missing, as serving already did.
 - Glide purges now throw a `PurgeException` when the cache storage cannot delete the variants, instead of failing silently.
-- Images served by the bundle controller now carry `Cache-Control: public, max-age=31536000, immutable` by default (previously Glide's `public, max-age=31536000` and an `Expires` header, which is now dropped). Configurable under `cache_control`.
-- Untransformed public-cache URLs now use the reserved params segment `_untransformed` (e.g. `photo.jpg/_untransformed.jpg`). URLs with an empty params segment such as `photo.jpg/.jpg` now return 404.
+- Images served by the bundle controller now carry `immutable` by default, and the `Expires` header set by Glide is dropped. Configurable under `cache_control`; `max_age: ~` keeps the transformer's headers, as before:
+    ```
+    # before
+    Cache-Control: max-age=31536000, public
+    Expires: <one year from now>
+    # after
+    Cache-Control: immutable, max-age=31536000, public
+    ```
+- Untransformed public-cache URLs now use the reserved params segment `_untransformed`. URLs with an empty params segment now return 404 (they used to loop through redirects):
+    ```
+    # before
+    /image/glide/uploads/photo.jpg/.jpg
+    # after
+    /image/glide/uploads/photo.jpg/_untransformed.jpg
+    ```
 
 ### Fixed
 
