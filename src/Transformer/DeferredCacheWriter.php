@@ -11,7 +11,7 @@ declare(strict_types=1);
  * with this source code in the file LICENSE.
  */
 
-namespace Silarhi\PicassoBundle\Service;
+namespace Silarhi\PicassoBundle\Transformer;
 
 use function is_resource;
 
@@ -32,6 +32,11 @@ use Symfony\Contracts\Service\ResetInterface;
  * A failed upload is logged, not thrown: the client already has the image, and
  * the next request for the variant renders it again. The local file is deleted
  * either way, so a long-running worker never accumulates them.
+ *
+ * Part of GlideTransformer's defer_cache_write, not a general-purpose service:
+ * both storages are Glide cache storages, which Glide requires to be Flysystem.
+ *
+ * @internal
  */
 final class DeferredCacheWriter implements ResetInterface
 {

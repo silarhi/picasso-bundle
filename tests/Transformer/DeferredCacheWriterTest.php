@@ -11,7 +11,7 @@ declare(strict_types=1);
  * with this source code in the file LICENSE.
  */
 
-namespace Silarhi\PicassoBundle\Tests\Service;
+namespace Silarhi\PicassoBundle\Tests\Transformer;
 
 use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemOperator;
@@ -21,7 +21,7 @@ use League\Flysystem\UnableToReadFile;
 use League\Flysystem\UnableToWriteFile;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
-use Silarhi\PicassoBundle\Service\DeferredCacheWriter;
+use Silarhi\PicassoBundle\Transformer\DeferredCacheWriter;
 use Symfony\Component\Filesystem\Filesystem as SymfonyFilesystem;
 
 class DeferredCacheWriterTest extends TestCase
