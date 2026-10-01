@@ -141,7 +141,8 @@ final readonly class ImageHelper implements ImageHelperInterface
 
         $transformerName = $this->resolveTransformerName($transformer, $loaderName);
         $imageTransformer = $this->transformerRegistry->get($transformerName);
-        $transformerContext = ['loader' => $loaderName, 'transformer' => $transformerName];
+        // A delegating loader (e.g. a chain) names the loader that loaded the image, which serves it
+        $transformerContext = ['loader' => $image->loader ?? $loaderName, 'transformer' => $transformerName];
 
         $placeholderName = $this->resolvePlaceholderName($placeholder, $loaderName);
         $placeholderUri = $this->generatePlaceholder(
@@ -167,7 +168,7 @@ final readonly class ImageHelper implements ImageHelperInterface
             sizes: $sizes,
             unoptimized: false,
             attributes: $attributes,
-            loader: $loaderName,
+            loader: $transformerContext['loader'],
             transformer: $transformerName,
             placeholder: $placeholderName,
         );

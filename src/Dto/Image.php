@@ -18,6 +18,10 @@ use Throwable;
 
 final readonly class Image
 {
+    /**
+     * @param string|null $loader Name of the loader that loaded the image, set when another loader (e.g. a chain)
+     *                            delegated to it. Generated URLs name this loader instead of the requested one.
+     */
     public function __construct(
         public ?string $path = null,
         /** @var (Closure(): (resource|null))|resource|null */
@@ -25,6 +29,7 @@ final readonly class Image
         public ?int $width = null,
         public ?int $height = null,
         public ?string $mimeType = null,
+        public ?string $loader = null,
     ) {
     }
 

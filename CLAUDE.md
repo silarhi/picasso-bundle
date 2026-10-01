@@ -25,7 +25,7 @@ src/
 ├── Dto/                # Image, ImageReference, ImageRenderData, ImageSource, ImageTransformation, SrcsetEntry
 ├── Exception/          # Domain exceptions (PicassoExceptionInterface and implementations)
 ├── Loader/             # FilesystemLoader, FlysystemLoader, FlysystemRegistry, UrlLoader,
-│                       #   VichUploaderLoader, VichMappingHelper + interfaces
+│                       #   VichUploaderLoader, VichMappingHelper, ChainLoader + interfaces
 │                       #   (ImageLoaderInterface, ServableLoaderInterface, VichMappingHelperInterface)
 ├── Placeholder/        # TransformerPlaceholder, BlurHashPlaceholder + PlaceholderInterface
 ├── Source/             # ImageSourceInterface + LocalImageSource, FlysystemImageSource
@@ -101,6 +101,8 @@ composer normalize
     - `VichUploaderLoader` serves one VichUploader mapping (constructor: `mapping`, `uploadDestination`). `load()` finds the upload field on the entity from the mapping via `VichMappingHelperInterface::resolveField()`, so the `field` context key is only needed when several fields of an entity share the mapping; wrong or ambiguous references throw `InvalidImageReferenceException`. `getSource()` resolves `uploadDestination` to a `FlysystemImageSource` when `FlysystemRegistry::has()` it, else to a `LocalImageSource`.
     - `VichLoaderPass` (compiler pass, `src/DependencyInjection/`) binds each vich loader, tagged `.picasso.vich_loader` by `loadExtension()`, to its mapping and upload destination read from the `vich_uploader.mappings` parameter (only known once every extension is loaded, hence a pass). Mapping resolution: the loader's `mapping` option, else the loader name when it is a mapping, else the only mapping; otherwise it throws an `InvalidConfigurationException` listing the available mappings. Config errors should always say how to fix them.
     - `UrlLoader` loads images from remote URLs via Symfony HttpClient.
+    - `ChainLoader` (`type: chain`, `loaders: [...]`) keeps one loader name for images spread over several roots, which is also how 1.x multi-root loaders keep their name (and templates) in 2.0. It renders each image with the first member holding it: a reference with a path goes to the first member whose `getSource()->exists()` (else the first member accepting it, so a missing image renders a URL that 404s, like with a single loader); a reference without a path (an entity) goes to the first member whose `load()` does not throw `InvalidImageReferenceException`, without touching any storage. Members must be filesystem, flysystem or vich loaders declared under `picasso.loaders` (`checkChain()`): they need a source to probe, and no nesting keeps resolution linear. The chain never serves (not servable).
+    - **Delegation without type checks.** A loader that hands an image over to another returns it with `Image::$loader` set to the delegate's name; `ImagePipeline::url()` and `ImageHelper` put `$image->loader ?? $requested` in the transformer context, so URLs (and `ImageRenderData::$loader`) name the loader that serves. Per-loader defaults (`default_transformer`, `default_placeholder`, `resolve_metadata`) still come from the requested loader. Never make the pipeline check for a loader class to find its delegate.
     - `FlysystemRegistry` manages multiple named Flysystem storage instances.
 - **Sources** (`src/Source/`) are the read access to originals behind a servable loader. `ImageSourceInterface` has two methods: `exists(path)` and `readStream(path)` (throws `ImageNotFoundException`). Paths are relative to the source root.
     - `LocalImageSource` reads a local directory with no Flysystem dependency. It resolves `.`/`..` itself and treats paths escaping the root, empty paths and null bytes as missing. `FilesystemLoader::load()` uses it too, so rendering and serving share the same path handling.
@@ -220,7 +222,7 @@ When making API changes, update the following:
 
 ## Common Patterns
 
-- **Adding a new loader**: Create a class implementing `ImageLoaderInterface` (or `ServableLoaderInterface` if local transformers should serve its images), add `#[AsImageLoader('name')]`, and it auto-registers.
+- **Adding a new loader**: Create a class implementing `ImageLoaderInterface` (or `ServableLoaderInterface` if local transformers should serve its images), add `#[AsImageLoader('name')]`, and it auto-registers. A loader delegating to other loaders sets `Image::$loader` on what it returns.
 - **Adding a new source**: Implement `ImageSourceInterface` (`exists()` + `readStream()`) and return it from a servable loader's `getSource()`. Glide reads it through `ImageSourceFlysystemAdapter`, so no Flysystem adapter is needed.
 - **Adding a new transformer**: Create a class implementing `ImageTransformerInterface` (or `LocalTransformerInterface` for local serving, or `PurgableTransformerInterface` for cache purge support), add `#[AsImageTransformer('name')]`, and it auto-registers.
 - **Adding a new placeholder**: Create a class implementing `PlaceholderInterface`, add `#[AsPlaceholder('name')]`, and it auto-registers. Alternatively, configure via `type: service` in the `placeholders` config.

@@ -48,7 +48,7 @@ readonly class ImagePipeline
         $image = $this->loaderRegistry->get($loaderName)->load($reference);
         $imageTransformer = $this->transformerRegistry->get($transformerName);
 
-        return $imageTransformer->url($image, $transformation, ['loader' => $loaderName, 'transformer' => $transformerName]);
+        return $imageTransformer->url($image, $transformation, ['loader' => $image->loader ?? $loaderName, 'transformer' => $transformerName]);
     }
 
     /**
