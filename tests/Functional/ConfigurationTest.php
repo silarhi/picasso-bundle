@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Tests\Functional;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\PicassoBundle;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
@@ -25,7 +26,7 @@ use Symfony\Component\Config\FileLocator;
  * @phpstan-type PlaceholderConfig array{enabled: bool, type: string|null, size: int, blur: int, quality: int, components_x: int, components_y: int, service: string|null}
  * @phpstan-type LoaderConfig array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null}
  * @phpstan-type PublicCacheConfig array{enabled: bool, prefix: string}
- * @phpstan-type TransformerConfig array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, error_max_age: int|null, public_cache: PublicCacheConfig}
+ * @phpstan-type TransformerConfig array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, public_cache: PublicCacheConfig}
  * @phpstan-type PicassoConfig array{
  *     default_loader: string|null,
  *     default_transformer: string|null,
@@ -38,6 +39,7 @@ use Symfony\Component\Config\FileLocator;
  *     placeholders: array<string, PlaceholderConfig>,
  *     loaders: array<string, LoaderConfig>,
  *     transformers: array<string, TransformerConfig>,
+ *     cache_control: array{max_age: int|null, immutable: bool, error_max_age: int|null},
  * }
  */
 class ConfigurationTest extends TestCase
@@ -708,22 +710,44 @@ class ConfigurationTest extends TestCase
         self::assertFalse($config['transformers']['my_glide']['public_cache']['enabled']);
         self::assertSame('', $config['transformers']['my_glide']['public_cache']['prefix']);
         self::assertNull($config['transformers']['my_glide']['base_url']);
-        self::assertNull($config['transformers']['my_glide']['error_max_age']);
     }
 
-    public function testGlideTransformerRejectsNegativeErrorMaxAge(): void
+    public function testCacheControlDefaults(): void
+    {
+        $config = $this->processConfig([]);
+
+        self::assertSame(['max_age' => 31536000, 'immutable' => true, 'error_max_age' => null], $config['cache_control']);
+    }
+
+    public function testCacheControlAcceptsNullLifetimes(): void
+    {
+        $config = $this->processConfig([
+            'cache_control' => ['max_age' => null, 'immutable' => false, 'error_max_age' => null],
+        ]);
+
+        self::assertSame(['max_age' => null, 'immutable' => false, 'error_max_age' => null], $config['cache_control']);
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>}>
+     */
+    public static function invalidCacheControlProvider(): iterable
+    {
+        yield 'negative max_age' => [['max_age' => -1]];
+        yield 'string max_age' => [['max_age' => '3600']];
+        yield 'negative error_max_age' => [['error_max_age' => -1]];
+        yield 'float error_max_age' => [['error_max_age' => 1.5]];
+    }
+
+    /**
+     * @param array<string, mixed> $cacheControl
+     */
+    #[DataProvider('invalidCacheControlProvider')]
+    public function testCacheControlRejectsInvalidLifetimes(array $cacheControl): void
     {
         $this->expectException(InvalidConfigurationException::class);
 
-        $this->processConfig([
-            'transformers' => [
-                'my_glide' => [
-                    'type' => 'glide',
-                    'sign_key' => 'secret-key',
-                    'error_max_age' => -1,
-                ],
-            ],
-        ]);
+        $this->processConfig(['cache_control' => $cacheControl]);
     }
 
     public function testGlideTransformerCacheAcceptsFlysystemStorageName(): void

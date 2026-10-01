@@ -283,6 +283,12 @@ picasso:
     # --- Metadata cache ---
     cache: true # true = cache.app, false = disabled, or a PSR-6 service ID
 
+    # --- HTTP cache headers of the images served by the bundle controller (Glide) ---
+    cache_control:
+        max_age: 31536000 # seconds a served image may be cached; null keeps the transformer's headers
+        immutable: true # served images never change meaning, so caches need not revalidate them
+        error_max_age: ~ # seconds a 404 may be cached by clients and CDNs (null: not cacheable)
+
     # --- Web profiler data collector (dev only) ---
     collector: false # set to true to record image renders / URL generations in the Symfony toolbar
 
@@ -336,7 +342,6 @@ picasso:
             driver: gd # gd | imagick
             max_image_size: ~ # optional max pixel count
             base_url: ~ # optional scheme + host prepended to image URLs, e.g. a CDN
-            error_max_age: ~ # seconds a 404 may be cached by clients and CDNs (null: not cacheable)
             public_cache:
                 enabled: false # serve transformed images from public directory
                 prefix: '' # path prepended to cache keys so they mirror the URL path
@@ -999,7 +1004,6 @@ picasso:
             driver: gd # gd | imagick
             max_image_size: ~ # optional: max pixel count (width x height)
             base_url: ~ # optional: e.g. https://img.example.com to point image URLs at a CDN
-            error_max_age: ~ # optional: seconds a 404 may be cached (e.g. 60)
             public_cache:
                 enabled: false # serve from public dir for better performance
                 prefix: '' # optional: path prepended to cache keys (see "Serving thumbnails from a CDN")
@@ -1057,12 +1061,13 @@ Browser ──► CDN ──► bucket (S3, R2, GCS…)       hit: served by the
 
 ```yaml
 picasso:
+    cache_control:
+        error_max_age: 60 # let the CDN absorb repeated 404s for a minute
     transformers:
         glide:
             sign_key: '%env(PICASSO_SIGN_KEY)%'
             cache: 'thumbs.storage' # Flysystem storage of the bucket
             base_url: 'https://img.example.com' # the CDN host
-            error_max_age: 60 # let the CDN absorb repeated 404s for a minute
             public_cache:
                 enabled: true
                 prefix: 'image' # the URL path before the transformer name (/image/glide/…)
@@ -1070,8 +1075,8 @@ picasso:
 
 - **`base_url`** makes every generated image URL point at the CDN: `https://img.example.com/image/glide/…`.
 - **`public_cache.prefix`** makes the cache key equal the URL path: the variant served at `/image/glide/flysystem/photo.jpg/fm_webp%2Cw_640.webp` is stored under the key `image/glide/flysystem/photo.jpg/fm_webp,w_640.webp`, which is exactly what the CDN looks up in the bucket. Set it to what comes before the transformer name in the URL path: `image` with the default [routes](#routes), or e.g. `media/image` when they are imported with a `/media` prefix.
-- **On a miss**, the application renders the variant, stores it in the bucket and returns it with `Cache-Control: public, max-age=31536000, immutable`. The next request is a hit.
-- **`error_max_age`** makes the image controller's 404s cacheable (`Cache-Control: public, max-age=…`), so a CDN does not send every request for a missing image to the application. Without it, 404s stay uncacheable.
+- **On a miss**, the application renders the variant, stores it in the bucket and returns it with `Cache-Control: public, max-age=31536000, immutable` (the `cache_control` defaults). The next request is a hit.
+- **`cache_control.error_max_age`** makes the image controller's 404s cacheable (`Cache-Control: public, max-age=…`), so a CDN does not send every request for a missing image to the application. Without it, 404s stay uncacheable.
 
 The signature is only checked on a miss: that is all it needs to protect, since it guards the rendering, and a variant that already exists is public anyway.
 
@@ -1164,7 +1169,10 @@ if ($throwable instanceof NotFoundHttpException
 }
 ```
 
-By default these 404s are not cacheable. Set the Glide transformer's `error_max_age` to let clients and CDNs keep them for that many seconds (`Cache-Control: public, max-age=…`).
+The controller, not the transformer, owns the `Cache-Control` of what it serves, configured under `picasso.cache_control`:
+
+- Served images (and their `304 Not Modified`) get `public, max-age=<max_age>` plus `immutable` when enabled; a transformer's `Expires` is dropped so it cannot contradict `max-age`. With `max_age: ~`, the transformer's own headers are kept. Redirects keep theirs.
+- 404s are not cacheable by default. Set `error_max_age` to let clients and CDNs keep them for that many seconds (`Cache-Control: public, max-age=…`).
 
 When two requests render the same variant at once and the cache storage rejects the second write (S3-compatible storages may answer `409 Conflict`), the request is still answered with the variant the first one cached, instead of an error.
 

@@ -405,19 +405,6 @@ class GlideTransformerServeTest extends TestCase
         self::assertSame(Response::HTTP_OK, $followed->getStatusCode(), 'A legacy redirect must not lead to another redirect.');
     }
 
-    public function testServeSendsImmutableCacheControlOnMissAndHit(): void
-    {
-        $transformer = $this->createTransformer($this->tempDir . '/cache');
-
-        foreach (['miss', 'hit'] as $attempt) {
-            $response = $this->serveFixture($transformer);
-
-            self::assertTrue($response->headers->hasCacheControlDirective('public'), $attempt);
-            self::assertTrue($response->headers->hasCacheControlDirective('immutable'), $attempt);
-            self::assertSame('31536000', $response->headers->getCacheControlDirective('max-age'), $attempt);
-        }
-    }
-
     public function testServeStoresPublicCacheVariantsUnderTheCachePrefix(): void
     {
         $transformer = $this->createTransformer($this->tempDir . '/cache', publicCache: true, cachePrefix: '/image/');
@@ -430,16 +417,6 @@ class GlideTransformerServeTest extends TestCase
         );
 
         self::assertFileExists($this->tempDir . '/cache/image/glide/filesystem/photo.jpg/fm_webp,w_10.webp');
-    }
-
-    private function serveFixture(GlideTransformer $transformer): Response
-    {
-        return $transformer->serve(
-            $this->createLoader(__DIR__ . '/../Fixtures'),
-            'photo.jpg',
-            $this->createSignedRequest('photo.jpg', ['w' => '10', 'fm' => 'webp']),
-            ['transformer' => 'glide', 'loader' => 'filesystem'],
-        );
     }
 
     private function createTransformer(string $cache, ?FlysystemRegistry $flysystemRegistry = null, bool $publicCache = false, string $cachePrefix = ''): GlideTransformer

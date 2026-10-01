@@ -11,14 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `ImageSourceInterface` (`exists()` + `readStream()`) in the new `Silarhi\PicassoBundle\Source` namespace: read access to the originals behind a servable loader, with `LocalImageSource` (local directory, no Flysystem dependency) and `FlysystemImageSource` (Flysystem storage). Custom storages can back a servable loader by implementing the two methods, without writing a Flysystem adapter.
 - `ImageSourceFlysystemAdapter`, a read-only Flysystem adapter that lets Glide read any `ImageSourceInterface`.
-- Glide options to serve thumbnails from a CDN whose origin is the cache bucket, so PHP only runs on cache misses: `base_url` (image URLs on the CDN host), `public_cache.prefix` (cache keys equal to the URL path) and `error_max_age` (cacheable 404s).
+- Glide options to serve thumbnails from a CDN whose origin is the cache bucket, so PHP only runs on cache misses: `base_url` (image URLs on the CDN host) and `public_cache.prefix` (cache keys equal to the URL path).
+- `cache_control` option: HTTP cache headers of the images served by the bundle controller, set by the controller instead of the transformer. `max_age` (default one year; `null` keeps the transformer's headers), `immutable` (default `true`) and `error_max_age` (cacheable 404s, default off).
 
 ### Changed
 
 - **BC break:** `ServableLoaderInterface::getSource()` now returns `ImageSourceInterface` instead of `FilesystemOperator|string`. Custom servable loaders must wrap a local path in `LocalImageSource` and a Flysystem storage in `FlysystemImageSource`.
 - `FilesystemLoader::load()` now treats paths escaping its base directory (`..`) as missing, as serving already did.
 - Glide purges now throw a `PurgeException` when the cache storage cannot delete the variants, instead of failing silently.
-- Glide image responses now carry `Cache-Control: public, max-age=31536000, immutable`.
+- Images served by the bundle controller now carry `Cache-Control: public, max-age=31536000, immutable` by default (previously Glide's `public, max-age=31536000` and an `Expires` header, which is now dropped). Configurable under `cache_control`.
 - Untransformed public-cache URLs now use the reserved params segment `_untransformed` (e.g. `photo.jpg/_untransformed.jpg`). URLs with an empty params segment such as `photo.jpg/.jpg` now return 404.
 
 ### Fixed
