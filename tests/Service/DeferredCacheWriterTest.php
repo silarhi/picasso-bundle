@@ -16,6 +16,7 @@ namespace Silarhi\PicassoBundle\Tests\Service;
 use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemOperator;
 use League\Flysystem\Local\LocalFilesystemAdapter;
+use League\Flysystem\UnableToDeleteFile;
 use League\Flysystem\UnableToReadFile;
 use League\Flysystem\UnableToWriteFile;
 use PHPUnit\Framework\TestCase;
@@ -114,6 +115,26 @@ class DeferredCacheWriterTest extends TestCase
         $writer = new DeferredCacheWriter($logger);
         $writer->defer($this->render, $broken, 'a.jpg/w_10.webp');
         $writer->flush();
+    }
+
+    public function testALocalFileThatCannotBeDeletedDoesNotStopTheFlush(): void
+    {
+        $stream = fopen('php://temp', 'w+');
+        self::assertIsResource($stream);
+        fwrite($stream, 'a');
+        rewind($stream);
+        $render = self::createStub(FilesystemOperator::class);
+        $render->method('readStream')->willReturn($stream);
+        $render->method('delete')->willThrowException(UnableToDeleteFile::atLocation('a.jpg/w_10.webp', 'busy'));
+        $this->render->write('b.jpg/w_10.webp', 'b');
+
+        $writer = new DeferredCacheWriter();
+        $writer->defer($render, $this->cache, 'a.jpg/w_10.webp');
+        $writer->defer($this->render, $this->cache, 'b.jpg/w_10.webp');
+        $writer->flush();
+
+        self::assertSame('a', $this->cache->read('a.jpg/w_10.webp'));
+        self::assertSame('b', $this->cache->read('b.jpg/w_10.webp'));
     }
 
     public function testAMissingLocalFileIsLoggedAndSkipped(): void
