@@ -24,8 +24,8 @@ use Symfony\Component\Config\FileLocator;
 /**
  * @phpstan-type PlaceholderConfig array{enabled: bool, type: string|null, size: int, blur: int, quality: int, components_x: int, components_y: int, service: string|null}
  * @phpstan-type LoaderConfig array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null}
- * @phpstan-type PublicCacheConfig array{enabled: bool}
- * @phpstan-type TransformerConfig array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, public_cache: PublicCacheConfig}
+ * @phpstan-type PublicCacheConfig array{enabled: bool, prefix: string}
+ * @phpstan-type TransformerConfig array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, error_max_age: int|null, public_cache: PublicCacheConfig}
  * @phpstan-type PicassoConfig array{
  *     default_loader: string|null,
  *     default_transformer: string|null,
@@ -706,6 +706,24 @@ class ConfigurationTest extends TestCase
         self::assertSame('gd', $config['transformers']['my_glide']['driver']);
         self::assertNull($config['transformers']['my_glide']['max_image_size']);
         self::assertFalse($config['transformers']['my_glide']['public_cache']['enabled']);
+        self::assertSame('', $config['transformers']['my_glide']['public_cache']['prefix']);
+        self::assertNull($config['transformers']['my_glide']['base_url']);
+        self::assertNull($config['transformers']['my_glide']['error_max_age']);
+    }
+
+    public function testGlideTransformerRejectsNegativeErrorMaxAge(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+
+        $this->processConfig([
+            'transformers' => [
+                'my_glide' => [
+                    'type' => 'glide',
+                    'sign_key' => 'secret-key',
+                    'error_max_age' => -1,
+                ],
+            ],
+        ]);
     }
 
     public function testGlideTransformerCacheAcceptsFlysystemStorageName(): void

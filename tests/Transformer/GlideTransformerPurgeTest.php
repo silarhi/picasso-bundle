@@ -219,6 +219,18 @@ class GlideTransformerPurgeTest extends TestCase
         }
     }
 
+    public function testPurgeDeletesPublicCacheVariantsUnderTheCachePrefix(): void
+    {
+        $transformer = $this->createTransformer($this->tempDir, true, '/image/');
+        $this->serve($transformer, 'photo.jpg/fm_webp,w_10.webp', []);
+        $variant = $this->tempDir . '/image/glide/filesystem/photo.jpg/fm_webp,w_10.webp';
+        self::assertFileExists($variant);
+
+        $transformer->purge('photo.jpg', ['transformer' => 'glide', 'loader' => 'filesystem']);
+
+        self::assertFileDoesNotExist($variant);
+    }
+
     private function createTransformerWithCacheStorage(FilesystemOperator $cache, bool $publicCache): GlideTransformer
     {
         return new GlideTransformer(
@@ -233,7 +245,7 @@ class GlideTransformerPurgeTest extends TestCase
         );
     }
 
-    private function createTransformer(string $cacheDir, bool $publicCache): GlideTransformer
+    private function createTransformer(string $cacheDir, bool $publicCache, string $cachePrefix = ''): GlideTransformer
     {
         $router = self::createStub(UrlGeneratorInterface::class);
 
@@ -245,6 +257,9 @@ class GlideTransformerPurgeTest extends TestCase
             'gd',
             null,
             $publicCache,
+            null,
+            null,
+            $cachePrefix,
         );
     }
 
