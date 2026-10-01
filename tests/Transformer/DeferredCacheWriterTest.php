@@ -23,6 +23,8 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Silarhi\PicassoBundle\Transformer\DeferredCacheWriter;
 use Symfony\Component\Filesystem\Filesystem as SymfonyFilesystem;
+use Symfony\Component\Lock\Exception\LockReleasingException;
+use Symfony\Component\Lock\LockInterface;
 
 class DeferredCacheWriterTest extends TestCase
 {
@@ -55,6 +57,66 @@ class DeferredCacheWriterTest extends TestCase
 
         self::assertSame('bytes', $this->cache->read('photo.jpg/w_10.webp'));
         self::assertFalse($this->render->fileExists('photo.jpg/w_10.webp'));
+    }
+
+    public function testFlushDeletesTheRenderDirectory(): void
+    {
+        // Several renders of one request share the directory, nested in Glide's variant folders
+        $this->render->write('photo.jpg/w_10.webp', 'small');
+        $this->render->write('photo.jpg/w_20.webp', 'large');
+        $writer = new DeferredCacheWriter();
+        $writer->defer($this->render, $this->cache, 'photo.jpg/w_10.webp');
+        $writer->defer(new Filesystem(new LocalFilesystemAdapter($this->tempDir . '/render')), $this->cache, 'photo.jpg/w_20.webp');
+
+        $writer->flush();
+
+        self::assertSame('small', $this->cache->read('photo.jpg/w_10.webp'));
+        self::assertSame('large', $this->cache->read('photo.jpg/w_20.webp'));
+        self::assertDirectoryDoesNotExist($this->tempDir . '/render');
+    }
+
+    public function testFlushReleasesTheLockOnceTheVariantIsStored(): void
+    {
+        $this->render->write('photo.jpg/w_10.webp', 'bytes');
+        $lock = $this->createMock(LockInterface::class);
+        $lock->expects(self::once())->method('release')->willReturnCallback(function (): void {
+            self::assertTrue($this->cache->fileExists('photo.jpg/w_10.webp'), 'Waiting requests look for the variant once the lock is released.');
+        });
+
+        $writer = new DeferredCacheWriter();
+        $writer->defer($this->render, $this->cache, 'photo.jpg/w_10.webp', $lock);
+        $writer->flush();
+        $writer->flush();
+    }
+
+    public function testAFailedUploadStillReleasesTheLock(): void
+    {
+        $this->render->write('a.jpg/w_10.webp', 'a');
+        $failing = self::createStub(FilesystemOperator::class);
+        $failing->method('writeStream')->willThrowException(UnableToWriteFile::atLocation('a.jpg/w_10.webp', 'denied'));
+        $lock = $this->createMock(LockInterface::class);
+        $lock->expects(self::once())->method('release');
+
+        $writer = new DeferredCacheWriter();
+        $writer->defer($this->render, $failing, 'a.jpg/w_10.webp', $lock);
+        $writer->flush();
+    }
+
+    public function testALockThatCannotBeReleasedIsLoggedAndTheFlushGoesOn(): void
+    {
+        $this->render->write('a.jpg/w_10.webp', 'a');
+        $this->render->write('b.jpg/w_10.webp', 'b');
+        $stuck = self::createStub(LockInterface::class);
+        $stuck->method('release')->willThrowException(new LockReleasingException('Store unreachable.'));
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('warning')->with(self::stringContains('render lock'));
+
+        $writer = new DeferredCacheWriter($logger);
+        $writer->defer($this->render, $this->cache, 'a.jpg/w_10.webp', $stuck);
+        $writer->defer($this->render, $this->cache, 'b.jpg/w_10.webp');
+        $writer->flush();
+
+        self::assertSame('b', $this->cache->read('b.jpg/w_10.webp'));
     }
 
     public function testResetFlushes(): void

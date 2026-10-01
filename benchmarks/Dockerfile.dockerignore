@@ -1,0 +1,10 @@
+# Build context is the repository root: send sources only, never host-built artifacts
+.git
+.claude
+node_modules
+vendor
+var
+composer.lock
+benchmarks/var
+.phpunit.cache
+coverage
