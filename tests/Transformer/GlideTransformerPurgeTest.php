@@ -30,6 +30,7 @@ use Silarhi\PicassoBundle\Exception\PurgeException;
 use Silarhi\PicassoBundle\Exception\TransformerNotFoundException;
 use Silarhi\PicassoBundle\Loader\FlysystemRegistry;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
+use Silarhi\PicassoBundle\Service\UrlAliases;
 use Silarhi\PicassoBundle\Source\LocalImageSource;
 use Silarhi\PicassoBundle\Transformer\DeferredCacheWriter;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
@@ -251,6 +252,7 @@ class GlideTransformerPurgeTest extends TestCase
     {
         return new GlideTransformer(
             self::createStub(UrlGeneratorInterface::class),
+            new UrlAliases([], []),
             self::SIGN_KEY,
             'thumbs.storage',
             'gd',
@@ -266,6 +268,7 @@ class GlideTransformerPurgeTest extends TestCase
 
         return new GlideTransformer(
             $router,
+            new UrlAliases([], []),
             self::SIGN_KEY,
             $cacheDir,
             'gd',
@@ -302,6 +305,7 @@ class GlideTransformerPurgeTest extends TestCase
 
         $transformer = new GlideTransformer(
             $router,
+            new UrlAliases([], []),
             self::SIGN_KEY,
             $this->tempDir,
             'gd',

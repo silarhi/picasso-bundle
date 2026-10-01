@@ -18,6 +18,7 @@ use function assert;
 use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
 use Silarhi\PicassoBundle\Service\LegacyMetadataResolver;
+use Silarhi\PicassoBundle\Service\UrlAliases;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -42,12 +43,14 @@ final readonly class LegacyUrlController
 
     /**
      * @param ContainerInterface $glideTransformers The Glide transformers, by name
+     * @param UrlAliases         $urlAliases        Turns the transformer URL segment back into a name
      * @param int|null           $errorMaxAge       Seconds a 404 may be cached (cache_control.error_max_age)
      */
     public function __construct(
         private ImageController $imageController,
         private ContainerInterface $glideTransformers,
         private LegacyMetadataResolver $resolver,
+        private UrlAliases $urlAliases,
         private ?int $errorMaxAge = null,
     ) {
     }
@@ -55,17 +58,18 @@ final readonly class LegacyUrlController
     public function __invoke(string $transformer, string $loader, string $path, Request $request): Response
     {
         $token = $request->query->getString(self::METADATA_PARAM);
+        $transformerName = $this->urlAliases->resolveTransformer($transformer);
 
-        if ('' === $token || !$this->glideTransformers->has($transformer)) {
+        if ('' === $token || !$this->glideTransformers->has($transformerName)) {
             return ($this->imageController)($transformer, $loader, $path, $request);
         }
 
-        $glide = $this->glideTransformers->get($transformer);
+        $glide = $this->glideTransformers->get($transformerName);
         assert($glide instanceof GlideTransformer);
 
         try {
             $target = $this->resolver->resolveLoader($token);
-            $response = $glide->redirectToLoader($target, $path, $request, ['transformer' => $transformer, 'loader' => $loader]);
+            $response = $glide->redirectToLoader($target, $path, $request, ['transformer' => $transformerName, 'loader' => $loader]);
         } catch (ImageNotFoundException $e) {
             throw (new NotFoundExceptionFactory($this->errorMaxAge))->create($e->getMessage(), $e);
         }

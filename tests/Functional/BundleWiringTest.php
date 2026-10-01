@@ -41,6 +41,7 @@ use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Service\MetadataGuesser;
 use Silarhi\PicassoBundle\Service\PlaceholderRegistry;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
+use Silarhi\PicassoBundle\Service\UrlAliases;
 use Silarhi\PicassoBundle\Source\FlysystemImageSource;
 use Silarhi\PicassoBundle\Tests\Functional\Stub\StubAttributePlaceholder;
 use Silarhi\PicassoBundle\Tests\Functional\Stub\StubAttributeTransformer;
@@ -194,7 +195,7 @@ class BundleWiringTest extends TestCase
         $controller = $container->getDefinition('.picasso.controller.legacy_url');
         self::assertSame(LegacyUrlController::class, $controller->getClass());
         self::assertSame(['picasso.controller.image', null, 0], $controller->getDecoratedService());
-        self::assertSame(60, $controller->getArgument(3));
+        self::assertSame(60, $controller->getArgument(4));
 
         // 1.x encrypted "_metadata" with the first Glide sign key; the first loader reading a root serves it
         $resolver = $container->getDefinition(LegacyMetadataResolver::SERVICE);
@@ -362,9 +363,9 @@ class BundleWiringTest extends TestCase
         ]);
 
         $transformer = $container->getDefinition('picasso.transformer.glide');
-        self::assertSame('https://cdn.example.com', $transformer->getArgument(7));
-        self::assertSame('image', $transformer->getArgument(8));
-        self::assertEquals(new Reference('picasso.deferred_cache_writer'), $transformer->getArgument(9));
+        self::assertSame('https://cdn.example.com', $transformer->getArgument(8));
+        self::assertSame('image', $transformer->getArgument(9));
+        self::assertEquals(new Reference('picasso.deferred_cache_writer'), $transformer->getArgument(10));
 
         $writer = $container->getDefinition('picasso.deferred_cache_writer');
         self::assertSame(DeferredCacheWriter::class, $writer->getClass());
@@ -386,10 +387,10 @@ class BundleWiringTest extends TestCase
         ]);
 
         $transformer = $container->getDefinition('picasso.transformer.glide');
-        self::assertNull($transformer->getArgument(7));
-        self::assertSame('', $transformer->getArgument(8));
-        self::assertNull($transformer->getArgument(9));
-        self::assertNull($transformer->getArgument(10), 'Render locks are opt-in.');
+        self::assertNull($transformer->getArgument(8));
+        self::assertSame('', $transformer->getArgument(9));
+        self::assertNull($transformer->getArgument(10));
+        self::assertNull($transformer->getArgument(11), 'Render locks are opt-in.');
         self::assertFalse($container->hasDefinition('picasso.deferred_cache_writer'));
         self::assertSame(
             ['max_age' => 31536000, 'immutable' => true, 'error_max_age' => null],
@@ -414,12 +415,12 @@ class BundleWiringTest extends TestCase
         ]);
 
         $transformer = $container->getDefinition('picasso.transformer.glide');
-        self::assertEquals(new Reference('app.lock_factory'), $transformer->getArgument(10));
-        self::assertSame(10.0, $transformer->getArgument(11));
+        self::assertEquals(new Reference('app.lock_factory'), $transformer->getArgument(11));
+        self::assertSame(10.0, $transformer->getArgument(12));
 
         $defaults = $container->getDefinition('picasso.transformer.defaults');
-        self::assertEquals(new Reference('lock.factory'), $defaults->getArgument(10), 'The LockFactory framework.lock configures.');
-        self::assertSame(30.0, $defaults->getArgument(11));
+        self::assertEquals(new Reference('lock.factory'), $defaults->getArgument(11), 'The LockFactory framework.lock configures.');
+        self::assertSame(30.0, $defaults->getArgument(12));
     }
 
     public function testVipsDriverWithoutItsPackageSaysHowToInstallIt(): void
@@ -1094,6 +1095,31 @@ class BundleWiringTest extends TestCase
         $placeholders = $container->get('picasso.placeholder_registry');
         self::assertInstanceOf(PlaceholderRegistry::class, $placeholders);
         self::assertInstanceOf(StubAttributePlaceholder::class, $placeholders->get('stub'));
+    }
+
+    public function testUrlAliasesComeFromTheConfigAndTheAttributes(): void
+    {
+        $container = $this->bootKernel([
+            'loaders' => [
+                'filesystem' => [
+                    'path' => __DIR__ . '/../Fixtures',
+                    'url_alias' => 'f',
+                ],
+            ],
+            'transformers' => [
+                'glide' => [
+                    'sign_key' => 'test',
+                    'url_alias' => 'g',
+                ],
+            ],
+        ], withServices: [StubConfiguredAttributeLoader::class, StubAttributeTransformer::class]);
+
+        $aliases = $container->get('picasso.url_aliases');
+        self::assertInstanceOf(UrlAliases::class, $aliases);
+        self::assertSame('f', $aliases->loaderSegment('filesystem'));
+        self::assertSame('cfg', $aliases->loaderSegment('configured'));
+        self::assertSame('g', $aliases->transformerSegment('glide'));
+        self::assertSame('s', $aliases->transformerSegment('stub'));
     }
 
     public function testBuildDoesNotRequireTheExtensionToBeLoaded(): void

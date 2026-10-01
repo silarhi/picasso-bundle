@@ -34,6 +34,7 @@ use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
 use Silarhi\PicassoBundle\Exception\UndecodableImageException;
 use Silarhi\PicassoBundle\Loader\FlysystemRegistry;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
+use Silarhi\PicassoBundle\Service\UrlAliases;
 use Silarhi\PicassoBundle\Source\FlysystemImageSource;
 use Silarhi\PicassoBundle\Source\ImageSourceInterface;
 use Silarhi\PicassoBundle\Source\LocalImageSource;
@@ -725,6 +726,7 @@ class GlideTransformerServeTest extends TestCase
 
         return new GlideTransformer(
             $router,
+            new UrlAliases([], []),
             self::SIGN_KEY,
             $cache,
             $driver,

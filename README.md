@@ -135,6 +135,7 @@ PicassoBundle solves this the same way Next.js Image did for React:
     - [Imgix (CDN)](#imgix-cdn)
     - [Custom Transformer](#custom-transformer)
 - [Routes](#routes)
+    - [URL Aliases](#url-aliases)
     - [Error Responses](#error-responses)
     - [1.x URLs](#1x-urls)
 - [Cache Purge](#cache-purge)
@@ -326,6 +327,7 @@ picasso:
             type: filesystem # inferred from key name
             path: '%kernel.project_dir%/public/uploads' # one directory per loader
             # resolve_metadata: ~  # auto-set to true for filesystem loaders
+            # url_alias: ~  # name of this loader in image URLs (see Routes)
 
         # my_flysystem:
         #     type: flysystem
@@ -352,6 +354,7 @@ picasso:
             max_image_size: ~ # optional max pixel count
             base_url: ~ # optional scheme + host prepended to image URLs, e.g. a CDN
             defer_cache_write: false # store a cache miss after the response is sent
+            url_alias: ~ # name of this transformer in image URLs (see Routes)
             lock:
                 enabled: false # render a missing variant once, however many requests ask for it (symfony/lock)
                 factory: lock.factory # LockFactory service ID
@@ -1207,7 +1210,7 @@ picasso:
 ```
 
 - **`base_url`** makes every generated image URL point at the CDN: `https://img.example.com/image/glide/…`.
-- **`public_cache.prefix`** makes the cache key equal the URL path: the variant served at `/image/glide/flysystem/photo.jpg/fm_webp%2Cw_640.webp` is stored under the key `image/glide/flysystem/photo.jpg/fm_webp,w_640.webp`, which is exactly what the CDN looks up in the bucket. Set it to what comes before the transformer name in the URL path: `image` with the default [routes](#routes), or e.g. `media/image` when they are imported with a `/media` prefix.
+- **`public_cache.prefix`** makes the cache key equal the URL path: the variant served at `/image/glide/flysystem/photo.jpg/fm_webp%2Cw_640.webp` is stored under the key `image/glide/flysystem/photo.jpg/fm_webp,w_640.webp`, which is exactly what the CDN looks up in the bucket. [URL aliases](#url-aliases) appear in both alike. Set it to what comes before the transformer name in the URL path: `image` with the default [routes](#routes), or e.g. `media/image` when they are imported with a `/media` prefix.
 - **On a miss**, the application renders the variant, stores it in the bucket and returns it with `Cache-Control: public, max-age=31536000, immutable` (the `cache_control` defaults). The next request is a hit.
 - **`defer_cache_write`** keeps the upload out of the client's wait: a miss is rendered to a local temporary directory, answered from there, and moved to the bucket on `kernel.terminate`, after the client has been released (`fastcgi_finish_request()` under PHP-FPM and FrankenPHP, after the request in FrankenPHP worker mode). The directory is only created by a miss and deleted once its renders are uploaded, so only the variants of requests in flight are on local disk. A failed upload is logged, not thrown: the next request renders the variant again. The upload still occupies the PHP worker until it completes, so size the worker pool for bursts of misses.
 - **`cache_control.error_max_age`** makes the image controller's 404s cacheable (`Cache-Control: public, max-age=…`), so a CDN does not send every request for a missing image to the application. Without it, 404s stay uncacheable.
@@ -1284,6 +1287,26 @@ picasso:
 > **Note:** Routes are only required when using a local transformer
 > like Glide. CDN-based transformers (Imgix) generate external URLs
 > and do not need this route.
+
+### URL Aliases
+
+By default, image URLs name the transformer and the loader: `/image/glide/product_image/photo.jpg`. Give either one a `url_alias` to replace its name in the URL with a shorter one, or with one that keeps your configuration names private:
+
+```yaml
+picasso:
+    transformers:
+        glide: { url_alias: g }
+    loaders:
+        product_image: { type: vich, url_alias: pi }
+# → /image/g/pi/photo.jpg
+```
+
+Loaders and transformers registered with the attributes take it as `urlAlias`: `#[AsImageLoader('s3', urlAlias: 's')]`, `#[AsImageTransformer('cloudinary', urlAlias: 'c')]`.
+
+- An alias only changes URLs. Templates, `default_loader`, `default_transformer` and purges keep using the names.
+- URLs naming a loader or transformer by its name keep being served after it gets an alias, so adding one does not break the URLs already published.
+- An alias may contain letters, digits, `_` and `-`. It must not be the alias or the name of another loader (or transformer, for a transformer alias). A loader and a transformer can share one, since they fill different URL segments. Conflicts fail at container build.
+- With `public_cache`, cache keys use the aliases as well, so they keep mirroring the URL path. Setting or changing an alias moves the cache keys like renaming would: purge the variants first, or let the old ones be.
 
 ### Error Responses
 

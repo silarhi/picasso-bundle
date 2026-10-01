@@ -30,6 +30,7 @@ use Silarhi\PicassoBundle\Controller\LegacyUrlController;
 use Silarhi\PicassoBundle\DataCollector\CollectingImageHelper;
 use Silarhi\PicassoBundle\DataCollector\CollectingMetadataGuesser;
 use Silarhi\PicassoBundle\DataCollector\PicassoDataCollector;
+use Silarhi\PicassoBundle\DependencyInjection\UrlAliasPass;
 use Silarhi\PicassoBundle\DependencyInjection\VichLoaderPass;
 use Silarhi\PicassoBundle\Loader\ChainLoader;
 use Silarhi\PicassoBundle\Loader\FilesystemLoader;
@@ -52,6 +53,7 @@ use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
 use Silarhi\PicassoBundle\Service\PlaceholderRegistry;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
+use Silarhi\PicassoBundle\Service\UrlAliases;
 use Silarhi\PicassoBundle\Transformer\DeferredCacheWriter;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
@@ -97,6 +99,9 @@ final class PicassoBundle extends AbstractBundle
                 if (null !== $attribute->resolveMetadata) {
                     $tag['resolve_metadata'] = $attribute->resolveMetadata;
                 }
+                if (null !== $attribute->urlAlias) {
+                    $tag['url_alias'] = $attribute->urlAlias;
+                }
                 $definition->addTag('picasso.loader', $tag);
             },
         );
@@ -104,7 +109,11 @@ final class PicassoBundle extends AbstractBundle
         $container->registerAttributeForAutoconfiguration(
             AsImageTransformer::class,
             static function (ChildDefinition $definition, AsImageTransformer $attribute): void {
-                $definition->addTag('picasso.transformer', ['key' => $attribute->name]);
+                $tag = ['key' => $attribute->name];
+                if (null !== $attribute->urlAlias) {
+                    $tag['url_alias'] = $attribute->urlAlias;
+                }
+                $definition->addTag('picasso.transformer', $tag);
             },
         );
 
@@ -116,6 +125,7 @@ final class PicassoBundle extends AbstractBundle
         );
 
         $container->addCompilerPass(new VichLoaderPass());
+        $container->addCompilerPass(new UrlAliasPass());
 
         // Merge per-loader defaults from attribute-tagged loaders into LoaderRegistry
         $container->addCompilerPass(new class implements CompilerPassInterface {
@@ -343,6 +353,10 @@ final class PicassoBundle extends AbstractBundle
                                 ->defaultNull()
                                 ->info('Default transformer name for this loader. Overrides the global default_transformer.')
                             ->end()
+                            ->scalarNode('url_alias')
+                                ->defaultNull()
+                                ->info('Public name of this loader in image URLs and public-cache keys, instead of its name (e.g. "p" for /image/glide/p/…).')
+                            ->end()
                             ->scalarNode('resolve_metadata')
                                 ->defaultNull()
                                 ->info('Whether to resolve image metadata for this loader. Null inherits from global. Filesystem loaders default to true.')
@@ -393,6 +407,10 @@ final class PicassoBundle extends AbstractBundle
                             ->scalarNode('request_factory')->defaultNull()->info('PSR-17 request factory service ID for imgix purge.')->end()
                             ->scalarNode('stream_factory')->defaultNull()->info('PSR-17 stream factory service ID for imgix purge.')->end()
                             ->scalarNode('service')->defaultNull()->info('Service ID for custom transformers (type: service).')->end()
+                            ->scalarNode('url_alias')
+                                ->defaultNull()
+                                ->info('Public name of this transformer in image URLs and public-cache keys, instead of its name (e.g. "g" for /image/g/…).')
+                            ->end()
                             ->booleanNode('defer_cache_write')
                                 ->defaultFalse()
                                 ->info('Glide: render a cache miss to local disk and move it to the cache storage after the response has been sent (kernel.terminate). For remote cache storages.')
@@ -445,8 +463,8 @@ final class PicassoBundle extends AbstractBundle
          *     default_quality: int|null,
          *     default_fit: string,
          *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int|null, quality: int|null, fit: string|null, format: string|null, components_x: int, components_y: int, driver: string, service: string|null}>,
-         *     loaders: array<string, array{enabled: bool, type: string|null, path: string|null, paths: mixed, loaders: list<string>, mapping: string|null, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null, resolve_metadata: bool|null}>,
-         *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, api_key: string|null, http_client: string|null, request_factory: string|null, stream_factory: string|null, service: string|null, defer_cache_write: bool, lock: array{enabled: bool, factory: string, ttl: float|int}, public_cache: array{enabled: bool, prefix: string}}>
+         *     loaders: array<string, array{enabled: bool, type: string|null, path: string|null, paths: mixed, loaders: list<string>, mapping: string|null, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null, url_alias: string|null, resolve_metadata: bool|null}>,
+         *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, api_key: string|null, http_client: string|null, request_factory: string|null, stream_factory: string|null, service: string|null, url_alias: string|null, defer_cache_write: bool, lock: array{enabled: bool, factory: string, ttl: float|int}, public_cache: array{enabled: bool, prefix: string}}>
          * } $config
          */
         $services = $container->services();
@@ -510,6 +528,9 @@ final class PicassoBundle extends AbstractBundle
             }
 
             $tag = ['key' => $name];
+            if (null !== $loaderConfig['url_alias']) {
+                $tag['url_alias'] = $loaderConfig['url_alias'];
+            }
             if (null !== $loaderConfig['default_placeholder']) {
                 $tag['default_placeholder'] = $loaderConfig['default_placeholder'];
                 $loaderPlaceholders[$name] = $loaderConfig['default_placeholder'];
@@ -603,6 +624,11 @@ final class PicassoBundle extends AbstractBundle
             $services->alias(ImageLoaderInterface::class, 'picasso.loader.' . $defaultLoader);
         }
 
+        // --- URL aliases (collected from the loader and transformer tags by UrlAliasPass) ---
+
+        $services->set(UrlAliasPass::SERVICE, UrlAliases::class)
+            ->args([[], []]);
+
         // --- Registries ---
 
         $services->set('picasso.loader_registry', LoaderRegistry::class)
@@ -635,6 +661,11 @@ final class PicassoBundle extends AbstractBundle
                 throw new Exception\InvalidConfigurationException(sprintf('Transformer "%s" must specify a "type" (glide, imgix, or service).', $name));
             }
 
+            $tag = ['key' => $name];
+            if (null !== $transformerConfig['url_alias']) {
+                $tag['url_alias'] = $transformerConfig['url_alias'];
+            }
+
             switch ($type) {
                 case 'glide':
                     $driverClass = GlideTransformer::driverClass($transformerConfig['driver']);
@@ -649,6 +680,7 @@ final class PicassoBundle extends AbstractBundle
                     $services->set('picasso.transformer.' . $name, GlideTransformer::class)
                         ->args([
                             service('router'),
+                            service(UrlAliasPass::SERVICE),
                             $transformerConfig['sign_key'],
                             $transformerConfig['cache'] ?? '%kernel.project_dir%/var/glide-cache',
                             $transformerConfig['driver'],
@@ -661,7 +693,7 @@ final class PicassoBundle extends AbstractBundle
                             $transformerConfig['lock']['enabled'] ? service($transformerConfig['lock']['factory']) : null,
                             (float) $transformerConfig['lock']['ttl'],
                         ])
-                        ->tag('picasso.transformer', ['key' => $name]);
+                        ->tag('picasso.transformer', $tag);
                     $glideTransformers[$name] = service('picasso.transformer.' . $name);
                     $glideSignKey ??= (string) $transformerConfig['sign_key'];
 
@@ -692,7 +724,7 @@ final class PicassoBundle extends AbstractBundle
 
                     $services->set('picasso.transformer.' . $name, ImgixTransformer::class)
                         ->args($imgixArgs)
-                        ->tag('picasso.transformer', ['key' => $name]);
+                        ->tag('picasso.transformer', $tag);
                     break;
 
                 case 'service':
@@ -700,7 +732,7 @@ final class PicassoBundle extends AbstractBundle
                     $builder->setDefinition(
                         'picasso.transformer.' . $name,
                         (new ChildDefinition($transformerConfig['service']))
-                            ->addTag('picasso.transformer', ['key' => $name]),
+                            ->addTag('picasso.transformer', $tag),
                     );
                     break;
             }
@@ -797,6 +829,7 @@ final class PicassoBundle extends AbstractBundle
                 service('picasso.transformer_registry'),
                 service('picasso.loader_registry'),
                 $config['cache_control'],
+                service(UrlAliasPass::SERVICE),
                 service('debug.stopwatch')->nullOnInvalid(),
             ])
             ->tag('controller.service_arguments')
@@ -814,6 +847,7 @@ final class PicassoBundle extends AbstractBundle
                     service('.inner'),
                     service_locator($glideTransformers),
                     service(LegacyMetadataResolver::SERVICE),
+                    service(UrlAliasPass::SERVICE),
                     $config['cache_control']['error_max_age'],
                 ])
                 ->tag('controller.service_arguments');

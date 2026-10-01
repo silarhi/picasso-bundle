@@ -23,6 +23,7 @@ use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
+use Silarhi\PicassoBundle\Service\UrlAliases;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 use Silarhi\PicassoBundle\Transformer\LocalTransformerInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -48,10 +49,30 @@ class ImageControllerTest extends TestCase
         $transformerRegistry = $this->createRegistry(TransformerRegistry::class, 'glide', $transformer);
         $loaderRegistry = $this->createRegistry(LoaderRegistry::class, 'filesystem', $loader);
 
-        $controller = new ImageController($transformerRegistry, $loaderRegistry, self::cacheControl());
+        $controller = new ImageController($transformerRegistry, $loaderRegistry, self::cacheControl(), new UrlAliases([], []));
         $response = $controller->__invoke('glide', 'filesystem', 'photo.jpg', $request);
 
         self::assertSame(200, $response->getStatusCode());
+    }
+
+    public function testInvokeResolvesUrlAliasesToNames(): void
+    {
+        $request = new Request();
+        $loader = $this->createMock(ServableLoaderInterface::class);
+        $transformer = $this->createMock(LocalTransformerInterface::class);
+        $transformer->expects(self::once())
+            ->method('serve')
+            ->with($loader, 'photo.jpg', $request, ['transformer' => 'glide', 'loader' => 'product_image'])
+            ->willReturn(new Response('image-data'));
+
+        $controller = new ImageController(
+            $this->createRegistry(TransformerRegistry::class, 'glide', $transformer),
+            $this->createRegistry(LoaderRegistry::class, 'product_image', $loader),
+            self::cacheControl(),
+            new UrlAliases(['product_image' => 'p'], ['glide' => 'g']),
+        );
+
+        self::assertSame(200, $controller->__invoke('g', 'p', 'photo.jpg', $request)->getStatusCode());
     }
 
     public function testInvokeThrowsNotFoundForUnknownTransformer(): void
@@ -63,7 +84,7 @@ class ImageControllerTest extends TestCase
         $loaderContainer = $this->createMock(ContainerInterface::class);
         $loaderRegistry = new LoaderRegistry($loaderContainer);
 
-        $controller = new ImageController($transformerRegistry, $loaderRegistry, self::cacheControl());
+        $controller = new ImageController($transformerRegistry, $loaderRegistry, self::cacheControl(), new UrlAliases([], []));
 
         $this->expectException(NotFoundHttpException::class);
         $this->expectExceptionMessage('Transformer "unknown" not found.');
@@ -78,7 +99,7 @@ class ImageControllerTest extends TestCase
         $loaderContainer = $this->createMock(ContainerInterface::class);
         $loaderRegistry = new LoaderRegistry($loaderContainer);
 
-        $controller = new ImageController($transformerRegistry, $loaderRegistry, self::cacheControl());
+        $controller = new ImageController($transformerRegistry, $loaderRegistry, self::cacheControl(), new UrlAliases([], []));
 
         $this->expectException(NotFoundHttpException::class);
         $this->expectExceptionMessage('does not support serving');
@@ -94,7 +115,7 @@ class ImageControllerTest extends TestCase
         $loaderContainer->expects(self::any())->method('has')->with('unknown')->willReturn(false);
         $loaderRegistry = new LoaderRegistry($loaderContainer);
 
-        $controller = new ImageController($transformerRegistry, $loaderRegistry, self::cacheControl());
+        $controller = new ImageController($transformerRegistry, $loaderRegistry, self::cacheControl(), new UrlAliases([], []));
 
         $this->expectException(NotFoundHttpException::class);
         $this->expectExceptionMessage('Loader "unknown" not found.');
@@ -109,7 +130,7 @@ class ImageControllerTest extends TestCase
         $transformerRegistry = $this->createRegistry(TransformerRegistry::class, 'glide', $transformer);
         $loaderRegistry = $this->createRegistry(LoaderRegistry::class, 'remote', $loader);
 
-        $controller = new ImageController($transformerRegistry, $loaderRegistry, self::cacheControl());
+        $controller = new ImageController($transformerRegistry, $loaderRegistry, self::cacheControl(), new UrlAliases([], []));
 
         $this->expectException(NotFoundHttpException::class);
         $this->expectExceptionMessage('does not support serving');
@@ -220,8 +241,8 @@ class ImageControllerTest extends TestCase
         $transformer = self::createStub(LocalTransformerInterface::class);
 
         foreach ([
-            'transformer' => new ImageController(new TransformerRegistry($missing), new LoaderRegistry($missing), self::cacheControl(errorMaxAge: 0)),
-            'loader' => new ImageController($this->createRegistry(TransformerRegistry::class, 'glide', $transformer), new LoaderRegistry($missing), self::cacheControl(errorMaxAge: 0)),
+            'transformer' => new ImageController(new TransformerRegistry($missing), new LoaderRegistry($missing), self::cacheControl(errorMaxAge: 0), new UrlAliases([], [])),
+            'loader' => new ImageController($this->createRegistry(TransformerRegistry::class, 'glide', $transformer), new LoaderRegistry($missing), self::cacheControl(errorMaxAge: 0), new UrlAliases([], [])),
         ] as $case => $controller) {
             try {
                 $controller->__invoke('glide', 'unknown', 'photo.jpg', new Request());
@@ -267,6 +288,7 @@ class ImageControllerTest extends TestCase
             $this->createRegistry(TransformerRegistry::class, 'glide', $transformer),
             $this->createRegistry(LoaderRegistry::class, 'filesystem', $loader),
             self::cacheControl($maxAge, $immutable),
+            new UrlAliases([], []),
         );
     }
 
@@ -280,6 +302,7 @@ class ImageControllerTest extends TestCase
             $this->createRegistry(TransformerRegistry::class, 'glide', $transformer),
             $this->createRegistry(LoaderRegistry::class, 'filesystem', $loader),
             self::cacheControl(errorMaxAge: $errorMaxAge),
+            new UrlAliases([], []),
         );
     }
 

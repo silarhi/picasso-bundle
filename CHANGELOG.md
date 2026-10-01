@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `mapping` option for vich loaders. It defaults to the loader name when that is a VichUploader mapping, else to the only mapping, so `product_image: { type: vich }` (or `vich: ~` with a single mapping) is enough. Unknown or ambiguous mappings fail at container build with the list of available mappings.
 - Chain loader (`type: chain`, `loaders: [uploads, assets]`): one loader name for images spread over several filesystem, flysystem or vich loaders. Each image is rendered with the first loader holding it, and its URLs name that loader.
 - `Image::$loader`: the loader that loaded an image when another one delegated to it. Generated URLs name it.
+- `url_alias` option for loaders and transformers (`urlAlias` on `#[AsImageLoader]` and `#[AsImageTransformer]`): the name of a loader or transformer in image URLs and public-cache keys, e.g. `/image/g/pi/photo.jpg` instead of `/image/glide/product_image/photo.jpg`. URLs using the names keep being served. Conflicting aliases fail at container build.
 - `InvalidImageReferenceException`, thrown when an entity passed to a vich loader has no field using its mapping, several of them and no `field` context key, or a `field` using another mapping.
 - Glide `lock` option (requires `symfony/lock`): concurrent requests for the same missing variant render it once. The first request renders it while the others wait, then serve it from the cache; with `defer_cache_write`, the lock is held until the variant is uploaded. `lock.factory` picks the `LockFactory` service (default: the one `framework.lock` configures) and `lock.ttl` (default 30 seconds) how long a lock outlives a renderer that crashed.
 
@@ -64,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     # after (the 1.x URL above answers 301 to it)
     /image/glide/uploads/photo.jpg?w=640&fm=webp&s=…
     ```
+- **BC break:** `GlideTransformer`, `ImageController` and `LegacyUrlController` require a `UrlAliases` constructor argument (second for `GlideTransformer`, after the router). Code instantiating them directly must pass `new UrlAliases([], [])` when no URL alias is configured; services wired by the bundle are unaffected.
 - `FilesystemLoader::load()` now treats paths escaping its base directory (`..`) as missing, as serving already did.
 - Glide purges now throw a `PurgeException` when the cache storage cannot delete the variants, instead of failing silently.
 - Images served by the bundle controller now carry `immutable` by default, and the `Expires` header set by Glide is dropped. Configurable under `cache_control`; `max_age: ~` keeps the transformer's headers, as before:
