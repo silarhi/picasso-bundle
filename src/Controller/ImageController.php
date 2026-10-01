@@ -20,6 +20,7 @@ use Silarhi\PicassoBundle\Exception\UndecodableImageException;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
+use Silarhi\PicassoBundle\Service\UrlAliases;
 use Silarhi\PicassoBundle\Transformer\LocalTransformerInterface;
 
 use function sprintf;
@@ -41,31 +42,39 @@ final readonly class ImageController
      * @param CacheControlConfig $cacheControl the bundle's cache_control config: max_age (seconds a served image may be
      *                                         cached; null keeps the transformer's headers), immutable, and
      *                                         error_max_age (seconds a 404 may be cached; null keeps it uncacheable)
+     * @param UrlAliases         $urlAliases   turns the transformer and loader URL segments back into names
      */
     public function __construct(
         private TransformerRegistry $transformerRegistry,
         private LoaderRegistry $loaderRegistry,
         private array $cacheControl,
+        private UrlAliases $urlAliases,
         private ?Stopwatch $stopwatch = null,
     ) {
     }
 
+    /**
+     * @param string $transformer The transformer URL segment: its alias, or its name
+     * @param string $loader      The loader URL segment: its alias, or its name
+     */
     public function __invoke(string $transformer, string $loader, string $path, Request $request): Response
     {
-        if (!$this->transformerRegistry->has($transformer)) {
+        $transformerName = $this->urlAliases->resolveTransformer($transformer);
+        if (!$this->transformerRegistry->has($transformerName)) {
             throw $this->notFound(sprintf('Transformer "%s" not found.', $transformer), new TransformerNotFoundException(sprintf('Transformer "%s" not found.', $transformer)));
         }
 
-        $imageTransformer = $this->transformerRegistry->get($transformer);
+        $imageTransformer = $this->transformerRegistry->get($transformerName);
         if (!$imageTransformer instanceof LocalTransformerInterface) {
             throw $this->notFound(sprintf('Transformer "%s" does not support serving.', $transformer));
         }
 
-        if (!$this->loaderRegistry->has($loader)) {
+        $loaderName = $this->urlAliases->resolveLoader($loader);
+        if (!$this->loaderRegistry->has($loaderName)) {
             throw $this->notFound(sprintf('Loader "%s" not found.', $loader), new LoaderNotFoundException(sprintf('Loader "%s" not found.', $loader)));
         }
 
-        $imageLoader = $this->loaderRegistry->get($loader);
+        $imageLoader = $this->loaderRegistry->get($loaderName);
         if (!$imageLoader instanceof ServableLoaderInterface) {
             throw $this->notFound(sprintf('Loader "%s" does not support serving.', $loader));
         }
@@ -74,8 +83,8 @@ final readonly class ImageController
 
         try {
             $response = $imageTransformer->serve($imageLoader, $path, $request, [
-                'transformer' => $transformer,
-                'loader' => $loader,
+                'transformer' => $transformerName,
+                'loader' => $loaderName,
             ]);
         } catch (ImageNotFoundException|UndecodableImageException $e) {
             throw $this->notFound($e->getMessage(), $e);

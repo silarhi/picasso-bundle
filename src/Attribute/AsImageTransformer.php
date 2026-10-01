@@ -20,6 +20,7 @@ final readonly class AsImageTransformer
 {
     public function __construct(
         public string $name,
+        public ?string $urlAlias = null,
     ) {
     }
 }

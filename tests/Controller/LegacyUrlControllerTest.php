@@ -24,6 +24,7 @@ use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
 use Silarhi\PicassoBundle\Service\LegacyMetadataResolver;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
+use Silarhi\PicassoBundle\Service\UrlAliases;
 use Silarhi\PicassoBundle\Tests\Fixtures\CollectsDeprecationsTrait;
 use Silarhi\PicassoBundle\Tests\Fixtures\LegacyMetadataToken;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
@@ -93,9 +94,10 @@ class LegacyUrlControllerTest extends TestCase
         $empty = new ServiceLocator([]);
 
         return new LegacyUrlController(
-            $imageController ?? new ImageController(new TransformerRegistry($empty), new LoaderRegistry($empty), self::CACHE_CONTROL),
+            $imageController ?? new ImageController(new TransformerRegistry($empty), new LoaderRegistry($empty), self::CACHE_CONTROL, new UrlAliases([], [])),
             new ServiceLocator(['glide' => $this->createGlideTransformer(...)]),
             new LegacyMetadataResolver(self::SIGN_KEY, [self::FIXTURES => 'fixtures'], '/app'),
+            new UrlAliases([], []),
             $errorMaxAge,
         );
     }
@@ -110,6 +112,7 @@ class LegacyUrlControllerTest extends TestCase
             new TransformerRegistry(new ServiceLocator([$transformerName => static fn (): LocalTransformerInterface => $transformer])),
             new LoaderRegistry(new ServiceLocator(['fixtures' => static fn (): ServableLoaderInterface => $loader])),
             self::CACHE_CONTROL,
+            new UrlAliases([], []),
         );
     }
 
@@ -122,6 +125,6 @@ class LegacyUrlControllerTest extends TestCase
             return '/image/' . $params['transformer'] . '/' . $params['loader'] . '/' . $params['path'];
         });
 
-        return new GlideTransformer($router, self::SIGN_KEY, sys_get_temp_dir() . '/picasso-legacy-url-test', 'gd', null, false);
+        return new GlideTransformer($router, new UrlAliases([], []), self::SIGN_KEY, sys_get_temp_dir() . '/picasso-legacy-url-test', 'gd', null, false);
     }
 }

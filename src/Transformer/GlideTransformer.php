@@ -39,6 +39,7 @@ use Silarhi\PicassoBundle\Exception\TransformerNotFoundException;
 use Silarhi\PicassoBundle\Exception\UndecodableImageException;
 use Silarhi\PicassoBundle\Loader\FlysystemRegistry;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
+use Silarhi\PicassoBundle\Service\UrlAliases;
 use Silarhi\PicassoBundle\Source\ImageSourceFlysystemAdapter;
 
 use function sprintf;
@@ -126,6 +127,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
      */
     public function __construct(
         private UrlGeneratorInterface $router,
+        private UrlAliases $urlAliases,
         string $signKey,
         string $cache,
         string $driver,
@@ -198,8 +200,8 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
             ->generateSignature($path, $glideParams);
 
         $url = $this->router->generate('picasso_image', [
-            'transformer' => $transformerName,
-            'loader' => $loaderName,
+            'transformer' => $this->urlAliases->transformerSegment($transformerName),
+            'loader' => $this->urlAliases->loaderSegment($loaderName),
             'path' => $path,
             ...$glideParams,
             's' => $signature,
@@ -358,11 +360,12 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
     }
 
     /**
-     * Where the public-cache variants of an image live: "[prefix/]transformer/loader/path".
+     * Where the public-cache variants of an image live: "[prefix/]transformer/loader/path",
+     * with the URL aliases of the transformer and loader, as in the URL path.
      */
     private function publicCacheDirectory(string $transformerName, string $loaderName, string $path): string
     {
-        $directory = $transformerName . '/' . $loaderName . '/' . ltrim($path, '/');
+        $directory = $this->urlAliases->transformerSegment($transformerName) . '/' . $this->urlAliases->loaderSegment($loaderName) . '/' . ltrim($path, '/');
 
         return '' !== $this->cachePrefix ? $this->cachePrefix . '/' . $directory : $directory;
     }

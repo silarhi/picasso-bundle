@@ -24,6 +24,7 @@ use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
+use Silarhi\PicassoBundle\Service\UrlAliases;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
@@ -56,6 +57,7 @@ class GlideTransformerTest extends TestCase
 
         $this->transformer = new GlideTransformer(
             $this->router,
+            new UrlAliases([], []),
             self::SIGN_KEY,
             '/tmp/cache',
             'gd',
@@ -178,7 +180,7 @@ class GlideTransformerTest extends TestCase
         $transformation = new ImageTransformation(width: 300, format: 'webp');
         $context = ['loader' => 'vich', 'transformer' => 'glide'];
 
-        $publicCacheTransformer = new GlideTransformer($this->router, self::SIGN_KEY, '/tmp/cache', 'gd', null, true);
+        $publicCacheTransformer = new GlideTransformer($this->router, new UrlAliases([], []), self::SIGN_KEY, '/tmp/cache', 'gd', null, true);
 
         self::assertSame($this->transformer->url($image, $transformation, $context), $this->transformer->url($image, $transformation, $context));
         self::assertSame($publicCacheTransformer->url($image, $transformation, $context), $publicCacheTransformer->url($image, $transformation, $context));
@@ -191,8 +193,8 @@ class GlideTransformerTest extends TestCase
         $context = ['loader' => 'filesystem', 'transformer' => 'glide'];
 
         foreach ([false, true] as $publicCache) {
-            $relative = new GlideTransformer($this->router, self::SIGN_KEY, '/tmp/cache', 'gd', null, $publicCache);
-            $onCdn = new GlideTransformer($this->router, self::SIGN_KEY, '/tmp/cache', 'gd', null, $publicCache, null, 'https://cdn.example.com/');
+            $relative = new GlideTransformer($this->router, new UrlAliases([], []), self::SIGN_KEY, '/tmp/cache', 'gd', null, $publicCache);
+            $onCdn = new GlideTransformer($this->router, new UrlAliases([], []), self::SIGN_KEY, '/tmp/cache', 'gd', null, $publicCache, null, 'https://cdn.example.com/');
 
             self::assertSame('https://cdn.example.com' . $relative->url($image, $transformation, $context), $onCdn->url($image, $transformation, $context));
         }
@@ -201,10 +203,23 @@ class GlideTransformerTest extends TestCase
     public function testComputeCachePathAppliesTheCachePrefix(): void
     {
         $context = ['loader' => 'filesystem', 'transformer' => 'glide'];
-        $prefixed = new GlideTransformer($this->router, self::SIGN_KEY, '/tmp/cache', 'gd', null, true, null, null, '/image/');
+        $prefixed = new GlideTransformer($this->router, new UrlAliases([], []), self::SIGN_KEY, '/tmp/cache', 'gd', null, true, null, null, '/image/');
 
         self::assertSame('glide/filesystem/uploads/photo.jpg/w_300.webp', $this->transformer->computeCachePath('uploads/photo.jpg', 'w_300.webp', $context));
         self::assertSame('image/glide/filesystem/uploads/photo.jpg/w_300.webp', $prefixed->computeCachePath('uploads/photo.jpg', 'w_300.webp', $context));
+    }
+
+    public function testUrlAndPublicCacheKeyNameTheTransformerAndLoaderByTheirUrlAlias(): void
+    {
+        $aliases = new UrlAliases(['product_image' => 'p'], ['glide' => 'g']);
+        $transformer = new GlideTransformer($this->router, $aliases, self::SIGN_KEY, '/tmp/cache', 'gd', null, true, null, null, 'image');
+        $context = ['loader' => 'product_image', 'transformer' => 'glide'];
+
+        $url = $transformer->url(new Image(path: 'photo.jpg'), new ImageTransformation(width: 300, format: 'webp'), $context);
+
+        self::assertStringStartsWith('/picasso/g/p/photo.jpg/fm_webp%2Cw_300.webp?s=', $url);
+        // The cache key mirrors the URL path, so a CDN in front of the bucket finds it
+        self::assertSame('image/g/p/photo.jpg/fm_webp,w_300.webp', $transformer->computeCachePath('photo.jpg', 'fm_webp,w_300.webp', $context));
     }
 
     public function testUrlCarriesOnlyTransformationAndSignature(): void
@@ -222,6 +237,7 @@ class GlideTransformerTest extends TestCase
     {
         $transformer = new GlideTransformer(
             $this->router,
+            new UrlAliases([], []),
             self::SIGN_KEY,
             '/tmp/cache',
             'gd',
@@ -259,6 +275,7 @@ class GlideTransformerTest extends TestCase
     {
         $transformer = new GlideTransformer(
             $this->router,
+            new UrlAliases([], []),
             self::SIGN_KEY,
             '/tmp/cache',
             'gd',
@@ -276,6 +293,7 @@ class GlideTransformerTest extends TestCase
     {
         $transformer = new GlideTransformer(
             $this->router,
+            new UrlAliases([], []),
             self::SIGN_KEY,
             '/tmp/cache',
             'gd',
@@ -299,6 +317,7 @@ class GlideTransformerTest extends TestCase
     {
         $transformer = new GlideTransformer(
             $this->router,
+            new UrlAliases([], []),
             self::SIGN_KEY,
             '/tmp/cache',
             'gd',
@@ -337,6 +356,7 @@ class GlideTransformerTest extends TestCase
     {
         $transformer = new GlideTransformer(
             $this->router,
+            new UrlAliases([], []),
             self::SIGN_KEY,
             '/tmp/cache',
             'gd',
@@ -436,6 +456,7 @@ class GlideTransformerTest extends TestCase
     {
         $transformer = new GlideTransformer(
             $this->router,
+            new UrlAliases([], []),
             self::SIGN_KEY,
             '/tmp/cache',
             'gd',

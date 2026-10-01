@@ -18,7 +18,7 @@ use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 
-#[AsImageTransformer('stub')]
+#[AsImageTransformer('stub', urlAlias: 's')]
 final class StubAttributeTransformer implements ImageTransformerInterface
 {
     public function url(Image $image, ImageTransformation $transformation, array $context = []): string
