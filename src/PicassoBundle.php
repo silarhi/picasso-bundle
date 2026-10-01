@@ -26,6 +26,7 @@ use Silarhi\PicassoBundle\Attribute\AsImageLoader;
 use Silarhi\PicassoBundle\Attribute\AsImageTransformer;
 use Silarhi\PicassoBundle\Attribute\AsPlaceholder;
 use Silarhi\PicassoBundle\Controller\ImageController;
+use Silarhi\PicassoBundle\Controller\LegacyUrlController;
 use Silarhi\PicassoBundle\DataCollector\CollectingImageHelper;
 use Silarhi\PicassoBundle\DataCollector\CollectingMetadataGuesser;
 use Silarhi\PicassoBundle\DataCollector\PicassoDataCollector;
@@ -44,6 +45,7 @@ use Silarhi\PicassoBundle\Placeholder\TransformerPlaceholder;
 use Silarhi\PicassoBundle\Service\ImageHelper;
 use Silarhi\PicassoBundle\Service\ImageHelperInterface;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
+use Silarhi\PicassoBundle\Service\LegacyMetadataResolver;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Service\MetadataGuesser;
 use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
@@ -465,6 +467,8 @@ final class PicassoBundle extends AbstractBundle
         $loaderTransformers = [];
         /** @var array<string, bool> $loaderResolveMetadata */
         $loaderResolveMetadata = [];
+        /** @var array<string, string> $loaderRoots Root → first loader reading it, for 1.x URLs (vich roots: VichLoaderPass) */
+        $loaderRoots = [];
 
         foreach ($config['loaders'] as $name => $loaderConfig) {
             if (!$loaderConfig['enabled']) {
@@ -515,6 +519,7 @@ final class PicassoBundle extends AbstractBundle
                     $services->set('picasso.loader.' . $name, FilesystemLoader::class)
                         ->args([$loaderConfig['path']])
                         ->tag('picasso.loader', $tag);
+                    $loaderRoots[$loaderConfig['path']] ??= $name;
                     break;
 
                 case 'flysystem':
@@ -600,6 +605,8 @@ final class PicassoBundle extends AbstractBundle
 
         $knownTransformerTypes = ['glide', 'imgix', 'service'];
         $deferredCacheWriterRegistered = false;
+        $glideTransformers = [];
+        $glideSignKey = null;
 
         foreach ($config['transformers'] as $name => $transformerConfig) {
             if (!$transformerConfig['enabled']) {
@@ -628,6 +635,8 @@ final class PicassoBundle extends AbstractBundle
                             $transformerConfig['defer_cache_write'] ? service('picasso.deferred_cache_writer') : null,
                         ])
                         ->tag('picasso.transformer', ['key' => $name]);
+                    $glideTransformers[$name] = service('picasso.transformer.' . $name);
+                    $glideSignKey ??= (string) $transformerConfig['sign_key'];
 
                     if ($transformerConfig['defer_cache_write'] && !$deferredCacheWriterRegistered) {
                         $services->set('picasso.deferred_cache_writer', DeferredCacheWriter::class)
@@ -765,6 +774,23 @@ final class PicassoBundle extends AbstractBundle
             ])
             ->tag('controller.service_arguments')
             ->public();
+
+        // 1.x Glide URLs carry the root of their source in "_metadata", 1.x
+        // encrypted it with the sign key of the first Glide transformer
+        if ([] !== $glideTransformers) {
+            $services->set(LegacyMetadataResolver::SERVICE, LegacyMetadataResolver::class)
+                ->args([$glideSignKey, $loaderRoots, '%kernel.project_dir%']);
+
+            $services->set('.picasso.controller.legacy_url', LegacyUrlController::class)
+                ->decorate('picasso.controller.image')
+                ->args([
+                    service('.inner'),
+                    service_locator($glideTransformers),
+                    service(LegacyMetadataResolver::SERVICE),
+                    $config['cache_control']['error_max_age'],
+                ])
+                ->tag('controller.service_arguments');
+        }
 
         // --- Pipeline ---
 

@@ -107,18 +107,8 @@ final readonly class ImageController
         return $response;
     }
 
-    /**
-     * A 404 that clients and CDNs may keep for error_max_age, so repeated requests
-     * for a missing image stop reaching the application. Without one, it stays
-     * uncacheable.
-     */
     private function notFound(string $message, ?Throwable $previous = null): NotFoundHttpException
     {
-        $errorMaxAge = $this->cacheControl['error_max_age'];
-        $headers = null !== $errorMaxAge
-            ? ['Cache-Control' => sprintf('public, max-age=%d', $errorMaxAge)]
-            : [];
-
-        return new NotFoundHttpException($message, $previous, 0, $headers);
+        return (new NotFoundExceptionFactory($this->cacheControl['error_max_age']))->create($message, $previous);
     }
 }

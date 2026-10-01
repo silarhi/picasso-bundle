@@ -134,6 +134,7 @@ PicassoBundle solves this the same way Next.js Image did for React:
     - [Custom Transformer](#custom-transformer)
 - [Routes](#routes)
     - [Error Responses](#error-responses)
+    - [1.x URLs](#1x-urls)
 - [Cache Purge](#cache-purge)
 - [How It Works](#how-it-works)
 - [Testing & Quality](#testing--quality)
@@ -1255,6 +1256,14 @@ The controller, not the transformer, owns the `Cache-Control` of what it serves,
 - 404s are not cacheable by default. Set `error_max_age` to let clients and CDNs keep them for that many seconds (`Cache-Control: public, max-age=…`).
 
 When two requests render the same variant at once and the cache storage rejects the second write (S3-compatible storages may answer `409 Conflict`), the request is still answered with the variant the first one cached, instead of an error.
+
+### 1.x URLs
+
+Image URLs published by 1.x (in CDN caches, emails, search engines, saved pages) keep working. A 1.x loader reading several directories or VichUploader mappings put the source of each image in an encrypted `_metadata` query param. Since 2.0, that source names the loader reading it, so such a URL is answered with a `301 Moved Permanently` to the same image and transformation under that loader, whatever its loader name has become (a [chain](#chain-loader), another loader, or none). Nothing needs configuring:
+
+- The source is matched against the `path` of filesystem loaders and the upload destination of vich loaders, also when the project moved to another directory since (deployments into a new release directory).
+- When no loader reads a 1.x source any more, its URLs answer `404`: declare a loader for it.
+- Each redirect triggers a deprecation, so the logs tell when 1.x URLs stop being requested. 1.x URLs without `_metadata` were already 2.0 URLs.
 
 ## Cache Purge
 

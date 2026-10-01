@@ -225,21 +225,6 @@ class GlideTransformerServeTest extends TestCase
         }
     }
 
-    public function testServeIgnoresPre2MetadataParam(): void
-    {
-        // URLs minted before 2.0 carry an encrypted "_metadata" param, covered by
-        // their signature. The loader alone now locates the source.
-        $response = $this->createTransformer($this->tempDir . '/cache')->serve(
-            $this->createLoader(__DIR__ . '/../Fixtures'),
-            'photo.jpg',
-            $this->createSignedRequest('photo.jpg', ['w' => '10', 'fm' => 'webp', '_metadata' => 'pre-2.0-token']),
-            ['transformer' => 'glide', 'loader' => 'vich'],
-        );
-
-        self::assertSame(200, $response->getStatusCode());
-        self::assertSame('image/webp', $response->headers->get('Content-Type'));
-    }
-
     public function testServeRejectsPublicCachePathWithoutSourcePath(): void
     {
         $transformer = $this->createTransformer($this->tempDir . '/cache', publicCache: true);
@@ -256,28 +241,66 @@ class GlideTransformerServeTest extends TestCase
         );
     }
 
-    public function testServeLegacyRedirectDropsPre2MetadataParam(): void
+    public function testRedirectToLoaderKeepsTheTransformation(): void
     {
-        $transformer = $this->createTransformer($this->tempDir . '/cache', publicCache: true);
-
-        $response = $transformer->serve(
-            $this->createLoader(__DIR__ . '/../Fixtures'),
-            'photo.jpg',
-            $this->createSignedRequest('photo.jpg', [
-                'w' => '10',
-                'fm' => 'webp',
-                '_metadata' => 'pre-2.0-token',
-            ]),
+        $response = $this->createTransformer($this->tempDir . '/cache')->redirectToLoader(
+            'uploads',
+            'users/42.jpg',
+            // Params the signature covers but Glide does not know (1.x "_metadata") are dropped
+            $this->createSignedRequest('users/42.jpg', ['w' => '10', '_metadata' => 'pre-2.0-token']),
             ['transformer' => 'glide', 'loader' => 'vich'],
         );
 
         self::assertSame(Response::HTTP_MOVED_PERMANENTLY, $response->getStatusCode());
+        self::assertTrue($response->headers->hasCacheControlDirective('public'));
+        $location = (string) $response->headers->get('Location');
+        self::assertSame('/picasso/glide/uploads/users/42.jpg', parse_url($location, \PHP_URL_PATH));
+        parse_str((string) parse_url($location, \PHP_URL_QUERY), $query);
+        self::assertSame(['w', 's'], array_keys($query));
+    }
+
+    public function testRedirectToLoaderKeepsPublicCacheParamsInThePath(): void
+    {
+        $response = $this->createTransformer($this->tempDir . '/cache', publicCache: true)->redirectToLoader(
+            'uploads',
+            'users/42.jpg/fm_webp,w_10.webp',
+            $this->createSignedRequest('users/42.jpg/fm_webp,w_10.webp', ['_metadata' => 'pre-2.0-token']),
+            ['transformer' => 'glide', 'loader' => 'vich'],
+        );
 
         $location = (string) $response->headers->get('Location');
-        self::assertSame('/picasso/glide/vich/photo.jpg/fm_webp%2Cw_10.webp', parse_url($location, \PHP_URL_PATH));
+        self::assertSame('/picasso/glide/uploads/users/42.jpg/fm_webp%2Cw_10.webp', parse_url($location, \PHP_URL_PATH));
+        parse_str((string) parse_url($location, \PHP_URL_QUERY), $query);
+        self::assertSame(['s'], array_keys($query));
+    }
 
+    public function testRedirectToLoaderMovesQueryParamsIntoThePathInPublicCacheMode(): void
+    {
+        // A URL minted before public cache was enabled keeps its params in the query string
+        $response = $this->createTransformer($this->tempDir . '/cache', publicCache: true)->redirectToLoader(
+            'uploads',
+            'photo.jpg',
+            $this->createSignedRequest('photo.jpg', ['w' => '10', 'fm' => 'webp', '_metadata' => 'pre-2.0-token']),
+            ['transformer' => 'glide', 'loader' => 'vich'],
+        );
+
+        $location = (string) $response->headers->get('Location');
+        self::assertSame('/picasso/glide/uploads/photo.jpg/fm_webp%2Cw_10.webp', parse_url($location, \PHP_URL_PATH));
         parse_str((string) parse_url($location, \PHP_URL_QUERY), $query);
         self::assertSame(['s'], array_keys($query), 'Only the signature stays in the query string');
+    }
+
+    public function testRedirectToLoaderRejectsAnInvalidSignature(): void
+    {
+        $this->expectException(ImageNotFoundException::class);
+        $this->expectExceptionMessage('Invalid image signature.');
+
+        $this->createTransformer($this->tempDir . '/cache')->redirectToLoader(
+            'uploads',
+            'photo.jpg',
+            new Request(['w' => '10', '_metadata' => 'pre-2.0-token', 's' => 'forged']),
+            ['transformer' => 'glide', 'loader' => 'vich'],
+        );
     }
 
     /**

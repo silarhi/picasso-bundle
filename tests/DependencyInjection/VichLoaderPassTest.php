@@ -16,6 +16,7 @@ namespace Silarhi\PicassoBundle\Tests\DependencyInjection;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\DependencyInjection\VichLoaderPass;
 use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
+use Silarhi\PicassoBundle\Service\LegacyMetadataResolver;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 
@@ -88,6 +89,23 @@ class VichLoaderPassTest extends TestCase
         $this->expectExceptionMessage('Loader "vich": the VichUploader mapping "product_image" has no "upload_destination".');
 
         $this->process('vich', null, ['product_image' => ['uri_prefix' => '/products']]);
+    }
+
+    public function testUploadDestinationsLead1xUrlsToTheirLoader(): void
+    {
+        $container = new ContainerBuilder();
+        $container->setParameter('vich_uploader.mappings', self::MAPPINGS);
+        // A filesystem loader declared first keeps a root it shares with a vich loader
+        $resolver = $container->setDefinition(LegacyMetadataResolver::SERVICE, new Definition(LegacyMetadataResolver::class, ['key', ['%kernel.project_dir%/public/products' => 'products_fs'], '/app']));
+        foreach (['product_image', 'user_avatar'] as $loader) {
+            $container->setDefinition('picasso.loader.' . $loader, (new Definition())
+                ->setArguments([null, null, '', '', null])
+                ->addTag(VichLoaderPass::TAG, ['loader' => $loader, 'mapping' => null]));
+        }
+
+        (new VichLoaderPass())->process($container);
+
+        self::assertSame(['%kernel.project_dir%/public/products' => 'products_fs', 'avatars.storage' => 'user_avatar'], $resolver->getArgument(1));
     }
 
     public function testNothingToDoWithoutVichLoaders(): void
