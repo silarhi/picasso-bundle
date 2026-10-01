@@ -41,6 +41,17 @@ class UrlAliasPassTest extends TestCase
         self::assertSame(['product_image' => 'product_image'], $container->getDefinition(UrlAliasPass::SERVICE)->getArgument(0));
     }
 
+    public function testTagsWithoutAKeyAreIgnored(): void
+    {
+        // A service tagged by hand without a key is located by its service id, and an alias needs a name
+        $container = $this->process(loaders: ['product_image' => 'p']);
+        $container->register('app.loader')->addTag('picasso.loader', ['url_alias' => 'a']);
+
+        (new UrlAliasPass())->process($container);
+
+        self::assertSame(['product_image' => 'p'], $container->getDefinition(UrlAliasPass::SERVICE)->getArgument(0));
+    }
+
     public function testAnAliasMustBeAUrlSegment(): void
     {
         $this->expectException(InvalidConfigurationException::class);
