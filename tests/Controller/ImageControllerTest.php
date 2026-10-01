@@ -143,7 +143,54 @@ class ImageControllerTest extends TestCase
         }
     }
 
-    private function createControllerThrowing(Throwable $exception): ImageController
+    public function testNotFoundIsCacheableForTheTransformerErrorMaxAge(): void
+    {
+        $controller = $this->createControllerThrowing(new ImageNotFoundException('Image not found.'), ['glide' => 60]);
+
+        try {
+            $controller->__invoke('glide', 'filesystem', 'photo.jpg', new Request());
+            self::fail('Expected a NotFoundHttpException.');
+        } catch (NotFoundHttpException $e) {
+            self::assertSame(['Cache-Control' => 'public, max-age=60'], $e->getHeaders());
+        }
+    }
+
+    public function testNotFoundForAnUnknownLoaderIsCacheableForTheTransformerErrorMaxAge(): void
+    {
+        $transformer = self::createStub(LocalTransformerInterface::class);
+        $loaderContainer = self::createStub(ContainerInterface::class);
+        $loaderContainer->method('has')->willReturn(false);
+        $controller = new ImageController(
+            $this->createRegistry(TransformerRegistry::class, 'glide', $transformer),
+            new LoaderRegistry($loaderContainer),
+            null,
+            ['glide' => 0],
+        );
+
+        try {
+            $controller->__invoke('glide', 'unknown', 'photo.jpg', new Request());
+            self::fail('Expected a NotFoundHttpException.');
+        } catch (NotFoundHttpException $e) {
+            self::assertSame(['Cache-Control' => 'public, max-age=0'], $e->getHeaders());
+        }
+    }
+
+    public function testNotFoundStaysUncacheableWithoutErrorMaxAge(): void
+    {
+        $controller = $this->createControllerThrowing(new ImageNotFoundException('Image not found.'), ['other' => 60]);
+
+        try {
+            $controller->__invoke('glide', 'filesystem', 'photo.jpg', new Request());
+            self::fail('Expected a NotFoundHttpException.');
+        } catch (NotFoundHttpException $e) {
+            self::assertSame([], $e->getHeaders());
+        }
+    }
+
+    /**
+     * @param array<string, int> $errorMaxAges
+     */
+    private function createControllerThrowing(Throwable $exception, array $errorMaxAges = []): ImageController
     {
         $loader = self::createStub(ServableLoaderInterface::class);
         $transformer = self::createStub(LocalTransformerInterface::class);
@@ -152,6 +199,8 @@ class ImageControllerTest extends TestCase
         return new ImageController(
             $this->createRegistry(TransformerRegistry::class, 'glide', $transformer),
             $this->createRegistry(LoaderRegistry::class, 'filesystem', $loader),
+            null,
+            $errorMaxAges,
         );
     }
 

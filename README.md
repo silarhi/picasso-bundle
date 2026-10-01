@@ -335,8 +335,11 @@ picasso:
             cache: '%kernel.project_dir%/var/glide-cache' # local path OR a Flysystem storage name (e.g. 'thumbs.storage')
             driver: gd # gd | imagick
             max_image_size: ~ # optional max pixel count
+            base_url: ~ # optional scheme + host prepended to image URLs, e.g. a CDN
+            error_max_age: ~ # seconds a 404 may be cached by clients and CDNs (null: not cacheable)
             public_cache:
                 enabled: false # serve transformed images from public directory
+                prefix: '' # path prepended to cache keys so they mirror the URL path
 
 
         # imgix:
@@ -995,8 +998,11 @@ picasso:
             cache: '%kernel.project_dir%/var/glide-cache'
             driver: gd # gd | imagick
             max_image_size: ~ # optional: max pixel count (width x height)
+            base_url: ~ # optional: e.g. https://img.example.com to point image URLs at a CDN
+            error_max_age: ~ # optional: seconds a 404 may be cached (e.g. 60)
             public_cache:
                 enabled: false # serve from public dir for better performance
+                prefix: '' # optional: path prepended to cache keys (see "Serving thumbnails from a CDN")
 ```
 
 > **Important:** When using Glide, you must [import the bundle routes](#routes) so that the image controller can serve transformed images.
@@ -1036,7 +1042,46 @@ picasso:
             driver: gd
 ```
 
-> **Note:** `public_cache: enabled: true` writes rendered files at a path your web server is expected to serve directly. Combined with a remote Flysystem cache, that only works if the underlying bucket is publicly served at the matching URL prefix — otherwise leave `public_cache` disabled and let the bundle's controller stream the cached file.
+> **Note:** `public_cache: enabled: true` writes rendered files at a path your web server is expected to serve directly. Combined with a remote Flysystem cache, that only works if the underlying bucket is publicly served at the matching URL prefix (see [Serving thumbnails from a CDN](#serving-thumbnails-from-a-cdn)) — otherwise leave `public_cache` disabled and let the bundle's controller stream the cached file.
+
+#### Serving thumbnails from a CDN
+
+For large catalogs, keep the rendered variants in a bucket and put a CDN in front of it, so that a thumbnail that already exists never reaches PHP. The application only handles misses, and still renders them on the fly:
+
+```
+Browser ──► CDN ──► bucket (S3, R2, GCS…)       hit: served by the CDN/bucket, no PHP
+                      │ 403/404
+                      ▼
+                    Symfony /image/…            miss: rendered, stored in the bucket, returned
+```
+
+```yaml
+picasso:
+    transformers:
+        glide:
+            sign_key: '%env(PICASSO_SIGN_KEY)%'
+            cache: 'thumbs.storage' # Flysystem storage of the bucket
+            base_url: 'https://img.example.com' # the CDN host
+            error_max_age: 60 # let the CDN absorb repeated 404s for a minute
+            public_cache:
+                enabled: true
+                prefix: 'image' # the URL path before the transformer name (/image/glide/…)
+```
+
+- **`base_url`** makes every generated image URL point at the CDN: `https://img.example.com/image/glide/…`.
+- **`public_cache.prefix`** makes the cache key equal the URL path: the variant served at `/image/glide/flysystem/photo.jpg/fm_webp%2Cw_640.webp` is stored under the key `image/glide/flysystem/photo.jpg/fm_webp,w_640.webp`, which is exactly what the CDN looks up in the bucket. Set it to what comes before the transformer name in the URL path: `image` with the default [routes](#routes), or e.g. `media/image` when they are imported with a `/media` prefix.
+- **On a miss**, the application renders the variant, stores it in the bucket and returns it with `Cache-Control: public, max-age=31536000, immutable`. The next request is a hit.
+- **`error_max_age`** makes the image controller's 404s cacheable (`Cache-Control: public, max-age=…`), so a CDN does not send every request for a missing image to the application. Without it, 404s stay uncacheable.
+
+The signature is only checked on a miss: that is all it needs to protect, since it guards the rendering, and a variant that already exists is public anyway.
+
+On the CDN side:
+
+- Use the bucket as the origin, and fall back to the application on `403`/`404` (CloudFront origin groups, a Cloudflare Worker reading R2, Fastly, or a reverse proxy such as nginx with `proxy_intercept_errors` and `error_page 403 404 = @app`). S3 answers `403` for a missing key when the reader cannot list the bucket.
+- Leave the query string (`s`, `_metadata`) out of the cache key, but forward it to the application on a miss: it carries the signature.
+- Give hits served from the bucket a long lifetime in the CDN's cache policy (or response headers policy): the bundle does not set `Cache-Control` on the objects it stores.
+
+A variant URL never changes meaning, so its cache never needs revalidating. Changing the source file behind an unchanged path therefore needs a [purge](#cache-purge), which clears the bucket but not the CDN's edge caches. Uploads with unique file names (as VichUploaderBundle generates) never need either.
 
 ### Imgix (CDN)
 
@@ -1119,6 +1164,8 @@ if ($throwable instanceof NotFoundHttpException
 }
 ```
 
+By default these 404s are not cacheable. Set the Glide transformer's `error_max_age` to let clients and CDNs keep them for that many seconds (`Cache-Control: public, max-age=…`).
+
 When two requests render the same variant at once and the cache storage rejects the second write (S3-compatible storages may answer `409 Conflict`), the request is still answered with the variant the first one cached, instead of an error.
 
 ## Cache Purge
@@ -1129,7 +1176,7 @@ A purge throws a `PurgeException` when the cache can't be cleared: the Glide cac
 
 ### Glide
 
-Glide cache is purged automatically — no extra configuration needed. In standard mode, `Server::deleteCache()` removes all cached variants. In public cache mode, the bundle deletes the cache directory for the specific transformer/loader/path combination.
+Glide cache is purged automatically — no extra configuration needed. In standard mode, `Server::deleteCache()` removes all cached variants. In public cache mode, the bundle deletes the cache directory for the specific transformer/loader/path combination (under `public_cache.prefix` when set). Purging does not reach a CDN in front of the cache: clear its edge caches separately.
 
 ### Imgix
 

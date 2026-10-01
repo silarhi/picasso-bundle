@@ -225,6 +225,39 @@ class BundleWiringTest extends TestCase
         self::assertTrue($container->has('picasso.loader.url'));
     }
 
+    public function testGlideCdnOptionsAreWired(): void
+    {
+        $container = $this->loadExtension([
+            'transformers' => [
+                'glide' => [
+                    'sign_key' => 'secret',
+                    'base_url' => 'https://cdn.example.com',
+                    'error_max_age' => 60,
+                    'public_cache' => ['enabled' => true, 'prefix' => 'image'],
+                ],
+            ],
+        ]);
+
+        $transformer = $container->getDefinition('picasso.transformer.glide');
+        self::assertSame('https://cdn.example.com', $transformer->getArgument(8));
+        self::assertSame('image', $transformer->getArgument(9));
+        self::assertSame(['glide' => 60], $container->getDefinition('picasso.controller.image')->getArgument(3));
+    }
+
+    public function testGlideCdnOptionsAreOffByDefault(): void
+    {
+        $container = $this->loadExtension([
+            'transformers' => [
+                'glide' => ['sign_key' => 'secret'],
+            ],
+        ]);
+
+        $transformer = $container->getDefinition('picasso.transformer.glide');
+        self::assertNull($transformer->getArgument(8));
+        self::assertSame('', $transformer->getArgument(9));
+        self::assertSame([], $container->getDefinition('picasso.controller.image')->getArgument(3));
+    }
+
     public function testImgixTransformerIsRegistered(): void
     {
         $container = $this->bootKernel([

@@ -28,13 +28,18 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Stopwatch\Stopwatch;
+use Throwable;
 
 final readonly class ImageController
 {
+    /**
+     * @param array<string, int> $errorMaxAges Per transformer name, how long (seconds) clients and CDNs may cache a 404
+     */
     public function __construct(
         private TransformerRegistry $transformerRegistry,
         private LoaderRegistry $loaderRegistry,
         private ?Stopwatch $stopwatch = null,
+        private array $errorMaxAges = [],
     ) {
     }
 
@@ -46,16 +51,16 @@ final readonly class ImageController
 
         $imageTransformer = $this->transformerRegistry->get($transformer);
         if (!$imageTransformer instanceof LocalTransformerInterface) {
-            throw new NotFoundHttpException(sprintf('Transformer "%s" does not support serving.', $transformer));
+            throw $this->notFound($transformer, sprintf('Transformer "%s" does not support serving.', $transformer));
         }
 
         if (!$this->loaderRegistry->has($loader)) {
-            throw new NotFoundHttpException(sprintf('Loader "%s" not found.', $loader), new LoaderNotFoundException(sprintf('Loader "%s" not found.', $loader)));
+            throw $this->notFound($transformer, sprintf('Loader "%s" not found.', $loader), new LoaderNotFoundException(sprintf('Loader "%s" not found.', $loader)));
         }
 
         $imageLoader = $this->loaderRegistry->get($loader);
         if (!$imageLoader instanceof ServableLoaderInterface) {
-            throw new NotFoundHttpException(sprintf('Loader "%s" does not support serving.', $loader));
+            throw $this->notFound($transformer, sprintf('Loader "%s" does not support serving.', $loader));
         }
 
         $this->stopwatch?->start('picasso.image_response', 'picasso');
@@ -66,11 +71,25 @@ final readonly class ImageController
                 'loader' => $loader,
             ]);
         } catch (ImageNotFoundException|UndecodableImageException $e) {
-            throw new NotFoundHttpException($e->getMessage(), $e);
+            throw $this->notFound($transformer, $e->getMessage(), $e);
         } finally {
             $this->stopwatch?->stop('picasso.image_response');
         }
 
         return $response;
+    }
+
+    /**
+     * A 404 that a CDN may keep for the transformer's error_max_age, so repeated
+     * requests for a missing image stop reaching the application. Without one, it
+     * stays uncacheable.
+     */
+    private function notFound(string $transformer, string $message, ?Throwable $previous = null): NotFoundHttpException
+    {
+        $headers = isset($this->errorMaxAges[$transformer])
+            ? ['Cache-Control' => sprintf('public, max-age=%d', $this->errorMaxAges[$transformer])]
+            : [];
+
+        return new NotFoundHttpException($message, $previous, 0, $headers);
     }
 }

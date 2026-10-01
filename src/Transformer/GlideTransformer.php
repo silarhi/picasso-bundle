@@ -90,9 +90,22 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         'Intervention\\Image\\Exception\\NotReadableException', // intervention/image 2
     ];
 
+    /**
+     * Cache-Control of a rendered variant: a variant URL never changes meaning,
+     * so caches need not revalidate it.
+     */
+    private const CACHE_CONTROL = 'public, max-age=31536000, immutable';
+
     private Signature $signature;
     private Server $server;
+    private ?string $baseUrl;
+    private string $cachePrefix;
 
+    /**
+     * @param string|null $baseUrl     Scheme and host (e.g. a CDN) prepended to generated URLs; null keeps them host-relative
+     * @param string      $cachePrefix Public-cache mode only: path prepended to every cache key, so keys can mirror the
+     *                                 URL path (e.g. "image" when the bundle routes are served under /image)
+     */
     public function __construct(
         private UrlGeneratorInterface $router,
         private UrlEncryption $urlEncryption,
@@ -102,8 +115,12 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         ?int $maxImageSize,
         private bool $publicCache,
         ?FlysystemRegistry $flysystemRegistry = null,
+        ?string $baseUrl = null,
+        string $cachePrefix = '',
     ) {
         $this->signature = SignatureFactory::create($signKey);
+        $this->baseUrl = null !== $baseUrl && '' !== $baseUrl ? rtrim($baseUrl, '/') : null;
+        $this->cachePrefix = trim($cachePrefix, '/');
 
         $resolvedCache = null !== $flysystemRegistry && $flysystemRegistry->has($cache)
             ? $flysystemRegistry->get($cache)
@@ -167,7 +184,9 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         // trailing chunk (e.g. "w_720.jpg") as a relative path. Percent-encoding
         // is transparent — routing, the Glide signature and static serving all
         // decode %2C back to "," — and leaves nothing for them to split on.
-        return str_replace(',', '%2C', $url);
+        $url = str_replace(',', '%2C', $url);
+
+        return null !== $this->baseUrl ? $this->baseUrl . $url : $url;
     }
 
     public function serve(ServableLoaderInterface $loader, string $path, Request $request, array $context = []): Response
@@ -239,7 +258,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
             /** @var Response $response */
             $response = $this->server->getImageResponse($path, $params);
 
-            return $response;
+            return $this->markImmutable($response);
         } catch (FileNotFoundException|InvalidArgumentException $e) {
             throw new ImageNotFoundException('Image not found.', $e->getCode(), previous: $e);
         } catch (FilesystemException $e) {
@@ -254,7 +273,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
             /** @var Response $response */
             $response = $this->server->getImageResponse($path, $params);
 
-            return $response;
+            return $this->markImmutable($response);
         } catch (Throwable $e) {
             if (!$this->isDecodingFailure($e)) {
                 throw $e;
@@ -262,6 +281,13 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
 
             throw new UndecodableImageException('Source image could not be decoded.', $e->getCode(), previous: $e);
         }
+    }
+
+    private function markImmutable(Response $response): Response
+    {
+        $response->headers->set('Cache-Control', self::CACHE_CONTROL);
+
+        return $response;
     }
 
     private function isDecodingFailure(Throwable $e): bool
@@ -285,9 +311,18 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         $transformerName = $context['transformer'] ?? throw new TransformerNotFoundException('The "transformer" key is required in the context array.');
         /** @var string $loaderName */
         $loaderName = $context['loader'] ?? throw new LoaderNotFoundException('The "loader" key is required in the context array.');
-        $cachePrefix = $transformerName . '/' . $loaderName;
 
-        return $cachePrefix . '/' . $path . '/' . $cacheFilename;
+        return $this->publicCacheDirectory($transformerName, $loaderName, $path) . '/' . $cacheFilename;
+    }
+
+    /**
+     * Where the public-cache variants of an image live: "[prefix/]transformer/loader/path".
+     */
+    private function publicCacheDirectory(string $transformerName, string $loaderName, string $path): string
+    {
+        $directory = $transformerName . '/' . $loaderName . '/' . ltrim($path, '/');
+
+        return '' !== $this->cachePrefix ? $this->cachePrefix . '/' . $directory : $directory;
     }
 
     public function purge(string $path, array $context = []): void
@@ -300,7 +335,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
             /** @var string $loaderName */
             $loaderName = $context['loader'] ?? throw new LoaderNotFoundException('The "loader" key is required in the context array for public cache purge.');
 
-            $cachePath = $transformerName . '/' . $loaderName . '/' . ltrim($path, '/');
+            $cachePath = $this->publicCacheDirectory($transformerName, $loaderName, $path);
         }
 
         // deleteCache() removes the folder of Glide's default cache path for

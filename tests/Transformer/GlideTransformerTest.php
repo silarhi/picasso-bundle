@@ -207,6 +207,29 @@ class GlideTransformerTest extends TestCase
         self::assertSame($publicCacheTransformer->url($image, $transformation, $context), $publicCacheTransformer->url($image, $transformation, $context));
     }
 
+    public function testUrlIsPrefixedWithTheBaseUrl(): void
+    {
+        $image = new Image(path: 'uploads/photo.jpg');
+        $transformation = new ImageTransformation(width: 300, format: 'webp');
+        $context = ['loader' => 'filesystem', 'transformer' => 'glide'];
+
+        foreach ([false, true] as $publicCache) {
+            $relative = new GlideTransformer($this->router, new UrlEncryption(self::SIGN_KEY), self::SIGN_KEY, '/tmp/cache', 'gd', null, $publicCache);
+            $onCdn = new GlideTransformer($this->router, new UrlEncryption(self::SIGN_KEY), self::SIGN_KEY, '/tmp/cache', 'gd', null, $publicCache, null, 'https://cdn.example.com/');
+
+            self::assertSame('https://cdn.example.com' . $relative->url($image, $transformation, $context), $onCdn->url($image, $transformation, $context));
+        }
+    }
+
+    public function testComputeCachePathAppliesTheCachePrefix(): void
+    {
+        $context = ['loader' => 'filesystem', 'transformer' => 'glide'];
+        $prefixed = new GlideTransformer($this->router, new UrlEncryption(self::SIGN_KEY), self::SIGN_KEY, '/tmp/cache', 'gd', null, true, null, null, '/image/');
+
+        self::assertSame('glide/filesystem/uploads/photo.jpg/w_300.webp', $this->transformer->computeCachePath('uploads/photo.jpg', 'w_300.webp', $context));
+        self::assertSame('image/glide/filesystem/uploads/photo.jpg/w_300.webp', $prefixed->computeCachePath('uploads/photo.jpg', 'w_300.webp', $context));
+    }
+
     public function testUrlOmitsMetadataWhenEmpty(): void
     {
         $image = new Image(path: 'photo.jpg');
