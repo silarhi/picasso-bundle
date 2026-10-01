@@ -220,8 +220,8 @@ class ImageControllerTest extends TestCase
         $transformer = self::createStub(LocalTransformerInterface::class);
 
         foreach ([
-            'transformer' => new ImageController(new TransformerRegistry($missing), new LoaderRegistry($missing), null, null, false, 0),
-            'loader' => new ImageController($this->createRegistry(TransformerRegistry::class, 'glide', $transformer), new LoaderRegistry($missing), null, null, false, 0),
+            'transformer' => new ImageController(new TransformerRegistry($missing), new LoaderRegistry($missing), null, self::cacheControl(errorMaxAge: 0)),
+            'loader' => new ImageController($this->createRegistry(TransformerRegistry::class, 'glide', $transformer), new LoaderRegistry($missing), null, self::cacheControl(errorMaxAge: 0)),
         ] as $case => $controller) {
             try {
                 $controller->__invoke('glide', 'unknown', 'photo.jpg', new Request());
@@ -267,8 +267,7 @@ class ImageControllerTest extends TestCase
             $this->createRegistry(TransformerRegistry::class, 'glide', $transformer),
             $this->createRegistry(LoaderRegistry::class, 'filesystem', $loader),
             null,
-            $maxAge,
-            $immutable,
+            self::cacheControl($maxAge, $immutable),
         );
     }
 
@@ -282,10 +281,16 @@ class ImageControllerTest extends TestCase
             $this->createRegistry(TransformerRegistry::class, 'glide', $transformer),
             $this->createRegistry(LoaderRegistry::class, 'filesystem', $loader),
             null,
-            null,
-            false,
-            $errorMaxAge,
+            self::cacheControl(errorMaxAge: $errorMaxAge),
         );
+    }
+
+    /**
+     * @return CacheControlConfig
+     */
+    private static function cacheControl(?int $maxAge = null, bool $immutable = false, ?int $errorMaxAge = null): array
+    {
+        return ['max_age' => $maxAge, 'immutable' => $immutable, 'error_max_age' => $errorMaxAge];
     }
 
     /**

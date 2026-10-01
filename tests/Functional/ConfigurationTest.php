@@ -39,7 +39,7 @@ use Symfony\Component\Config\FileLocator;
  *     placeholders: array<string, PlaceholderConfig>,
  *     loaders: array<string, LoaderConfig>,
  *     transformers: array<string, TransformerConfig>,
- *     cache_control: array{max_age: int|null, immutable: bool, error_max_age: int|null},
+ *     cache_control: CacheControlConfig,
  * }
  */
 class ConfigurationTest extends TestCase

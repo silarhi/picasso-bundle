@@ -38,17 +38,16 @@ use Throwable;
 final readonly class ImageController
 {
     /**
-     * @param int|null $maxAge      Seconds clients and CDNs may cache a served image; null keeps the transformer's headers
-     * @param bool     $immutable   Whether served images are marked immutable (only applied with a $maxAge)
-     * @param int|null $errorMaxAge Seconds clients and CDNs may cache a 404; null keeps 404s uncacheable
+     * @param CacheControlConfig $cacheControl The bundle's cache_control config: max_age (seconds a served image may be
+     *                                         cached; null keeps the transformer's headers), immutable, and
+     *                                         error_max_age (seconds a 404 may be cached; null keeps it uncacheable).
+     *                                         The default leaves every header alone.
      */
     public function __construct(
         private TransformerRegistry $transformerRegistry,
         private LoaderRegistry $loaderRegistry,
         private ?Stopwatch $stopwatch = null,
-        private ?int $maxAge = null,
-        private bool $immutable = false,
-        private ?int $errorMaxAge = null,
+        private array $cacheControl = ['max_age' => null, 'immutable' => false, 'error_max_age' => null],
     ) {
     }
 
@@ -94,13 +93,14 @@ final readonly class ImageController
      */
     private function applyCacheHeaders(Response $response): Response
     {
-        if (null === $this->maxAge || (!$response->isSuccessful() && Response::HTTP_NOT_MODIFIED !== $response->getStatusCode())) {
+        $maxAge = $this->cacheControl['max_age'];
+        if (null === $maxAge || (!$response->isSuccessful() && Response::HTTP_NOT_MODIFIED !== $response->getStatusCode())) {
             return $response;
         }
 
         $response->setPublic();
-        $response->setMaxAge($this->maxAge);
-        $response->setImmutable($this->immutable);
+        $response->setMaxAge($maxAge);
+        $response->setImmutable($this->cacheControl['immutable']);
         // max-age is the lifetime; a transformer's Expires would only contradict it
         $response->headers->remove('Expires');
 
@@ -114,8 +114,9 @@ final readonly class ImageController
      */
     private function notFound(string $message, ?Throwable $previous = null): NotFoundHttpException
     {
-        $headers = null !== $this->errorMaxAge
-            ? ['Cache-Control' => sprintf('public, max-age=%d', $this->errorMaxAge)]
+        $errorMaxAge = $this->cacheControl['error_max_age'];
+        $headers = null !== $errorMaxAge
+            ? ['Cache-Control' => sprintf('public, max-age=%d', $errorMaxAge)]
             : [];
 
         return new NotFoundHttpException($message, $previous, 0, $headers);
