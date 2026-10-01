@@ -33,6 +33,7 @@ use Silarhi\PicassoBundle\PicassoBundle;
 use Silarhi\PicassoBundle\Placeholder\BlurHashPlaceholder;
 use Silarhi\PicassoBundle\Placeholder\PlaceholderInterface;
 use Silarhi\PicassoBundle\Placeholder\TransformerPlaceholder;
+use Silarhi\PicassoBundle\Service\DeferredCacheWriter;
 use Silarhi\PicassoBundle\Service\ImageHelper;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Service\MetadataGuesser;
@@ -233,6 +234,7 @@ class BundleWiringTest extends TestCase
                 'glide' => [
                     'sign_key' => 'secret',
                     'base_url' => 'https://cdn.example.com',
+                    'defer_cache_write' => true,
                     'public_cache' => ['enabled' => true, 'prefix' => 'image'],
                 ],
             ],
@@ -241,6 +243,13 @@ class BundleWiringTest extends TestCase
         $transformer = $container->getDefinition('picasso.transformer.glide');
         self::assertSame('https://cdn.example.com', $transformer->getArgument(8));
         self::assertSame('image', $transformer->getArgument(9));
+        self::assertEquals(new Reference('picasso.deferred_cache_writer'), $transformer->getArgument(10));
+
+        $writer = $container->getDefinition('picasso.deferred_cache_writer');
+        self::assertSame(DeferredCacheWriter::class, $writer->getClass());
+        self::assertSame([['event' => 'kernel.terminate', 'method' => 'flush']], $writer->getTag('kernel.event_listener'));
+        self::assertSame([['method' => 'reset']], $writer->getTag('kernel.reset'));
+
         self::assertSame(
             ['max_age' => 600, 'immutable' => false, 'error_max_age' => 60],
             $container->getDefinition('picasso.controller.image')->getArgument(3),
@@ -258,6 +267,8 @@ class BundleWiringTest extends TestCase
         $transformer = $container->getDefinition('picasso.transformer.glide');
         self::assertNull($transformer->getArgument(8));
         self::assertSame('', $transformer->getArgument(9));
+        self::assertNull($transformer->getArgument(10));
+        self::assertFalse($container->hasDefinition('picasso.deferred_cache_writer'));
         self::assertSame(
             ['max_age' => 31536000, 'immutable' => true, 'error_max_age' => null],
             $container->getDefinition('picasso.controller.image')->getArgument(3),

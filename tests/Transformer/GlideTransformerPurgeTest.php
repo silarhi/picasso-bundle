@@ -30,6 +30,7 @@ use Silarhi\PicassoBundle\Exception\PurgeException;
 use Silarhi\PicassoBundle\Exception\TransformerNotFoundException;
 use Silarhi\PicassoBundle\Loader\FlysystemRegistry;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
+use Silarhi\PicassoBundle\Service\DeferredCacheWriter;
 use Silarhi\PicassoBundle\Service\UrlEncryption;
 use Silarhi\PicassoBundle\Source\LocalImageSource;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
@@ -231,6 +232,22 @@ class GlideTransformerPurgeTest extends TestCase
         self::assertFileDoesNotExist($variant);
     }
 
+    public function testPurgeAfterADeferredServeDeletesFromTheCacheStorage(): void
+    {
+        // A deferred miss leaves the local render directory as the cache of the
+        // shared server; in a long-running process the purge must still reach
+        // the cache storage.
+        $writer = new DeferredCacheWriter();
+        $transformer = $this->createTransformer($this->tempDir, true, deferredCacheWriter: $writer);
+        $this->serve($transformer, 'photo.jpg/fm_webp,w_10.webp', []);
+        $writer->flush();
+        $this->serve($transformer, 'photo.jpg/fm_webp,w_20.webp', []);
+
+        $transformer->purge('photo.jpg', ['transformer' => 'glide', 'loader' => 'filesystem']);
+
+        self::assertFileDoesNotExist($this->tempDir . '/glide/filesystem/photo.jpg/fm_webp,w_10.webp');
+    }
+
     private function createTransformerWithCacheStorage(FilesystemOperator $cache, bool $publicCache): GlideTransformer
     {
         return new GlideTransformer(
@@ -245,7 +262,7 @@ class GlideTransformerPurgeTest extends TestCase
         );
     }
 
-    private function createTransformer(string $cacheDir, bool $publicCache, string $cachePrefix = ''): GlideTransformer
+    private function createTransformer(string $cacheDir, bool $publicCache, string $cachePrefix = '', ?DeferredCacheWriter $deferredCacheWriter = null): GlideTransformer
     {
         $router = self::createStub(UrlGeneratorInterface::class);
 
@@ -260,6 +277,7 @@ class GlideTransformerPurgeTest extends TestCase
             null,
             null,
             $cachePrefix,
+            $deferredCacheWriter,
         );
     }
 

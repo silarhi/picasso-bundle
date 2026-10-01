@@ -39,6 +39,7 @@ use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
 use Silarhi\PicassoBundle\Placeholder\BlurHashPlaceholder;
 use Silarhi\PicassoBundle\Placeholder\PlaceholderInterface;
 use Silarhi\PicassoBundle\Placeholder\TransformerPlaceholder;
+use Silarhi\PicassoBundle\Service\DeferredCacheWriter;
 use Silarhi\PicassoBundle\Service\ImageHelper;
 use Silarhi\PicassoBundle\Service\ImageHelperInterface;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
@@ -369,6 +370,10 @@ final class PicassoBundle extends AbstractBundle
                             ->scalarNode('request_factory')->defaultNull()->info('PSR-17 request factory service ID for imgix purge.')->end()
                             ->scalarNode('stream_factory')->defaultNull()->info('PSR-17 stream factory service ID for imgix purge.')->end()
                             ->scalarNode('service')->defaultNull()->info('Service ID for custom transformers (type: service).')->end()
+                            ->booleanNode('defer_cache_write')
+                                ->defaultFalse()
+                                ->info('Glide: render a cache miss to local disk and move it to the cache storage after the response has been sent (kernel.terminate). For remote cache storages.')
+                            ->end()
                             ->arrayNode('public_cache')
                                 ->canBeEnabled()
                                 ->children()
@@ -403,7 +408,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_fit: string,
          *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int|null, quality: int|null, fit: string|null, format: string|null, components_x: int, components_y: int, driver: string, service: string|null}>,
          *     loaders: array<string, array{enabled: bool, type: string|null, paths: list<string>, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null, resolve_metadata: bool|null}>,
-         *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, api_key: string|null, http_client: string|null, request_factory: string|null, stream_factory: string|null, service: string|null, public_cache: array{enabled: bool, prefix: string}}>
+         *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, api_key: string|null, http_client: string|null, request_factory: string|null, stream_factory: string|null, service: string|null, defer_cache_write: bool, public_cache: array{enabled: bool, prefix: string}}>
          * } $config
          */
         $services = $container->services();
@@ -545,6 +550,7 @@ final class PicassoBundle extends AbstractBundle
 
         $knownTransformerTypes = ['glide', 'imgix', 'service'];
         $urlEncryptionRegistered = false;
+        $deferredCacheWriterRegistered = false;
 
         foreach ($config['transformers'] as $name => $transformerConfig) {
             if (!$transformerConfig['enabled']) {
@@ -578,8 +584,19 @@ final class PicassoBundle extends AbstractBundle
                             $hasFlysystem ? service('.picasso.flysystem_registry') : null,
                             $transformerConfig['base_url'],
                             $transformerConfig['public_cache']['prefix'],
+                            $transformerConfig['defer_cache_write'] ? service('picasso.deferred_cache_writer') : null,
                         ])
                         ->tag('picasso.transformer', ['key' => $name]);
+
+                    if ($transformerConfig['defer_cache_write'] && !$deferredCacheWriterRegistered) {
+                        $services->set('picasso.deferred_cache_writer', DeferredCacheWriter::class)
+                            ->args([service('logger')->nullOnInvalid()])
+                            ->tag('kernel.event_listener', ['event' => 'kernel.terminate', 'method' => 'flush'])
+                            ->tag('kernel.reset', ['method' => 'reset'])
+                            ->tag('monolog.logger', ['channel' => 'picasso']);
+                        $deferredCacheWriterRegistered = true;
+                    }
+
                     break;
 
                 case 'imgix':
