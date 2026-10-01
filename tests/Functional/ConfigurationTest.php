@@ -24,7 +24,7 @@ use Symfony\Component\Config\FileLocator;
 
 /**
  * @phpstan-type PlaceholderConfig array{enabled: bool, type: string|null, size: int, blur: int, quality: int, components_x: int, components_y: int, service: string|null}
- * @phpstan-type LoaderConfig array{enabled: bool, type: string|null, path: string|null, paths: mixed, mapping: string|null, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null}
+ * @phpstan-type LoaderConfig array{enabled: bool, type: string|null, path: string|null, paths: mixed, loaders: list<string>, mapping: string|null, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null}
  * @phpstan-type PublicCacheConfig array{enabled: bool, prefix: string}
  * @phpstan-type TransformerConfig array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, defer_cache_write: bool, public_cache: PublicCacheConfig}
  * @phpstan-type PicassoConfig array{

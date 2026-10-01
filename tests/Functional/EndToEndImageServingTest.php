@@ -182,6 +182,28 @@ class EndToEndImageServingTest extends KernelTestCase
         self::assertSame(200, $response->getStatusCode(), 'Overridden loader URL serving failed: ' . $response->getContent());
     }
 
+    public function testRenderThroughChainNamesTheLoaderHoldingTheImage(): void
+    {
+        $rendered = $this->renderTwigComponent('Picasso:Image', [
+            'src' => 'photo.jpg',
+            'loader' => 'chained',
+            'sizes' => '100vw',
+        ]);
+
+        $srcUrl = $this->parseSrcFromImg($rendered->toString());
+        self::assertStringContainsString('/image/local_glide/main/photo.jpg', $srcUrl);
+        self::assertSame(200, $this->handleRequest($srcUrl)->getStatusCode());
+    }
+
+    public function testChainNeverServes(): void
+    {
+        $srcUrl = $this->parseSrcFromImg($this->renderTwigComponent('Picasso:Image', ['src' => 'photo.jpg', 'sizes' => '100vw'])->toString());
+
+        $response = $this->handleRequest(str_replace('/local_glide/main/', '/local_glide/chained/', $srcUrl));
+
+        self::assertSame(404, $response->getStatusCode());
+    }
+
     public function testTamperedSignatureReturns404(): void
     {
         $rendered = $this->renderTwigComponent('Picasso:Image', [

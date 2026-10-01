@@ -30,6 +30,7 @@ use Silarhi\PicassoBundle\DataCollector\CollectingImageHelper;
 use Silarhi\PicassoBundle\DataCollector\CollectingMetadataGuesser;
 use Silarhi\PicassoBundle\DataCollector\PicassoDataCollector;
 use Silarhi\PicassoBundle\DependencyInjection\VichLoaderPass;
+use Silarhi\PicassoBundle\Loader\ChainLoader;
 use Silarhi\PicassoBundle\Loader\FilesystemLoader;
 use Silarhi\PicassoBundle\Loader\FlysystemLoader;
 use Silarhi\PicassoBundle\Loader\FlysystemRegistry;
@@ -63,8 +64,10 @@ use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
+use Symfony\Component\DependencyInjection\Loader\Configurator\ReferenceConfigurator;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
+use function Symfony\Component\DependencyInjection\Loader\Configurator\service_locator;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_locator;
 
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
@@ -297,7 +300,7 @@ final class PicassoBundle extends AbstractBundle
                         ->children()
                             ->booleanNode('enabled')->defaultTrue()->end()
                             ->enumNode('type')
-                                ->values(['filesystem', 'flysystem', 'vich', 'url'])
+                                ->values(['filesystem', 'flysystem', 'vich', 'url', 'chain'])
                                 ->defaultNull()
                                 ->info('Loader type. Inferred from name when it matches a known type.')
                             ->end()
@@ -308,6 +311,10 @@ final class PicassoBundle extends AbstractBundle
                             ->variableNode('paths')
                                 ->defaultNull()
                                 ->info('Removed in 2.0: declare one filesystem loader per directory, each with its own "path".')
+                            ->end()
+                            ->arrayNode('loaders')
+                                ->scalarPrototype()->end()
+                                ->info('Loaders a chain loader tries, in order: each image is rendered with the first one holding it.')
                             ->end()
                             ->scalarNode('mapping')
                                 ->defaultNull()
@@ -352,7 +359,7 @@ final class PicassoBundle extends AbstractBundle
                         ->end()
                         ->validate()
                             ->ifTrue(static fn (array $v): bool => null !== $v['paths'])
-                            ->thenInvalid('The "paths" option was removed in 2.0. Declare one filesystem loader per directory, each with its own "path" (e.g. "uploads: { type: filesystem, path: \'%%kernel.project_dir%%/public/uploads\' }"), and pick the loader in your templates.')
+                            ->thenInvalid('The "paths" option was removed in 2.0. Declare one filesystem loader per directory, each with its own "path" (e.g. "uploads: { type: filesystem, path: \'%%kernel.project_dir%%/public/uploads\' }"), then pick the loader in your templates, or keep this name for all of them with a chain loader (e.g. "filesystem: { type: chain, loaders: [uploads, assets] }").')
                         ->end()
                     ->end()
                 ->end()
@@ -420,7 +427,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_quality: int|null,
          *     default_fit: string,
          *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int|null, quality: int|null, fit: string|null, format: string|null, components_x: int, components_y: int, driver: string, service: string|null}>,
-         *     loaders: array<string, array{enabled: bool, type: string|null, path: string|null, paths: mixed, mapping: string|null, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null, resolve_metadata: bool|null}>,
+         *     loaders: array<string, array{enabled: bool, type: string|null, path: string|null, paths: mixed, loaders: list<string>, mapping: string|null, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null, resolve_metadata: bool|null}>,
          *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, api_key: string|null, http_client: string|null, request_factory: string|null, stream_factory: string|null, service: string|null, defer_cache_write: bool, public_cache: array{enabled: bool, prefix: string}}>
          * } $config
          */
@@ -476,6 +483,10 @@ final class PicassoBundle extends AbstractBundle
 
             if (null !== $loaderConfig['mapping'] && 'vich' !== $type) {
                 throw new Exception\InvalidConfigurationException(sprintf('Loader "%s": the "mapping" option is only supported by vich loaders.', $name));
+            }
+
+            if ([] !== $loaderConfig['loaders'] && 'chain' !== $type) {
+                throw new Exception\InvalidConfigurationException(sprintf('Loader "%s": the "loaders" option is only supported by chain loaders.', $name));
             }
 
             $tag = ['key' => $name];
@@ -546,6 +557,19 @@ final class PicassoBundle extends AbstractBundle
                             ->tag('picasso.loader', $tag)
                             ->tag(VichLoaderPass::TAG, ['loader' => $name, 'mapping' => $loaderConfig['mapping']]);
                     }
+                    break;
+
+                case 'chain':
+                    $chain = $loaderConfig['loaders'];
+                    $this->checkChain($name, $chain, $config['loaders'], $knownTypes);
+
+                    $services->set('picasso.loader.' . $name, ChainLoader::class)
+                        ->args([
+                            $name,
+                            service_locator(array_combine($chain, array_map(static fn (string $loader): ReferenceConfigurator => service('picasso.loader.' . $loader), $chain))),
+                            $chain,
+                        ])
+                        ->tag('picasso.loader', $tag);
                     break;
             }
         }
@@ -837,6 +861,31 @@ final class PicassoBundle extends AbstractBundle
                     dirname(__DIR__) . '/templates' => 'Picasso',
                 ],
             ]);
+        }
+    }
+
+    /**
+     * A chain lists servable loaders declared in the bundle configuration: it
+     * asks their source whether they hold an image.
+     *
+     * @param list<string>                                                $chain
+     * @param array<string, array{enabled: bool, type: string|null, ...}> $loaders
+     * @param list<string>                                                $knownTypes
+     */
+    private function checkChain(string $name, array $chain, array $loaders, array $knownTypes): void
+    {
+        if ([] === $chain) {
+            throw new Exception\InvalidConfigurationException(sprintf('Loader "%s": a chain loader requires "loaders", the loaders it tries in order (e.g. "loaders: [uploads, assets]").', $name));
+        }
+
+        foreach ($chain as $loader) {
+            $type = isset($loaders[$loader]) && $loaders[$loader]['enabled']
+                ? $loaders[$loader]['type'] ?? (in_array($loader, $knownTypes, true) ? $loader : null)
+                : null;
+
+            if (!in_array($type, ['filesystem', 'flysystem', 'vich'], true)) {
+                throw new Exception\InvalidConfigurationException(sprintf('Loader "%s": chain member "%s" must be a filesystem, flysystem or vich loader declared under "picasso.loaders".', $name, $loader));
+            }
         }
     }
 

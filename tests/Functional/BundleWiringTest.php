@@ -26,6 +26,7 @@ use Silarhi\PicassoBundle\DataCollector\CollectingImageHelper;
 use Silarhi\PicassoBundle\DataCollector\CollectingMetadataGuesser;
 use Silarhi\PicassoBundle\DataCollector\PicassoDataCollector;
 use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
+use Silarhi\PicassoBundle\Loader\ChainLoader;
 use Silarhi\PicassoBundle\Loader\FlysystemLoader;
 use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
 use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
@@ -112,6 +113,64 @@ class BundleWiringTest extends TestCase
         $this->expectExceptionMessage('Loader "filesystem": the "mapping" option is only supported by vich loaders.');
 
         $this->loadExtension(['loaders' => ['filesystem' => ['path' => '/tmp', 'mapping' => 'product_image']]]);
+    }
+
+    public function testChainLoaderIsWired(): void
+    {
+        $container = $this->loadExtension(['loaders' => [
+            'uploads' => ['type' => 'filesystem', 'path' => '/uploads'],
+            'assets' => ['type' => 'filesystem', 'path' => '/assets'],
+            'filesystem' => ['type' => 'chain', 'loaders' => ['uploads', 'assets']],
+        ]]);
+
+        $definition = $container->getDefinition('picasso.loader.filesystem');
+        self::assertSame(ChainLoader::class, $definition->getClass());
+        self::assertSame('filesystem', $definition->getArgument(0));
+        self::assertSame(['uploads', 'assets'], $definition->getArgument(2));
+        self::assertSame([['key' => 'filesystem']], $definition->getTag('picasso.loader'));
+    }
+
+    /**
+     * @return iterable<string, array{array<string, array<string, mixed>>, string}>
+     */
+    public static function invalidChainProvider(): iterable
+    {
+        yield 'no loaders' => [
+            ['all' => ['type' => 'chain']],
+            'Loader "all": a chain loader requires "loaders", the loaders it tries in order (e.g. "loaders: [uploads, assets]").',
+        ];
+        yield 'unknown member' => [
+            ['all' => ['type' => 'chain', 'loaders' => ['nope']]],
+            'Loader "all": chain member "nope" must be a filesystem, flysystem or vich loader declared under "picasso.loaders".',
+        ];
+        yield 'disabled member' => [
+            ['uploads' => ['type' => 'filesystem', 'path' => '/uploads', 'enabled' => false], 'all' => ['type' => 'chain', 'loaders' => ['uploads']]],
+            'Loader "all": chain member "uploads" must be a filesystem, flysystem or vich loader declared under "picasso.loaders".',
+        ];
+        yield 'member that cannot tell whether it holds an image' => [
+            ['url' => [], 'all' => ['type' => 'chain', 'loaders' => ['url']]],
+            'Loader "all": chain member "url" must be a filesystem, flysystem or vich loader declared under "picasso.loaders".',
+        ];
+        yield 'nested chain' => [
+            ['inner' => ['type' => 'chain', 'loaders' => ['all']], 'all' => ['type' => 'chain', 'loaders' => ['inner']]],
+            'Loader "inner": chain member "all" must be a filesystem, flysystem or vich loader declared under "picasso.loaders".',
+        ];
+        yield 'loaders on another type' => [
+            ['uploads' => ['type' => 'filesystem', 'path' => '/uploads', 'loaders' => ['assets']]],
+            'Loader "uploads": the "loaders" option is only supported by chain loaders.',
+        ];
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $loaders
+     */
+    #[DataProvider('invalidChainProvider')]
+    public function testInvalidChainLoaderIsRejected(array $loaders, string $message): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage($message);
+
+        $this->loadExtension(['loaders' => $loaders]);
     }
 
     public function testTransformerWithUnknownTypeThrowsLogicException(): void

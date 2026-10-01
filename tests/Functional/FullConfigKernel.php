@@ -23,6 +23,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
  * Kernel that exercises the full breadth of configuration options:
  * - Multiple filesystem loaders with different names
  * - Disabled loader
+ * - Chain loader
  * - Imgix transformer alongside Glide
  * - Service-type transformer
  * - Disabled transformer
@@ -73,6 +74,15 @@ class FullConfigKernel extends AbstractPicassoKernel
                     'type' => 'filesystem',
                     'enabled' => false,
                     'path' => '/nonexistent',
+                ],
+                // Holds no image: the chain falls through to "main"
+                'entities_fs' => [
+                    'type' => 'filesystem',
+                    'path' => dirname(__DIR__) . '/Fixtures/Entity',
+                ],
+                'chained' => [
+                    'type' => 'chain',
+                    'loaders' => ['entities_fs', 'main'],
                 ],
             ],
             'transformers' => [
