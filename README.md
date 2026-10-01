@@ -130,6 +130,8 @@ PicassoBundle solves this the same way Next.js Image did for React:
     - [Custom Loader](#custom-loader)
 - [Transformers](#transformers)
     - [Glide (Local)](#glide-local)
+        - [Choosing a driver](#choosing-a-driver)
+        - [Rendering each variant once](#rendering-each-variant-once)
     - [Imgix (CDN)](#imgix-cdn)
     - [Custom Transformer](#custom-transformer)
 - [Routes](#routes)
@@ -137,6 +139,7 @@ PicassoBundle solves this the same way Next.js Image did for React:
     - [1.x URLs](#1x-urls)
 - [Cache Purge](#cache-purge)
 - [How It Works](#how-it-works)
+- [Performance](#performance)
 - [Testing & Quality](#testing--quality)
 - [Contributing](#contributing)
 - [License](#license)
@@ -171,13 +174,15 @@ PicassoBundle solves this the same way Next.js Image did for React:
 
 ### Optional Dependencies
 
-| Package                                   | Required for                               |
-| ----------------------------------------- | ------------------------------------------ |
-| `league/glide` + `league/glide-symfony`   | Glide transformer (local image processing) |
-| `kornrunner/blurhash` + `imagine/imagine` | BlurHash placeholder                       |
-| `league/flysystem-bundle`                 | Flysystem loader                           |
-| `vich/uploader-bundle`                    | VichUploader loader                        |
-| `symfony/http-client`                     | URL loader                                 |
+| Package                                   | Required for                                                                 |
+| ----------------------------------------- | ---------------------------------------------------------------------------- |
+| `league/glide`                            | Glide transformer (local image processing)                                   |
+| `intervention/image-driver-vips`          | Glide `vips` driver ([libvips](#choosing-a-driver))                          |
+| `symfony/lock`                            | Glide `lock` option ([one render per variant](#rendering-each-variant-once)) |
+| `kornrunner/blurhash` + `imagine/imagine` | BlurHash placeholder                                                         |
+| `league/flysystem-bundle`                 | Flysystem loader                                                             |
+| `vich/uploader-bundle`                    | VichUploader loader                                                          |
+| `symfony/http-client`                     | URL loader                                                                   |
 
 ## Installation
 
@@ -198,7 +203,7 @@ Install a transformer — at least one is required:
 
 ```bash
 # Option A: Glide (local image transformation)
-composer require league/glide league/glide-symfony
+composer require league/glide
 
 # Option B: Imgix (CDN-based transformation)
 # No extra package needed, just configure your Imgix base URL
@@ -343,10 +348,14 @@ picasso:
             type: glide # inferred from key name
             sign_key: ~ # signing key for secure URLs
             cache: '%kernel.project_dir%/var/glide-cache' # local path OR a Flysystem storage name (e.g. 'thumbs.storage')
-            driver: gd # gd | imagick
+            driver: gd # gd | imagick | vips
             max_image_size: ~ # optional max pixel count
             base_url: ~ # optional scheme + host prepended to image URLs, e.g. a CDN
             defer_cache_write: false # store a cache miss after the response is sent
+            lock:
+                enabled: false # render a missing variant once, however many requests ask for it (symfony/lock)
+                factory: lock.factory # LockFactory service ID
+                ttl: 30 # seconds a lock outlives a renderer that crashed
             public_cache:
                 enabled: false # serve transformed images from public directory
                 prefix: '' # path prepended to cache keys so they mirror the URL path
@@ -1067,10 +1076,10 @@ Transformers generate URLs for on-demand image transformation.
 
 ### Glide (Local)
 
-[Glide](https://glide.thephpleague.com/) processes images locally using GD or Imagick.
+[Glide](https://glide.thephpleague.com/) processes images locally using GD, Imagick or libvips. Glide 2, 3 and 4 are supported.
 
 ```bash
-composer require league/glide league/glide-symfony
+composer require league/glide
 ```
 
 ```yaml
@@ -1079,10 +1088,12 @@ picasso:
         glide:
             sign_key: '%env(PICASSO_SIGN_KEY)%'
             cache: '%kernel.project_dir%/var/glide-cache'
-            driver: gd # gd | imagick
+            driver: gd # gd | imagick | vips
             max_image_size: ~ # optional: max pixel count (width x height)
             base_url: ~ # optional: e.g. https://img.example.com to point image URLs at a CDN
             defer_cache_write: false # store a cache miss after the response is sent
+            lock:
+                enabled: false # render a missing variant once (see "Rendering each variant once")
             public_cache:
                 enabled: false # serve from public dir for better performance
                 prefix: '' # optional: path prepended to cache keys (see "Serving thumbnails from a CDN")
@@ -1091,6 +1102,48 @@ picasso:
 > **Important:** When using Glide, you must [import the bundle routes](#routes) so that the image controller can serve transformed images.
 
 Glide URLs are stable: the same image and transformation always produce the same URL and signature. A thumbnail used several times in a page, or across pages, is fetched once and caches cleanly in browsers and CDNs.
+
+A cached variant costs two calls to the cache storage (its size, then its contents), and a conditional request (`If-Modified-Since`) one: the content type is read from the image's first bytes. That matters when the cache is an object store, where each call is an HTTP request. On such a storage, responses carry no `Last-Modified` header, which would cost one more call: signed URLs never change, and [`cache_control`](#error-responses) makes them cacheable for a year anyway.
+
+#### Choosing a driver
+
+| Driver    | Needs                                                                                                |
+| --------- | ---------------------------------------------------------------------------------------------------- |
+| `gd`      | The `gd` extension. The default.                                                                     |
+| `imagick` | The `imagick` extension.                                                                             |
+| `vips`    | `composer require intervention/image-driver-vips` (Glide 3 or later), libvips, and the FFI extension |
+
+[libvips](https://www.libvips.org/) is the fastest driver on Linux: in the official Alpine image it renders a whole srcset two to three times faster than GD and Imagick, and AVIF about five times faster (see [Performance](#performance)). Glide hands every driver the whole source file, so libvips cannot shrink large sources while decoding them, and uses about as much memory as the others. The Intervention driver calls it through [FFI](https://www.php.net/manual/en/book.ffi.php):
+
+- Install libvips: `apt install libvips42` (Debian/Ubuntu), `apk add vips vips-heif` (Alpine; `vips-heif` adds AVIF), `brew install vips` (macOS).
+- Enable FFI for the web SAPI: the default `ffi.enable=preload` only allows it on the command line and in preloaded scripts, so set `ffi.enable=true` for PHP-FPM, FrankenPHP or Apache.
+
+Composer picks the driver version matching your Glide version (1.x for Glide 3, 4.x for Glide 4). A missing package fails at container build and says what to install.
+
+#### Rendering each variant once
+
+Nothing stops several requests from rendering the same missing variant at the same time: a crawler fetching a page's images, a burst of visitors after a newsletter, or a CDN with many edge locations each asking the origin. Every one of them decodes the source and encodes the variant, so 16 concurrent requests cost 16 renders (and their memory).
+
+With `lock`, the first request renders the variant while the others wait for it, then serve it from the cache:
+
+```yaml
+framework:
+    lock: '%env(LOCK_DSN)%' # e.g. redis://redis:6379, or flock on a single server
+
+picasso:
+    transformers:
+        glide:
+            lock:
+                enabled: true
+                # factory: lock.factory # the LockFactory framework.lock configures, or your own service
+                # ttl: 30 # seconds a lock outlives a renderer that crashed
+```
+
+- Install the component: `composer require symfony/lock`. Use a store shared by every server rendering images (Redis, a database...). `flock` only serializes the renders of one server.
+- Hits take no lock: only a miss locks, keyed by the variant's cache path.
+- With `defer_cache_write`, the lock is held until the variant is uploaded: before that, the waiting requests would not find it in the cache.
+- If the renderer dies, its lock expires after `ttl` and a waiting request renders the variant itself. Keep `ttl` above your slowest render (plus its upload with `defer_cache_write`).
+- Waiting requests hold a PHP worker while they wait, idle instead of rendering: they cost a worker slot, not CPU or memory.
 
 #### Storing the Glide cache on Flysystem
 
@@ -1156,7 +1209,7 @@ picasso:
 - **`base_url`** makes every generated image URL point at the CDN: `https://img.example.com/image/glide/…`.
 - **`public_cache.prefix`** makes the cache key equal the URL path: the variant served at `/image/glide/flysystem/photo.jpg/fm_webp%2Cw_640.webp` is stored under the key `image/glide/flysystem/photo.jpg/fm_webp,w_640.webp`, which is exactly what the CDN looks up in the bucket. Set it to what comes before the transformer name in the URL path: `image` with the default [routes](#routes), or e.g. `media/image` when they are imported with a `/media` prefix.
 - **On a miss**, the application renders the variant, stores it in the bucket and returns it with `Cache-Control: public, max-age=31536000, immutable` (the `cache_control` defaults). The next request is a hit.
-- **`defer_cache_write`** keeps the upload out of the client's wait: a miss is rendered to a local temporary directory, answered from there, and moved to the bucket on `kernel.terminate`, after the client has been released (`fastcgi_finish_request()` under PHP-FPM and FrankenPHP, after the request in FrankenPHP worker mode). Only the variants of requests in flight are on local disk. A failed upload is logged, not thrown: the next request renders the variant again. The upload still occupies the PHP worker until it completes, so size the worker pool for bursts of misses.
+- **`defer_cache_write`** keeps the upload out of the client's wait: a miss is rendered to a local temporary directory, answered from there, and moved to the bucket on `kernel.terminate`, after the client has been released (`fastcgi_finish_request()` under PHP-FPM and FrankenPHP, after the request in FrankenPHP worker mode). The directory is only created by a miss and deleted once its renders are uploaded, so only the variants of requests in flight are on local disk. A failed upload is logged, not thrown: the next request renders the variant again. The upload still occupies the PHP worker until it completes, so size the worker pool for bursts of misses.
 - **`cache_control.error_max_age`** makes the image controller's 404s cacheable (`Cache-Control: public, max-age=…`), so a CDN does not send every request for a missing image to the application. Without it, 404s stay uncacheable.
 
 The signature is only checked on a miss: that is all it needs to protect, since it guards the rendering, and a variant that already exists is public anyway.
@@ -1341,6 +1394,138 @@ The generated HTML follows modern best practices:
 - `sizes` attribute for accurate viewport-based selection
 - `loading="lazy"` by default for below-the-fold images
 - Blur placeholder with CSS `background-image` and `onload` cleanup
+
+## Performance
+
+Numbers from `benchmarks/run.php` in the official `php:8.4-cli-alpine` image ([`benchmarks/Dockerfile`](#running-the-benchmarks): GD with its bundled libgd, Imagick 7.1 and libvips from Alpine, OPcache on), on an Apple M-series machine running Linux arm64 natively. Default bundle configuration (AVIF, WebP and JPEG, 16 widths), one PHP worker per core, league/glide 4.1. Sources are generated photo-like JPEGs: small (800×600), HD (1920×1080) and 4K (3840×2160). Expect other hardware to differ in scale, not in shape. The same benchmarks on macOS (PHP 8.5, Homebrew libraries) give the same picture for PHP-side work, but not for image encoding: see [the differences](#on-macos).
+
+### Pages
+
+| Operation                                        | Time   |
+| ------------------------------------------------ | ------ |
+| One URL (`picasso_image_url()`)                  | 6.0 µs |
+| Image with fixed width and height (7 URLs)       | 35 µs  |
+| Responsive image, `sizes` set (42 URLs)          | 170 µs |
+| Responsive image + `resolveMetadata` (PSR-6 hit) | 166 µs |
+| Twig page with 30 responsive images              | 5.5 ms |
+
+Rendering never touches the cache storage: a crawler fetching HTML pages costs URL signing (plus one `stat()` per image with the filesystem loader).
+
+### Cache hits
+
+| Mode            | Cache storage             | Storage calls | 200                  | 304             |
+| --------------- | ------------------------- | ------------- | -------------------- | --------------- |
+| Glide cache     | local disk                | 2             | 116 µs (8,600 req/s) | 1 call, 95 µs   |
+| Glide cache     | object store (10 ms/call) | 2             | 23.9 ms              | 1 call, 12.9 ms |
+| public cache    | local disk                | 2             | 117 µs (8,561 req/s) | 1 call, 97 µs   |
+| public cache    | object store (10 ms/call) | 2             | 25.4 ms              | 1 call, 13.1 ms |
+| deferred writes | local disk                | 2             | 119 µs (8,420 req/s) | 1 call, 104 µs  |
+| deferred writes | object store (10 ms/call) | 2             | 24.1 ms              | 1 call, 12.7 ms |
+
+Before 2.0, a hit went through Glide's own response factory: 5 storage calls (6 with deferred writes), about twice the time on local disk and 60 ms (74 ms) on the object store, and a 304 still opened the variant. No memory or file descriptor growth over 5,000 hits in one worker.
+
+### Junk URLs
+
+| Request (all answered 404)                | Time   |
+| ----------------------------------------- | ------ |
+| Invalid signature                         | 681 µs |
+| Valid signature, missing image            | 693 µs |
+| Unknown loader                            | 457 µs |
+| Tracking param appended (`&utm_source=x`) | 643 µs |
+
+A 404 costs about six hits (Symfony's error handling, and an `error`-level log line per request): set [`cache_control.error_max_age`](#error-responses) so a CDN absorbs them. Any query param the signature does not cover, tracking params included, invalidates the URL.
+
+### Cache misses
+
+Render time and peak memory (RSS) of one variant:
+
+| Source | Width | Format | gd             | imagick        | vips           |
+| ------ | ----- | ------ | -------------- | -------------- | -------------- |
+| small  | 640   | jpg    | 14 ms, 77 MB   | 11 ms, 77 MB   | 9 ms, 77 MB    |
+| small  | 640   | webp   | 30 ms, 77 MB   | 32 ms, 77 MB   | 17 ms, 77 MB   |
+| small  | 640   | avif   | 66 ms, 77 MB   | 48 ms, 77 MB   | 27 ms, 94 MB   |
+| hd     | 640   | jpg    | 18 ms, 77 MB   | 22 ms, 77 MB   | 19 ms, 87 MB   |
+| hd     | 640   | webp   | 30 ms, 77 MB   | 45 ms, 77 MB   | 22 ms, 88 MB   |
+| hd     | 640   | avif   | 76 ms, 77 MB   | 61 ms, 81 MB   | 31 ms, 94 MB   |
+| hd     | 1920  | jpg    | 31 ms, 77 MB   | 28 ms, 101 MB  | 22 ms, 86 MB   |
+| hd     | 1920  | webp   | 135 ms, 77 MB  | 170 ms, 120 MB | 73 ms, 83 MB   |
+| hd     | 1920  | avif   | 195 ms, 110 MB | 238 ms, 133 MB | 57 ms, 163 MB  |
+| 4k     | 640   | jpg    | 59 ms, 81 MB   | 76 ms, 148 MB  | 31 ms, 101 MB  |
+| 4k     | 640   | webp   | 68 ms, 80 MB   | 94 ms, 148 MB  | 33 ms, 98 MB   |
+| 4k     | 640   | avif   | 103 ms, 84 MB  | 106 ms, 155 MB | 38 ms, 107 MB  |
+| 4k     | 3840  | jpg    | 120 ms, 115 MB | 102 ms, 264 MB | 57 ms, 120 MB  |
+| 4k     | 3840  | webp   | 523 ms, 146 MB | 677 ms, 338 MB | 286 ms, 129 MB |
+| 4k     | 3840  | avif   | 847 ms, 278 MB | 853 ms, 341 MB | 150 ms, 386 MB |
+
+About 77 MB of each figure is the PHP process itself (kernel, autoloader).
+
+A crawler fetching every srcset URL of one image that was never rendered:
+
+| Source | Variants | gd    | imagick | vips  | Cache written |
+| ------ | -------- | ----- | ------- | ----- | ------------- |
+| small  | 33       | 0.6 s | 0.5 s   | 0.3 s | 0.7 MB        |
+| hd     | 42       | 1.7 s | 1.8 s   | 0.8 s | 2.3 MB        |
+| 4k     | 48       | 5.9 s | 6.9 s   | 2.2 s | 7.7 MB        |
+
+Sixteen concurrent requests for the same missing variant (4K source, WebP, 1920 wide, gd), each in its own process:
+
+| [`lock`](#rendering-each-variant-once) | Renders | Responses | CPU (all processes) | Wall time |
+| -------------------------------------- | ------- | --------- | ------------------- | --------- |
+| off                                    | 16      | 16 × 200  | 6.6 s               | 0.61 s    |
+| on                                     | 1       | 16 × 200  | 1.0 s               | 0.32 s    |
+
+### Memory
+
+RSS of one long-running worker stays flat over 60 cold renders (HD source, 640/1080/1920 wide) with every driver and format: at most +0.02 MB per render, after a 15-render warm-up.
+
+`memory_limit` only bounds part of a render. GD built with the libgd bundled in PHP (as in the official Docker images) allocates its pixel buffers through PHP, so they count; the encoders (libjpeg, libwebp, libavif) and the Imagick and libvips drivers allocate outside PHP's memory manager, and do not count:
+
+| Render (4K source, 3840 wide) | gd                             | imagick             | vips                |
+| ----------------------------- | ------------------------------ | ------------------- | ------------------- |
+| JPEG, `memory_limit=96M`      | fatal error (memory exhausted) | 264 MB RSS, renders | 124 MB RSS, renders |
+| JPEG, `memory_limit=128M`     | 130 MB RSS, renders            | 280 MB RSS, renders | 134 MB RSS, renders |
+| AVIF, `memory_limit=128M`     | 277 MB RSS, renders            | 341 MB RSS, renders | 385 MB RSS, renders |
+
+So size the worker pool by RSS, not by `memory_limit`, and give GD a `memory_limit` that fits the largest source you accept (about 15 bytes per source pixel: a 4K source needs 128M), or set `max_image_size`.
+
+### On macOS
+
+With Homebrew's libraries (GD 2.3.3 linked to the system libgd, libavif, libvips 8.18), PHP-side numbers are within 10% of the Linux ones, but encoding differs:
+
+- libvips encodes AVIF two to three times slower than GD and Imagick (1,167 ms for a 4K source to 3840 wide) instead of five times faster: Homebrew's AV1 encoder settings differ. A full crawl of a 4K image takes about 5 s with every driver.
+- GD's AVIF encoder leaks about 2.5 MB of RSS per render, which adds up in long-running workers. It does not on Alpine.
+- GD's pixel buffers do not count toward `memory_limit`, as GD uses the system libgd.
+
+Benchmark the image your production runs: encoders are where platforms differ.
+
+### Tuning for crawlers
+
+- **Put a CDN in front of the cache** ([Serving thumbnails from a CDN](#serving-thumbnails-from-a-cdn)): hits then never reach PHP, and misses are the only cost left.
+- **Enable [`lock`](#rendering-each-variant-once)** with a store shared by your servers: a crawler or a CDN asking for a missing variant from several places renders it once.
+- **Consider the [`vips` driver](#choosing-a-driver)** on Linux: it renders a whole srcset two to three times faster than GD or Imagick, and AVIF five times faster.
+- **Trim what a crawler can ask for.** Every format and width is one more variant per image: the default 3 formats × 16 widths make up to 48. Drop the widths your layout never uses (the 3840-wide variants are the slowest by far) and consider dropping WebP when you serve AVIF: browsers that do not support AVIF fall back to JPEG.
+- **Set `max_image_size`**, so a huge upload cannot be rendered at full size.
+- **Size workers by RSS, not `memory_limit`**: a 4K AVIF render takes 280 to 390 MB depending on the driver.
+- **Set [`cache_control.error_max_age`](#error-responses)**, so repeated junk URLs are answered by the CDN.
+
+### Running the benchmarks
+
+```bash
+XDEBUG_MODE=off php -d opcache.enable_cli=1 benchmarks/run.php            # every scenario, ~5 minutes
+XDEBUG_MODE=off php -d opcache.enable_cli=1 benchmarks/run.php hit herd   # some of: render hit notfound miss crawl herd memory
+```
+
+Each scenario prints a Markdown table. Drivers are benchmarked when available (`imagick` extension; `intervention/image-driver-vips` with libvips and FFI). Generated images, caches and kernels go to `benchmarks/var/`, which can be deleted at any time.
+
+To measure on Linux, as most production servers run, `benchmarks/Dockerfile` builds the official `php:8.4-cli-alpine` image with GD (bundled libgd, AVIF), Imagick and libvips (Alpine packages, AVIF included), FFI and OPcache:
+
+```bash
+docker build -f benchmarks/Dockerfile -t picasso-bench .
+docker run --rm picasso-bench              # every scenario
+docker run --rm picasso-bench miss memory  # some of them
+```
+
+Pass `--build-arg PHP_VERSION=8.2` to benchmark another PHP version, and `--cpus`/`--memory` to `docker run` to match your production limits.
 
 ## Testing & Quality
 

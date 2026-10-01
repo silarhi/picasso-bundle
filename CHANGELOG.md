@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Chain loader (`type: chain`, `loaders: [uploads, assets]`): one loader name for images spread over several filesystem, flysystem or vich loaders. Each image is rendered with the first loader holding it, and its URLs name that loader.
 - `Image::$loader`: the loader that loaded an image when another one delegated to it. Generated URLs name it.
 - `InvalidImageReferenceException`, thrown when an entity passed to a vich loader has no field using its mapping, several of them and no `field` context key, or a `field` using another mapping.
+- Glide `lock` option (requires `symfony/lock`): concurrent requests for the same missing variant render it once. The first request renders it while the others wait, then serve it from the cache; with `defer_cache_write`, the lock is held until the variant is uploaded. `lock.factory` picks the `LockFactory` service (default: the one `framework.lock` configures) and `lock.ttl` (default 30 seconds) how long a lock outlives a renderer that crashed.
 
 ### Changed
 
@@ -80,6 +81,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     # after
     /image/glide/uploads/photo.jpg/_untransformed.jpg
     ```
+- Glide serves a cached variant with two calls to the cache storage (size, then contents) instead of five, and answers a conditional request with one call, without opening the variant. The content type is read from the image's first bytes. On a cache storage whose streams are not local files (an object store), responses no longer carry a `Last-Modified` header, which would cost one more call.
+- `league/glide-symfony` is no longer needed by the Glide transformer, which unlocks Glide 4 (`league/glide-symfony` only supports Glide 2 and 3). It can be removed from your dependencies.
 
 ### Fixed
 
@@ -87,6 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Two Vich mappings storing files under the same relative path no longer share Glide cache entries or purges: each mapping is served under its own loader name.
 - Purging a Glide image after serving it in the same process (FrankenPHP worker mode, RoadRunner, Swoole, Messenger consumers) now deletes the right cache path.
 - Untransformed public-cache URLs no longer cause a redirect loop.
+- The Glide `vips` driver, accepted by the configuration since 1.x, now works: it maps to `intervention/image-driver-vips` (Glide 3 or later), and a missing package fails at container build with the command to install it, instead of an "Unable to resolve driver" error when the transformer is first used.
 
 ## [1.3.2] - 2026-09-30
 

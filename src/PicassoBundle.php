@@ -73,6 +73,7 @@ use function Symfony\Component\DependencyInjection\Loader\Configurator\service_l
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_locator;
 
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
+use Symfony\Component\Lock\LockFactory;
 use Vich\UploaderBundle\Storage\StorageInterface as VichStorageInterface;
 
 final class PicassoBundle extends AbstractBundle
@@ -396,6 +397,21 @@ final class PicassoBundle extends AbstractBundle
                                 ->defaultFalse()
                                 ->info('Glide: render a cache miss to local disk and move it to the cache storage after the response has been sent (kernel.terminate). For remote cache storages.')
                             ->end()
+                            ->arrayNode('lock')
+                                ->canBeEnabled()
+                                ->info('Glide: render each missing variant once across processes; concurrent requests for it wait for that render and serve it. Requires symfony/lock.')
+                                ->children()
+                                    ->scalarNode('factory')
+                                        ->defaultValue('lock.factory')
+                                        ->info('Symfony LockFactory service ID. "lock.factory" is the one framework.lock configures; use a store shared by every server (e.g. Redis) when several serve images.')
+                                    ->end()
+                                    ->floatNode('ttl')
+                                        ->defaultValue(30.0)
+                                        ->min(1)
+                                        ->info('Seconds a render lock outlives a renderer that crashed. Must exceed the slowest render, plus the upload with defer_cache_write.')
+                                    ->end()
+                                ->end()
+                            ->end()
                             ->arrayNode('public_cache')
                                 ->canBeEnabled()
                                 ->children()
@@ -430,7 +446,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_fit: string,
          *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int|null, quality: int|null, fit: string|null, format: string|null, components_x: int, components_y: int, driver: string, service: string|null}>,
          *     loaders: array<string, array{enabled: bool, type: string|null, path: string|null, paths: mixed, loaders: list<string>, mapping: string|null, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null, resolve_metadata: bool|null}>,
-         *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, api_key: string|null, http_client: string|null, request_factory: string|null, stream_factory: string|null, service: string|null, defer_cache_write: bool, public_cache: array{enabled: bool, prefix: string}}>
+         *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, api_key: string|null, http_client: string|null, request_factory: string|null, stream_factory: string|null, service: string|null, defer_cache_write: bool, lock: array{enabled: bool, factory: string, ttl: float|int}, public_cache: array{enabled: bool, prefix: string}}>
          * } $config
          */
         $services = $container->services();
@@ -621,6 +637,15 @@ final class PicassoBundle extends AbstractBundle
 
             switch ($type) {
                 case 'glide':
+                    $driverClass = GlideTransformer::driverClass($transformerConfig['driver']);
+                    if (null !== $driverClass && !class_exists($driverClass)) {
+                        throw new Exception\InvalidConfigurationException(sprintf('The "%s" driver of transformer "%s" requires intervention/image-driver-vips (league/glide 3 or later): run "composer require intervention/image-driver-vips". It runs libvips through FFI, so libvips must be installed and FFI enabled (ffi.enable=true under PHP-FPM).', $transformerConfig['driver'], $name));
+                    }
+
+                    if ($transformerConfig['lock']['enabled'] && !class_exists(LockFactory::class)) {
+                        throw new Exception\InvalidConfigurationException(sprintf('The "lock" option of transformer "%s" requires symfony/lock: run "composer require symfony/lock", then configure "framework.lock" (or point "lock.factory" to your own LockFactory service).', $name));
+                    }
+
                     $services->set('picasso.transformer.' . $name, GlideTransformer::class)
                         ->args([
                             service('router'),
@@ -633,6 +658,8 @@ final class PicassoBundle extends AbstractBundle
                             $transformerConfig['base_url'],
                             $transformerConfig['public_cache']['prefix'],
                             $transformerConfig['defer_cache_write'] ? service('picasso.deferred_cache_writer') : null,
+                            $transformerConfig['lock']['enabled'] ? service($transformerConfig['lock']['factory']) : null,
+                            (float) $transformerConfig['lock']['ttl'],
                         ])
                         ->tag('picasso.transformer', ['key' => $name]);
                     $glideTransformers[$name] = service('picasso.transformer.' . $name);

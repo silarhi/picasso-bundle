@@ -389,11 +389,53 @@ class BundleWiringTest extends TestCase
         self::assertNull($transformer->getArgument(7));
         self::assertSame('', $transformer->getArgument(8));
         self::assertNull($transformer->getArgument(9));
+        self::assertNull($transformer->getArgument(10), 'Render locks are opt-in.');
         self::assertFalse($container->hasDefinition('picasso.deferred_cache_writer'));
         self::assertSame(
             ['max_age' => 31536000, 'immutable' => true, 'error_max_age' => null],
             $container->getDefinition('picasso.controller.image')->getArgument(2),
         );
+    }
+
+    public function testGlideRenderLockIsWired(): void
+    {
+        $container = $this->loadExtension([
+            'transformers' => [
+                'glide' => [
+                    'sign_key' => 'secret',
+                    'lock' => ['enabled' => true, 'factory' => 'app.lock_factory', 'ttl' => 10],
+                ],
+                'defaults' => [
+                    'type' => 'glide',
+                    'sign_key' => 'secret',
+                    'lock' => true,
+                ],
+            ],
+        ]);
+
+        $transformer = $container->getDefinition('picasso.transformer.glide');
+        self::assertEquals(new Reference('app.lock_factory'), $transformer->getArgument(10));
+        self::assertSame(10.0, $transformer->getArgument(11));
+
+        $defaults = $container->getDefinition('picasso.transformer.defaults');
+        self::assertEquals(new Reference('lock.factory'), $defaults->getArgument(10), 'The LockFactory framework.lock configures.');
+        self::assertSame(30.0, $defaults->getArgument(11));
+    }
+
+    public function testVipsDriverWithoutItsPackageSaysHowToInstallIt(): void
+    {
+        if (class_exists('Intervention\\Image\\Drivers\\Vips\\Driver')) {
+            self::markTestSkipped('intervention/image-driver-vips is installed.');
+        }
+
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('composer require intervention/image-driver-vips');
+
+        $this->loadExtension([
+            'transformers' => [
+                'glide' => ['sign_key' => 'secret', 'driver' => 'vips'],
+            ],
+        ]);
     }
 
     public function testImgixTransformerIsRegistered(): void

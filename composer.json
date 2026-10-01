@@ -16,7 +16,6 @@
         "kornrunner/blurhash": "^1.2",
         "league/flysystem-bundle": "^2.1 || ^3.0",
         "league/glide": "^2.3 || ^3.0 || ^4.0",
-        "league/glide-symfony": "^2.0",
         "phpstan/extension-installer": "^1.4.3",
         "phpstan/phpstan": "^2.2.16",
         "phpstan/phpstan-strict-rules": "^2.0.12",
@@ -26,19 +25,21 @@
         "psr/http-factory": "^1.1",
         "rector/rector": "^2.6.7",
         "symfony/http-client": "^6.4 || ^7.0 || ^8.0",
+        "symfony/lock": "^6.4 || ^7.0 || ^8.0",
         "symfony/twig-bundle": "^6.4 || ^7.0 || ^8.0",
         "vich/uploader-bundle": "^2.9 || ^3.0",
         "vincentlanglet/twig-cs-fixer": "^4.1.1"
     },
     "suggest": {
         "imagine/imagine": "Required for the BlurHash placeholder (supports GD and Imagick)",
+        "intervention/image-driver-vips": "Required for the Glide vips driver (league/glide 3 or later, needs libvips and the FFI extension)",
         "kornrunner/blurhash": "Required for the BlurHash placeholder",
         "league/flysystem": "Required for the Flysystem loader",
         "league/glide": "Required for the Glide transformer (local image transformation)",
-        "league/glide-symfony": "Required for the Glide transformer",
         "psr/http-client": "Required for the URL loader (PSR-18 HTTP client interface)",
         "psr/http-factory": "Required for the URL loader (PSR-17 HTTP factory interface)",
         "symfony/http-client": "Provides a PSR-18 HTTP client implementation for the URL loader",
+        "symfony/lock": "Required for the Glide lock option (render each missing variant once)",
         "vich/uploader-bundle": "Required for the VichUploader loader"
     },
     "autoload": {

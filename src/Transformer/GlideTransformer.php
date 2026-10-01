@@ -25,7 +25,6 @@ use League\Flysystem\FilesystemOperator;
 use League\Flysystem\Local\LocalFilesystemAdapter;
 use League\Glide\Filesystem\FileNotFoundException;
 use League\Glide\Filesystem\FilesystemException;
-use League\Glide\Responses\SymfonyResponseFactory;
 use League\Glide\Server;
 use League\Glide\ServerFactory;
 use League\Glide\Signatures\Signature;
@@ -47,6 +46,7 @@ use function sprintf;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Throwable;
 
@@ -89,6 +89,18 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         'Intervention\\Image\\Exception\\NotReadableException', // intervention/image 2
     ];
 
+    /**
+     * Intervention drivers known by name, beyond the "gd" and "imagick" Glide resolves itself.
+     */
+    private const DRIVERS = [
+        'vips' => 'Intervention\\Image\\Drivers\\Vips\\Driver', // intervention/image-driver-vips
+    ];
+
+    /**
+     * Prefix of the lock serializing the renders of a variant across processes.
+     */
+    private const LOCK_PREFIX = 'picasso.glide.';
+
     private Signature $signature;
     private Server $server;
     private ?string $baseUrl;
@@ -96,16 +108,21 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
     private FilesystemOperator $cacheStorage;
 
     /**
-     * Local directory a miss is rendered to when cache writes are deferred.
+     * Local directory a miss is rendered to when cache writes are deferred. Only
+     * created by a miss, and deleted by the writer once the render is moved.
      */
-    private ?FilesystemOperator $renderStorage;
+    private ?string $renderDirectory;
 
     /**
+     * @param string                   $driver              "gd", "imagick", "vips" (needs intervention/image-driver-vips) or an Intervention driver class
      * @param string|null              $baseUrl             Scheme and host (e.g. a CDN) prepended to generated URLs; null keeps them host-relative
      * @param string                   $cachePrefix         Public-cache mode only: path prepended to every cache key, so keys can mirror the
      *                                                      URL path (e.g. "image" when the bundle routes are served under /image)
      * @param DeferredCacheWriter|null $deferredCacheWriter When set, a miss is rendered to local disk and moved to the
      *                                                      cache storage after the response has been sent
+     * @param LockFactory|null         $lockFactory         When set, concurrent requests for the same missing variant render it
+     *                                                      once: the others wait for that render and serve it
+     * @param float                    $lockTtl             Seconds a render lock outlives a crashed renderer
      */
     public function __construct(
         private UrlGeneratorInterface $router,
@@ -118,6 +135,8 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         ?string $baseUrl = null,
         string $cachePrefix = '',
         private ?DeferredCacheWriter $deferredCacheWriter = null,
+        private ?LockFactory $lockFactory = null,
+        private float $lockTtl = 30.0,
     ) {
         $this->signature = SignatureFactory::create($signKey);
         $this->baseUrl = null !== $baseUrl && '' !== $baseUrl ? rtrim($baseUrl, '/') : null;
@@ -130,7 +149,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         $serverConfig = [
             'source' => $resolvedCache,
             'cache' => $resolvedCache,
-            'driver' => $driver,
+            'driver' => self::DRIVERS[$driver] ?? $driver,
         ];
 
         if (null !== $maxImageSize) {
@@ -139,9 +158,20 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
 
         $this->server = ServerFactory::create($serverConfig);
         $this->cacheStorage = $this->server->getCache();
-        $this->renderStorage = null !== $deferredCacheWriter
-            ? new Filesystem(new LocalFilesystemAdapter(sys_get_temp_dir() . '/picasso-glide-' . bin2hex(random_bytes(8))))
+        // One directory per instance, so per worker thread. Not created here: most
+        // instances only generate URLs or serve hits, and each would leave one behind.
+        $this->renderDirectory = null !== $deferredCacheWriter
+            ? sys_get_temp_dir() . '/picasso-glide-' . bin2hex(random_bytes(8))
             : null;
+    }
+
+    /**
+     * The Intervention driver class a driver name stands for, when Glide does not
+     * resolve it itself. The class exists only when its package is installed.
+     */
+    public static function driverClass(string $driver): ?string
+    {
+        return self::DRIVERS[$driver] ?? null;
     }
 
     public function url(Image $image, ImageTransformation $transformation, array $context = []): string
@@ -225,26 +255,59 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
             };
         }
 
+        $responseFactory = new GlideResponseFactory($request);
         $this->server->setSource(new Filesystem(new ImageSourceFlysystemAdapter($loader->getSource())));
-        $this->server->setResponseFactory(new SymfonyResponseFactory($request));
+        $this->server->setResponseFactory($responseFactory);
         $this->server->setCachePathCallable($cachePathCallable);
-
         // The server is shared by every request of a long-running process, so
-        // each request picks its cache storage. With deferred writes, a miss is
-        // rendered to local disk and moved to the cache storage on kernel.terminate.
+        // each request picks its cache storage.
         $this->server->setCache($this->cacheStorage);
-        $renderStorage = null;
-        if (null !== $this->renderStorage && !$this->server->cacheFileExists($path, $params)) {
-            $renderStorage = $this->renderStorage;
+
+        try {
+            $cachePath = $this->server->getCachePath($path, $params);
+        } catch (FileNotFoundException $e) {
+            throw new ImageNotFoundException('Image not found.', $e->getCode(), previous: $e);
+        }
+
+        // A hit never goes through Glide, which would ask the storage whether the
+        // variant exists before reading it.
+        $response = $responseFactory->fromCache($this->cacheStorage, $cachePath);
+        if (null !== $response) {
+            return $response;
+        }
+
+        $lock = $this->lockFactory?->createLock(self::LOCK_PREFIX . hash('xxh128', $cachePath), $this->lockTtl);
+        if (null !== $lock && !$lock->acquire()) {
+            // Another process is rendering this variant: wait for it, then serve its render
+            $lock->acquire(true);
+            $response = $responseFactory->fromCache($this->cacheStorage, $cachePath);
+            if (null !== $response) {
+                $lock->release();
+
+                return $response;
+            }
+        }
+
+        // With deferred writes, a miss is rendered to local disk and moved to the
+        // cache storage on kernel.terminate.
+        $renderStorage = null !== $this->renderDirectory
+            ? new Filesystem(new LocalFilesystemAdapter($this->renderDirectory))
+            : null;
+        if (null !== $renderStorage) {
             $this->server->setCache($renderStorage);
         }
+
+        $lockHandedOver = false;
 
         try {
             /** @var Response $response */
             $response = $this->server->getImageResponse($path, $params);
 
-            if (null !== $renderStorage) {
-                $this->deferredCacheWriter?->defer($renderStorage, $this->cacheStorage, $this->server->getCachePath($path, $params));
+            if (null !== $renderStorage && null !== $this->deferredCacheWriter) {
+                // The variant reaches the cache storage after the response is sent:
+                // the lock must keep the waiting requests away until then.
+                $this->deferredCacheWriter->defer($renderStorage, $this->cacheStorage, $cachePath, $lock);
+                $lockHandedOver = true;
             }
 
             return $response;
@@ -255,20 +318,17 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
             // write it; object stores may reject the losers (e.g. S3-compatible
             // storages answering 409 to a conflicting conditional write). Once
             // the variant is there, serve it rather than fail the request.
-            if (!$this->server->cacheFileExists($path, $params)) {
-                throw $e;
-            }
-
-            /** @var Response $response */
-            $response = $this->server->getImageResponse($path, $params);
-
-            return $response;
+            return $responseFactory->fromCache($this->server->getCache(), $cachePath) ?? throw $e;
         } catch (Throwable $e) {
             if (!$this->isDecodingFailure($e)) {
                 throw $e;
             }
 
             throw new UndecodableImageException('Source image could not be decoded.', $e->getCode(), previous: $e);
+        } finally {
+            if (!$lockHandedOver) {
+                $lock?->release();
+            }
         }
     }
 

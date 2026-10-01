@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Silarhi\PicassoBundle\Tests\Transformer;
 
 use function assert;
+use function extension_loaded;
 use function in_array;
 use function is_string;
 
@@ -25,6 +26,7 @@ use League\Glide\Filesystem\FilesystemException;
 use League\Glide\Signatures\SignatureFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use ReflectionProperty;
 use RuntimeException;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
@@ -35,17 +37,22 @@ use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
 use Silarhi\PicassoBundle\Source\FlysystemImageSource;
 use Silarhi\PicassoBundle\Source\ImageSourceInterface;
 use Silarhi\PicassoBundle\Source\LocalImageSource;
+use Silarhi\PicassoBundle\Tests\Transformer\Stub\CountingFilesystem;
 use Silarhi\PicassoBundle\Tests\Transformer\Stub\RacyCacheAdapter;
 use Silarhi\PicassoBundle\Transformer\DeferredCacheWriter;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 
+use function sprintf;
 use function strlen;
 
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\Filesystem\Filesystem as SymfonyFilesystem;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\SharedLockInterface;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use Throwable;
 
 class GlideTransformerServeTest extends TestCase
 {
@@ -445,6 +452,232 @@ class GlideTransformerServeTest extends TestCase
         self::assertSame('stored', file_get_contents($variant), 'A hit must not be rendered and uploaded again.');
     }
 
+    /**
+     * @return iterable<string, array{bool, bool}>
+     */
+    public static function cacheModeProvider(): iterable
+    {
+        yield 'default' => [false, false];
+        yield 'public cache' => [true, false];
+        yield 'deferred writes' => [false, true];
+        yield 'public cache, deferred writes' => [true, true];
+    }
+
+    #[DataProvider('cacheModeProvider')]
+    public function testAHitCostsTwoStorageCalls(bool $publicCache, bool $deferred): void
+    {
+        $cache = new CountingFilesystem($this->tempDir . '/cache');
+        $writer = $deferred ? new DeferredCacheWriter() : null;
+        $transformer = $this->createTransformer('counting.storage', $this->createRegistryOf('counting.storage', $cache), publicCache: $publicCache, deferredCacheWriter: $writer);
+        $path = $publicCache ? 'photo.jpg/fm_webp,w_10.webp' : 'photo.jpg';
+        $params = $publicCache ? [] : ['w' => '10', 'fm' => 'webp'];
+        $context = ['transformer' => 'glide', 'loader' => 'filesystem'];
+        $loader = $this->createLoader(__DIR__ . '/../Fixtures');
+        $transformer->serve($loader, $path, $this->createSignedRequest($path, $params), $context);
+        $writer?->flush();
+        $cache->reset();
+
+        $response = $transformer->serve($loader, $path, $this->createSignedRequest($path, $params), $context);
+        $body = $this->responseBody($response);
+
+        self::assertSame(['fileSize' => 1, 'readStream' => 1], $cache->calls, 'Glide alone asks for existence, stream, mime type, size and date.');
+        self::assertSame('image/webp', $response->headers->get('Content-Type'));
+        self::assertSame((string) strlen($body), $response->headers->get('Content-Length'));
+    }
+
+    public function testANotModifiedHitNeverOpensTheVariant(): void
+    {
+        $cache = new CountingFilesystem($this->tempDir . '/cache');
+        $transformer = $this->createTransformer('counting.storage', $this->createRegistryOf('counting.storage', $cache));
+        $loader = $this->createLoader(__DIR__ . '/../Fixtures');
+        $context = ['transformer' => 'glide', 'loader' => 'filesystem'];
+        $params = ['w' => '10', 'fm' => 'webp'];
+        $lastModified = (string) $transformer->serve($loader, 'photo.jpg', $this->createSignedRequest('photo.jpg', $params), $context)->headers->get('Last-Modified');
+        $cache->reset();
+
+        $request = $this->createSignedRequest('photo.jpg', $params);
+        $request->headers->set('If-Modified-Since', $lastModified);
+        $response = $transformer->serve($loader, 'photo.jpg', $request, $context);
+
+        self::assertSame(Response::HTTP_NOT_MODIFIED, $response->getStatusCode());
+        self::assertSame(['lastModified' => 1], $cache->calls);
+    }
+
+    public function testDeferredWritesLeaveNoRenderDirectoryBehind(): void
+    {
+        $writer = new DeferredCacheWriter();
+        $transformer = $this->createTransformer($this->tempDir . '/cache', publicCache: true, deferredCacheWriter: $writer);
+        $renderDirectory = (new ReflectionProperty(GlideTransformer::class, 'renderDirectory'))->getValue($transformer);
+        self::assertIsString($renderDirectory);
+
+        $transformer->url(new Image(path: 'photo.jpg'), new ImageTransformation(width: 10), ['transformer' => 'glide', 'loader' => 'filesystem']);
+        self::assertDirectoryDoesNotExist($renderDirectory, 'An instance that renders nothing must not create it: PHP-FPM builds one per request.');
+
+        $this->servePublicCacheFixture($transformer);
+        self::assertDirectoryExists($renderDirectory);
+
+        $writer->flush();
+        self::assertDirectoryDoesNotExist($renderDirectory, 'The variant folders Glide created must go too.');
+        self::assertFileExists($this->tempDir . '/cache/glide/filesystem/photo.jpg/fm_webp,w_10.webp');
+
+        // A long-running worker renders again into the same directory
+        unlink($this->tempDir . '/cache/glide/filesystem/photo.jpg/fm_webp,w_10.webp');
+        self::assertSame(200, $this->servePublicCacheFixture($transformer)->getStatusCode());
+        $writer->flush();
+        self::assertFileExists($this->tempDir . '/cache/glide/filesystem/photo.jpg/fm_webp,w_10.webp');
+        self::assertDirectoryDoesNotExist($renderDirectory);
+    }
+
+    public function testAnUncontendedMissRendersUnderTheLock(): void
+    {
+        $lock = $this->createMock(SharedLockInterface::class);
+        $lock->expects(self::once())->method('acquire')->with(false)->willReturn(true);
+        $lock->expects(self::once())->method('release');
+        $transformer = $this->createTransformer($this->tempDir . '/cache', lockFactory: $this->createLockFactory($lock));
+
+        $response = $this->serveFixture($transformer);
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('image/webp', $response->headers->get('Content-Type'));
+    }
+
+    public function testAMissWaitsForTheRenderInProgressAndServesIt(): void
+    {
+        $transformer = $this->createTransformer($this->tempDir . '/cache', lockFactory: $this->createLockFactory($lock = $this->createMock(SharedLockInterface::class)));
+        $lock->expects(self::exactly(2))->method('acquire')->willReturnCallback(function (bool $blocking): bool {
+            if (!$blocking) {
+                return false;
+            }
+
+            // The other process stores its render, then releases the lock
+            $this->storeEveryVariantAs((string) file_get_contents(__DIR__ . '/../Fixtures/2x3.png'));
+
+            return true;
+        });
+        $lock->expects(self::once())->method('release');
+
+        $response = $this->serveFixture($transformer);
+
+        self::assertSame((string) file_get_contents(__DIR__ . '/../Fixtures/2x3.png'), $this->responseBody($response), 'The variant must be rendered once.');
+    }
+
+    public function testAMissRendersItselfWhenTheLockHolderStoredNothing(): void
+    {
+        $transformer = $this->createTransformer($this->tempDir . '/cache', lockFactory: $this->createLockFactory($lock = $this->createMock(SharedLockInterface::class)));
+        // The lock holder crashed: its lock expired, and no variant was stored
+        $lock->expects(self::exactly(2))->method('acquire')->willReturnCallback(static fn (bool $blocking): bool => $blocking);
+        $lock->expects(self::once())->method('release');
+
+        $response = $this->serveFixture($transformer);
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertStringStartsWith('RIFF', $this->responseBody($response));
+    }
+
+    public function testADeferredRenderReleasesItsLockOnFlush(): void
+    {
+        $writer = new DeferredCacheWriter();
+        $lock = $this->createMock(SharedLockInterface::class);
+        $lock->expects(self::once())->method('acquire')->willReturn(true);
+        $transformer = $this->createTransformer($this->tempDir . '/cache', deferredCacheWriter: $writer, lockFactory: $this->createLockFactory($lock));
+        $released = 0;
+        $lock->expects(self::once())->method('release')->willReturnCallback(function () use (&$released): void {
+            self::assertNotEmpty(glob($this->tempDir . '/cache/photo.jpg/*'), 'Waiting requests must find the variant once the lock is released.');
+            ++$released;
+        });
+
+        $this->serveFixture($transformer);
+        self::assertSame(0, $released, 'Waiting requests would not find the variant in the cache storage yet.');
+
+        $writer->flush();
+        self::assertSame(1, $released);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function driverProvider(): iterable
+    {
+        yield 'gd' => ['gd'];
+        yield 'imagick' => ['imagick'];
+        yield 'vips' => ['vips'];
+    }
+
+    #[DataProvider('driverProvider')]
+    public function testEveryDriverRendersAVariant(string $driver): void
+    {
+        $driverClass = GlideTransformer::driverClass($driver);
+        if ('imagick' === $driver && !extension_loaded('imagick')) {
+            self::markTestSkipped('The imagick extension is not loaded.');
+        }
+        if (null !== $driverClass && !class_exists($driverClass)) {
+            self::markTestSkipped(sprintf('The "%s" driver package is not installed.', $driver));
+        }
+
+        try {
+            $transformer = $this->createTransformer($this->tempDir . '/cache', driver: $driver);
+        } catch (Throwable $e) {
+            self::markTestSkipped(sprintf('The "%s" driver cannot run here: %s', $driver, $e->getMessage()));
+        }
+
+        $response = $this->serveFixture($transformer);
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('image/webp', $response->headers->get('Content-Type'));
+        $size = getimagesizefromstring($this->responseBody($response));
+        self::assertIsArray($size);
+        self::assertSame([10, 5], [$size[0], $size[1]]);
+    }
+
+    public function testAHitTakesNoLock(): void
+    {
+        $lockFactory = $this->createMock(LockFactory::class);
+        $lockFactory->expects(self::never())->method('createLock');
+        $this->serveFixture($this->createTransformer($this->tempDir . '/cache'));
+
+        $this->serveFixture($this->createTransformer($this->tempDir . '/cache', lockFactory: $lockFactory));
+    }
+
+    private function serveFixture(GlideTransformer $transformer): Response
+    {
+        return $transformer->serve(
+            $this->createLoader(__DIR__ . '/../Fixtures'),
+            'photo.jpg',
+            $this->createSignedRequest('photo.jpg', ['w' => '10', 'fm' => 'webp']),
+            ['transformer' => 'glide', 'loader' => 'filesystem'],
+        );
+    }
+
+    /**
+     * Renders and stores the variant serveFixture() asks for, as another process
+     * would, then marks it to tell it apart from a render of this process.
+     */
+    private function storeEveryVariantAs(string $contents): void
+    {
+        $this->serveFixture($this->createTransformer($this->tempDir . '/cache'));
+        $variants = glob($this->tempDir . '/cache/photo.jpg/*');
+        self::assertIsArray($variants);
+        self::assertNotEmpty($variants);
+        foreach ($variants as $variant) {
+            file_put_contents($variant, $contents);
+        }
+    }
+
+    private function createLockFactory(SharedLockInterface $lock): LockFactory
+    {
+        $lockFactory = self::createStub(LockFactory::class);
+        $lockFactory->method('createLock')->willReturn($lock);
+
+        return $lockFactory;
+    }
+
+    private function createRegistryOf(string $storageName, FilesystemOperator $storage): FlysystemRegistry
+    {
+        return new FlysystemRegistry(new ServiceLocator([
+            $storageName => static fn (): FilesystemOperator => $storage,
+        ]));
+    }
+
     private function servePublicCacheFixture(GlideTransformer $transformer): Response
     {
         return $transformer->serve(
@@ -463,7 +696,7 @@ class GlideTransformerServeTest extends TestCase
         return (string) ob_get_clean();
     }
 
-    private function createTransformer(string $cache, ?FlysystemRegistry $flysystemRegistry = null, bool $publicCache = false, string $cachePrefix = '', ?DeferredCacheWriter $deferredCacheWriter = null): GlideTransformer
+    private function createTransformer(string $cache, ?FlysystemRegistry $flysystemRegistry = null, bool $publicCache = false, string $cachePrefix = '', ?DeferredCacheWriter $deferredCacheWriter = null, ?LockFactory $lockFactory = null, string $driver = 'gd'): GlideTransformer
     {
         $router = self::createStub(UrlGeneratorInterface::class);
         $router->method('generate')->willReturnCallback(static function (string $name, array $params): string {
@@ -481,13 +714,14 @@ class GlideTransformerServeTest extends TestCase
             $router,
             self::SIGN_KEY,
             $cache,
-            'gd',
+            $driver,
             null,
             $publicCache,
             $flysystemRegistry,
             null,
             $cachePrefix,
             $deferredCacheWriter,
+            $lockFactory,
         );
     }
 
