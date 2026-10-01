@@ -232,6 +232,19 @@ class GlideTransformerServeTest extends TestCase
         }
     }
 
+    public function testServeRejectsAnEmptyPath(): void
+    {
+        $this->expectException(ImageNotFoundException::class);
+        $this->expectExceptionMessage('Image not found.');
+
+        $this->createTransformer($this->tempDir . '/cache')->serve(
+            $this->createLoader(__DIR__ . '/../Fixtures'),
+            '',
+            $this->createSignedRequest('', ['w' => '10']),
+            ['transformer' => 'glide', 'loader' => 'filesystem'],
+        );
+    }
+
     public function testServeRejectsPublicCachePathWithoutSourcePath(): void
     {
         $transformer = $this->createTransformer($this->tempDir . '/cache', publicCache: true);

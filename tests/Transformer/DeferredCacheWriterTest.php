@@ -16,6 +16,7 @@ namespace Silarhi\PicassoBundle\Tests\Transformer;
 use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemOperator;
 use League\Flysystem\Local\LocalFilesystemAdapter;
+use League\Flysystem\UnableToDeleteDirectory;
 use League\Flysystem\UnableToDeleteFile;
 use League\Flysystem\UnableToReadFile;
 use League\Flysystem\UnableToWriteFile;
@@ -73,6 +74,23 @@ class DeferredCacheWriterTest extends TestCase
         self::assertSame('small', $this->cache->read('photo.jpg/w_10.webp'));
         self::assertSame('large', $this->cache->read('photo.jpg/w_20.webp'));
         self::assertDirectoryDoesNotExist($this->tempDir . '/render');
+    }
+
+    public function testARenderDirectoryThatCannotBeDeletedDoesNotFailTheFlush(): void
+    {
+        $stream = fopen('php://temp', 'w+');
+        self::assertIsResource($stream);
+        fwrite($stream, 'a');
+        rewind($stream);
+        $render = self::createStub(FilesystemOperator::class);
+        $render->method('readStream')->willReturn($stream);
+        $render->method('deleteDirectory')->willThrowException(UnableToDeleteDirectory::atLocation('', 'busy'));
+
+        $writer = new DeferredCacheWriter();
+        $writer->defer($render, $this->cache, 'a.jpg/w_10.webp');
+        $writer->flush();
+
+        self::assertSame('a', $this->cache->read('a.jpg/w_10.webp'), 'The upload is what matters; the next flush tries the cleanup again.');
     }
 
     public function testFlushReleasesTheLockOnceTheVariantIsStored(): void
