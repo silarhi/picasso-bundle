@@ -106,6 +106,7 @@ PicassoBundle solves this the same way Next.js Image did for React:
 - [Features](#features)
 - [Requirements](#requirements)
 - [Installation](#installation)
+    - [Upgrading from 1.x](#upgrading-from-1x)
 - [Quick Start](#quick-start)
 - [Configuration](#configuration)
     - [Minimal Configuration](#minimal-configuration)
@@ -132,6 +133,8 @@ PicassoBundle solves this the same way Next.js Image did for React:
     - [Glide (Local)](#glide-local)
         - [Choosing a driver](#choosing-a-driver)
         - [Rendering each variant once](#rendering-each-variant-once)
+        - [Storing the Glide cache on Flysystem](#storing-the-glide-cache-on-flysystem)
+        - [Serving thumbnails from a CDN](#serving-thumbnails-from-a-cdn)
     - [Imgix (CDN)](#imgix-cdn)
     - [Custom Transformer](#custom-transformer)
 - [Routes](#routes)
@@ -139,6 +142,7 @@ PicassoBundle solves this the same way Next.js Image did for React:
     - [Error Responses](#error-responses)
     - [1.x URLs](#1x-urls)
 - [Cache Purge](#cache-purge)
+    - [Programmatic Usage](#programmatic-usage)
 - [How It Works](#how-it-works)
 - [Performance](#performance)
 - [Testing & Quality](#testing--quality)
@@ -210,9 +214,15 @@ composer require league/glide
 # No extra package needed, just configure your Imgix base URL
 ```
 
+### Upgrading from 1.x
+
+2.0 contains breaking changes: one directory per filesystem loader, one mapping per vich loader, no more
+`_metadata` in Glide URLs, new constructor arguments and `immutable` cache headers by default. Follow
+[UPGRADE-2.0.md](UPGRADE-2.0.md) for the steps, and see the [CHANGELOG](CHANGELOG.md) for everything that changed.
+
 ## Quick Start
 
-**1. Configure** a loader and a transformer:
+**1. Configure** a loader, a transformer and a placeholder:
 
 ```yaml
 # config/packages/picasso.yaml
@@ -223,6 +233,8 @@ picasso:
     transformers:
         glide:
             sign_key: '%env(PICASSO_SIGN_KEY)%'
+    placeholders:
+        blur: { type: transformer } # optional: blurred preview while the image loads
 ```
 
 **2. Import the routes** (required for Glide local serving):
@@ -247,7 +259,8 @@ picasso:
 
 This renders a `<picture>` element with `<source>` tags for AVIF and
 WebP, a fallback `<img>` with JPEG srcset, and an inline blur
-placeholder — all automatically.
+placeholder — all automatically. Placeholders are opt-in: without the
+`placeholders` entry, images render without one (see [Placeholders](#placeholders)).
 
 ## Configuration
 
@@ -302,13 +315,16 @@ picasso:
     # --- Web profiler data collector (dev only) ---
     collector: false # set to true to record image renders / URL generations in the Symfony toolbar
 
-    # --- Placeholders ---
+    # --- Placeholders (none by default: each entry below is an opt-in example) ---
     placeholders:
         blur:
-            type: transformer # inferred from key name when matching a known type
+            enabled: true # false skips this entry without removing it
+            type: transformer # transformer | blurhash | service; inferred only when the key is one of them
             size: 10 # tiny image width/height in px
-            blur: 5 # blur radius
-            quality: 30 # JPEG quality for blur image (1–100)
+            blur: 5 # blur radius (null disables blur)
+            quality: 30 # quality of the blur image (1–100, null uses the transformer default)
+            fit: crop # fit mode of the blur image (null uses the transformer default)
+            format: jpg # format of the blur image (null uses the transformer default)
 
         # blurhash:
         #     type: blurhash
@@ -324,10 +340,13 @@ picasso:
     # --- Loaders ---
     loaders:
         filesystem:
+            enabled: true # false skips this loader without removing it
             type: filesystem # inferred from key name
             path: '%kernel.project_dir%/public/uploads' # one directory per loader
             # resolve_metadata: ~  # auto-set to true for filesystem loaders
             # url_alias: ~  # name of this loader in image URLs (see Routes)
+            # default_placeholder: ~  # overrides the global default_placeholder for this loader
+            # default_transformer: ~  # overrides the global default_transformer for this loader
 
         # my_flysystem:
         #     type: flysystem
@@ -344,9 +363,14 @@ picasso:
         #     request_factory: ~   # optional: custom PSR-17 request factory service ID
         #     resolve_metadata: ~  # inherits from global (false)
 
+        # images:
+        #     type: chain
+        #     loaders: [filesystem, my_flysystem]  # tried in order: each image uses the first loader holding it
+
     # --- Transformers ---
     transformers:
         glide:
+            enabled: true # false skips this transformer without removing it
             type: glide # inferred from key name
             sign_key: ~ # signing key for secure URLs
             cache: '%kernel.project_dir%/var/glide-cache' # local path OR a Flysystem storage name (e.g. 'thumbs.storage')

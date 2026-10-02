@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] - Unreleased
+## [2.0.0] - 2026-10-02
 
 ### Added
 
@@ -65,7 +65,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     # after (the 1.x URL above answers 301 to it)
     /image/glide/uploads/photo.jpg?w=640&fm=webp&s=…
     ```
-- **BC break:** `GlideTransformer`, `ImageController` and `LegacyUrlController` require a `UrlAliases` constructor argument (second for `GlideTransformer`, after the router). Code instantiating them directly must pass `new UrlAliases([], [])` when no URL alias is configured; services wired by the bundle are unaffected.
+- **BC break:** `GlideTransformer` and `ImageController` require a `UrlAliases` constructor argument (second for `GlideTransformer`, after the router), and `ImageController` also takes an `array $cacheControl` before it (`$transformerRegistry, $loaderRegistry, $cacheControl, $urlAliases, ?$stopwatch`). Code instantiating them directly must pass `new UrlAliases([], [])` when no URL alias is configured; services wired by the bundle are unaffected.
+- **BC break:** `VichMappingHelperInterface`: `getFilePropertyName()` and `getUploadDestination()` are replaced by `resolveField(object $entity, string $mapping, ?string $field): string`, and the `$field` argument of `readMimeType()` and `readDimensions()` is no longer nullable. Only custom implementations or decorators of the interface are affected.
 - `FilesystemLoader::load()` now treats paths escaping its base directory (`..`) as missing, as serving already did.
 - Glide purges now throw a `PurgeException` when the cache storage cannot delete the variants, instead of failing silently.
 - Images served by the bundle controller now carry `immutable` by default, and the `Expires` header set by Glide is dropped. Configurable under `cache_control`; `max_age: ~` keeps the transformer's headers, as before:
@@ -144,7 +145,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release.
 
-[2.0.0]: https://github.com/silarhi/picasso-bundle/compare/v1.3.2...HEAD
+[2.0.0]: https://github.com/silarhi/picasso-bundle/compare/v1.3.2...v2.0.0
 [1.3.2]: https://github.com/silarhi/picasso-bundle/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/silarhi/picasso-bundle/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/silarhi/picasso-bundle/compare/v1.2.0...v1.3.0
