@@ -558,8 +558,9 @@ class GlideTransformerServeTest extends TestCase
     public function testAMissWaitsForTheRenderInProgressAndServesIt(): void
     {
         $transformer = $this->createTransformer($this->tempDir . '/cache', lockFactory: $this->createLockFactory($lock = $this->createMock(SharedLockInterface::class)));
-        $lock->expects(self::exactly(2))->method('acquire')->willReturnCallback(function (bool $blocking): bool {
-            if (!$blocking) {
+        $attempts = 0;
+        $lock->expects(self::exactly(3))->method('acquire')->with(false)->willReturnCallback(function () use (&$attempts): bool {
+            if (++$attempts < 3) {
                 return false;
             }
 
@@ -579,13 +580,44 @@ class GlideTransformerServeTest extends TestCase
     {
         $transformer = $this->createTransformer($this->tempDir . '/cache', lockFactory: $this->createLockFactory($lock = $this->createMock(SharedLockInterface::class)));
         // The lock holder crashed: its lock expired, and no variant was stored
-        $lock->expects(self::exactly(2))->method('acquire')->willReturnCallback(static fn (bool $blocking): bool => $blocking);
+        $lock->expects(self::exactly(2))->method('acquire')->with(false)->willReturnOnConsecutiveCalls(false, true);
         $lock->expects(self::once())->method('release');
 
         $response = $this->serveFixture($transformer);
 
         self::assertSame(200, $response->getStatusCode());
         self::assertStringStartsWith('RIFF', $this->responseBody($response));
+    }
+
+    public function testAMissRendersItselfOnceTheWaitIsOver(): void
+    {
+        $writer = new DeferredCacheWriter();
+        $transformer = $this->createTransformer($this->tempDir . '/cache', deferredCacheWriter: $writer, lockFactory: $this->createLockFactory($lock = $this->createMock(SharedLockInterface::class)), lockWait: 0.3);
+        // The lock holder is stuck (e.g. on a stalled upload) and keeps its lock
+        $lock->expects(self::atLeastOnce())->method('acquire')->with(false)->willReturn(false);
+        $lock->expects(self::never())->method('release');
+
+        $start = microtime(true);
+        $response = $this->serveFixture($transformer);
+        $waited = microtime(true) - $start;
+        $writer->flush();
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertStringStartsWith('RIFF', $this->responseBody($response));
+        self::assertGreaterThanOrEqual(0.3, $waited, 'The miss must wait for the render in progress first.');
+        self::assertLessThan(2.0, $waited, 'The wait must end after lock.wait, not when the holder lets go.');
+        self::assertNotEmpty(glob($this->tempDir . '/cache/photo.jpg/*'), 'The variant rendered without the lock is stored as well.');
+    }
+
+    public function testAMissDoesNotWaitWhenTheWaitIsZero(): void
+    {
+        $transformer = $this->createTransformer($this->tempDir . '/cache', lockFactory: $this->createLockFactory($lock = $this->createMock(SharedLockInterface::class)), lockWait: 0.0);
+        $lock->expects(self::once())->method('acquire')->with(false)->willReturn(false);
+        $lock->expects(self::never())->method('release');
+
+        $response = $this->serveFixture($transformer);
+
+        self::assertSame(200, $response->getStatusCode());
     }
 
     public function testADeferredRenderReleasesItsLockOnFlush(): void
@@ -710,7 +742,7 @@ class GlideTransformerServeTest extends TestCase
         return (string) ob_get_clean();
     }
 
-    private function createTransformer(string $cache, ?FlysystemRegistry $flysystemRegistry = null, bool $publicCache = false, string $cachePrefix = '', ?DeferredCacheWriter $deferredCacheWriter = null, ?LockFactory $lockFactory = null, string $driver = 'gd'): GlideTransformer
+    private function createTransformer(string $cache, ?FlysystemRegistry $flysystemRegistry = null, bool $publicCache = false, string $cachePrefix = '', ?DeferredCacheWriter $deferredCacheWriter = null, ?LockFactory $lockFactory = null, string $driver = 'gd', float $lockWait = 10.0): GlideTransformer
     {
         $router = self::createStub(UrlGeneratorInterface::class);
         $router->method('generate')->willReturnCallback(static function (string $name, array $params): string {
@@ -737,6 +769,8 @@ class GlideTransformerServeTest extends TestCase
             $cachePrefix,
             $deferredCacheWriter,
             $lockFactory,
+            30.0,
+            $lockWait,
         );
     }
 

@@ -383,6 +383,7 @@ picasso:
                 enabled: false # render a missing variant once, however many requests ask for it (symfony/lock)
                 factory: lock.factory # LockFactory service ID
                 ttl: 30 # seconds a lock outlives a renderer that crashed
+                wait: 10 # seconds a miss waits for a render in progress before rendering the variant itself
             public_cache:
                 enabled: false # serve transformed images from public directory
                 prefix: '' # path prepended to cache keys so they mirror the URL path
@@ -1164,12 +1165,14 @@ picasso:
                 enabled: true
                 # factory: lock.factory # the LockFactory framework.lock configures, or your own service
                 # ttl: 30 # seconds a lock outlives a renderer that crashed
+                # wait: 10 # seconds a miss waits for a render in progress
 ```
 
 - Install the component: `composer require symfony/lock`. Use a store shared by every server rendering images (Redis, a database...). `flock` only serializes the renders of one server.
 - Hits take no lock: only a miss locks, keyed by the variant's cache path.
 - With `defer_cache_write`, the lock is held until the variant is uploaded: before that, the waiting requests would not find it in the cache.
 - If the renderer dies, its lock expires after `ttl` and a waiting request renders the variant itself. Keep `ttl` above your slowest render (plus its upload with `defer_cache_write`).
+- A request waits at most `wait` seconds, then renders the variant itself, without the lock: a render held up (e.g. by an upload to a stalled storage) never keeps the others waiting until `max_execution_time`, a fatal error that also ends a long-running worker (FrankenPHP, RoadRunner). Keep `wait` well under `max_execution_time`, leaving room for the render itself.
 - Waiting requests hold a PHP worker while they wait, idle instead of rendering: they cost a worker slot, not CPU or memory.
 
 #### Storing the Glide cache on Flysystem

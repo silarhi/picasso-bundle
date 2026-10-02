@@ -48,6 +48,7 @@ use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\LockInterface;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Throwable;
 
@@ -102,6 +103,12 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
      */
     private const LOCK_PREFIX = 'picasso.glide.';
 
+    /**
+     * Microseconds between two attempts to take the render lock of a variant
+     * another process is rendering (what Symfony's blocking acquire waits).
+     */
+    private const LOCK_POLL_INTERVAL = 100_000;
+
     private Signature $signature;
     private Server $server;
     private ?string $baseUrl;
@@ -124,6 +131,8 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
      * @param LockFactory|null         $lockFactory         When set, concurrent requests for the same missing variant render it
      *                                                      once: the others wait for that render and serve it
      * @param float                    $lockTtl             Seconds a render lock outlives a crashed renderer
+     * @param float                    $lockWait            Seconds a miss waits for the render in progress of the same
+     *                                                      variant before rendering it itself
      */
     public function __construct(
         private UrlGeneratorInterface $router,
@@ -139,6 +148,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         private ?DeferredCacheWriter $deferredCacheWriter = null,
         private ?LockFactory $lockFactory = null,
         private float $lockTtl = 30.0,
+        private float $lockWait = 10.0,
     ) {
         $this->signature = SignatureFactory::create($signKey);
         $this->baseUrl = null !== $baseUrl && '' !== $baseUrl ? rtrim($baseUrl, '/') : null;
@@ -281,12 +291,17 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         $lock = $this->lockFactory?->createLock(self::LOCK_PREFIX . hash('xxh128', $cachePath), $this->lockTtl);
         if (null !== $lock && !$lock->acquire()) {
             // Another process is rendering this variant: wait for it, then serve its render
-            $lock->acquire(true);
-            $response = $responseFactory->fromCache($this->cacheStorage, $cachePath);
-            if (null !== $response) {
-                $lock->release();
+            if ($this->acquireWithinWait($lock)) {
+                $response = $responseFactory->fromCache($this->cacheStorage, $cachePath);
+                if (null !== $response) {
+                    $lock->release();
 
-                return $response;
+                    return $response;
+                }
+            } else {
+                // That render outlasts the wait (a stalled upload, a slow storage): render the
+                // variant here, without the lock, rather than run out of the request's time
+                $lock = null;
             }
         }
 
@@ -332,6 +347,27 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
                 $lock?->release();
             }
         }
+    }
+
+    /**
+     * Takes a lock another process holds, waiting at most lock.wait for it.
+     * LockInterface::acquire(true) has no timeout: it would wait as long as the
+     * holder keeps the lock, up to its ttl, and past the request's
+     * max_execution_time, a fatal error that also ends a long-running worker.
+     */
+    private function acquireWithinWait(LockInterface $lock): bool
+    {
+        $deadline = microtime(true) + $this->lockWait;
+
+        while (($remaining = $deadline - microtime(true)) > 0) {
+            usleep((int) min(self::LOCK_POLL_INTERVAL, $remaining * 1_000_000));
+
+            if ($lock->acquire()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function isDecodingFailure(Throwable $e): bool

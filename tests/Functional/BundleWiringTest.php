@@ -404,7 +404,7 @@ class BundleWiringTest extends TestCase
             'transformers' => [
                 'glide' => [
                     'sign_key' => 'secret',
-                    'lock' => ['enabled' => true, 'factory' => 'app.lock_factory', 'ttl' => 10],
+                    'lock' => ['enabled' => true, 'factory' => 'app.lock_factory', 'ttl' => 10, 'wait' => 5],
                 ],
                 'defaults' => [
                     'type' => 'glide',
@@ -417,10 +417,12 @@ class BundleWiringTest extends TestCase
         $transformer = $container->getDefinition('picasso.transformer.glide');
         self::assertEquals(new Reference('app.lock_factory'), $transformer->getArgument(11));
         self::assertSame(10.0, $transformer->getArgument(12));
+        self::assertSame(5.0, $transformer->getArgument(13));
 
         $defaults = $container->getDefinition('picasso.transformer.defaults');
         self::assertEquals(new Reference('lock.factory'), $defaults->getArgument(11), 'The LockFactory framework.lock configures.');
         self::assertSame(30.0, $defaults->getArgument(12));
+        self::assertSame(10.0, $defaults->getArgument(13));
     }
 
     public function testVipsDriverWithoutItsPackageSaysHowToInstallIt(): void
