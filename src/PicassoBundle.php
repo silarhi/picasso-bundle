@@ -428,6 +428,11 @@ final class PicassoBundle extends AbstractBundle
                                         ->min(1)
                                         ->info('Seconds a render lock outlives a renderer that crashed. Must exceed the slowest render, plus the upload with defer_cache_write.')
                                     ->end()
+                                    ->floatNode('wait')
+                                        ->defaultValue(10.0)
+                                        ->min(0)
+                                        ->info('Seconds a request waits for the render in progress of the same variant, after which it renders the variant itself. Keep it well under max_execution_time: running out of it is a fatal error.')
+                                    ->end()
                                 ->end()
                             ->end()
                             ->arrayNode('public_cache')
@@ -464,7 +469,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_fit: string,
          *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int|null, quality: int|null, fit: string|null, format: string|null, components_x: int, components_y: int, driver: string, service: string|null}>,
          *     loaders: array<string, array{enabled: bool, type: string|null, path: string|null, paths: mixed, loaders: list<string>, mapping: string|null, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null, url_alias: string|null, resolve_metadata: bool|null}>,
-         *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, api_key: string|null, http_client: string|null, request_factory: string|null, stream_factory: string|null, service: string|null, url_alias: string|null, defer_cache_write: bool, lock: array{enabled: bool, factory: string, ttl: float|int}, public_cache: array{enabled: bool, prefix: string}}>
+         *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, api_key: string|null, http_client: string|null, request_factory: string|null, stream_factory: string|null, service: string|null, url_alias: string|null, defer_cache_write: bool, lock: array{enabled: bool, factory: string, ttl: float|int, wait: float|int}, public_cache: array{enabled: bool, prefix: string}}>
          * } $config
          */
         $services = $container->services();
@@ -692,6 +697,7 @@ final class PicassoBundle extends AbstractBundle
                             $transformerConfig['defer_cache_write'] ? service('picasso.deferred_cache_writer') : null,
                             $transformerConfig['lock']['enabled'] ? service($transformerConfig['lock']['factory']) : null,
                             (float) $transformerConfig['lock']['ttl'],
+                            (float) $transformerConfig['lock']['wait'],
                         ])
                         ->tag('picasso.transformer', $tag);
                     $glideTransformers[$name] = service('picasso.transformer.' . $name);

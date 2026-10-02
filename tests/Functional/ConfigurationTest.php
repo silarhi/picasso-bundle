@@ -26,7 +26,7 @@ use Symfony\Component\Config\FileLocator;
  * @phpstan-type PlaceholderConfig array{enabled: bool, type: string|null, size: int, blur: int, quality: int, components_x: int, components_y: int, service: string|null}
  * @phpstan-type LoaderConfig array{enabled: bool, type: string|null, path: string|null, paths: mixed, loaders: list<string>, mapping: string|null, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null}
  * @phpstan-type PublicCacheConfig array{enabled: bool, prefix: string}
- * @phpstan-type TransformerConfig array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, defer_cache_write: bool, lock: array{enabled: bool, factory: string, ttl: float|int}, public_cache: PublicCacheConfig}
+ * @phpstan-type TransformerConfig array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, service: string|null, defer_cache_write: bool, lock: array{enabled: bool, factory: string, ttl: float|int, wait: float|int}, public_cache: PublicCacheConfig}
  * @phpstan-type PicassoConfig array{
  *     default_loader: string|null,
  *     default_transformer: string|null,
@@ -840,7 +840,7 @@ class ConfigurationTest extends TestCase
             ],
         ]);
 
-        self::assertSame(['enabled' => false, 'factory' => 'lock.factory', 'ttl' => 30.0], $config['transformers']['my_glide']['lock']);
+        self::assertSame(['enabled' => false, 'factory' => 'lock.factory', 'ttl' => 30.0, 'wait' => 10.0], $config['transformers']['my_glide']['lock']);
     }
 
     public function testGlideRenderLockTtlMustBeAtLeastOneSecond(): void
@@ -851,6 +851,18 @@ class ConfigurationTest extends TestCase
         $this->processConfig([
             'transformers' => [
                 'my_glide' => ['type' => 'glide', 'lock' => ['ttl' => 0]],
+            ],
+        ]);
+    }
+
+    public function testGlideRenderLockWaitCannotBeNegative(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessageMatches('/wait/');
+
+        $this->processConfig([
+            'transformers' => [
+                'my_glide' => ['type' => 'glide', 'lock' => ['wait' => -1]],
             ],
         ]);
     }
