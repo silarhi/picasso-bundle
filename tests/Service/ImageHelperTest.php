@@ -756,7 +756,7 @@ class ImageHelperTest extends TestCase
         );
     }
 
-    public function testSkipsStreamResolutionWhenBothDisplayDimensionsProvided(): void
+    public function testSkipsStreamResolutionWhenBothDisplayDimensionsProvidedAndMetadataResolutionDisabled(): void
     {
         $this->pipeline->expects(self::once())
             ->method('load')
@@ -771,10 +771,59 @@ class ImageHelperTest extends TestCase
             width: 400,
             height: 300,
             sizes: '100vw',
+            resolveMetadata: false,
         );
 
         self::assertSame(400, $data->width);
         self::assertSame(300, $data->height);
+    }
+
+    public function testResolvesSourceWidthToCapSrcsetWhenBothDisplayDimensionsProvided(): void
+    {
+        $stream = fopen('php://memory', 'r+');
+        self::assertNotFalse($stream);
+        // The filesystem loader resolves metadata: the source is read even though both display dimensions are given
+        $this->pipeline->expects(self::once())
+            ->method('load')
+            ->with(self::anything(), self::anything(), true)
+            ->willReturn(new Image(path: 'photo.jpg', stream: $stream));
+        $this->metadataGuesser->expects(self::once())
+            ->method('guess')
+            ->willReturn(['width' => 1800, 'height' => 2700, 'mimeType' => 'image/jpeg']);
+        $sourceWidths = [];
+        $this->srcsetGenerator->expects(self::exactly(3))
+            ->method('generateSrcset')
+            ->willReturnCallback(static function (
+                ImageTransformerInterface $transformer,
+                Image $image,
+                string $format,
+                ?int $width = null,
+                ?int $height = null,
+                ?string $sizes = null,
+                ?int $quality = null,
+                ?string $fit = null,
+                array $context = [],
+                ?int $sourceWidth = null,
+            ) use (&$sourceWidths): array {
+                $sourceWidths[] = $sourceWidth;
+
+                return [new SrcsetEntry('/img/photo.jpg?w=640', '640w')];
+            });
+        $this->srcsetGenerator->method('buildSrcsetString')->willReturn('/img/photo.jpg?w=640 640w');
+        $this->srcsetGenerator->method('getFallbackUrl')->willReturn('/img/photo.jpg');
+
+        $helper = $this->createHelper();
+        $data = $helper->imageData(
+            src: 'photo.jpg',
+            width: 1200,
+            height: 500,
+            sizes: '100vw',
+        );
+
+        // Candidates are capped to the source width, the displayed dimensions stay as given
+        self::assertSame([1800, 1800, 1800], $sourceWidths);
+        self::assertSame(1200, $data->width);
+        self::assertSame(500, $data->height);
     }
 
     public function testUpscalingPreventionWorksWithExplicitSourceAndDisplayDimensions(): void

@@ -132,7 +132,9 @@ final readonly class ImageHelper implements ImageHelperInterface
         $reference = new ImageReference($src, $context);
         $hasAllDisplayDims = null !== $width && null !== $height;
         $hasAllSourceDims = null !== $sourceWidth && null !== $sourceHeight;
-        $needsMetadata = !$hasAllDisplayDims && !$hasAllSourceDims;
+        // Explicit display dimensions need no source dimensions, except to cap srcset candidates to the
+        // source width: loaders resolving metadata (filesystem by default, a cheap local read) still read them
+        $needsMetadata = !$hasAllSourceDims && (!$hasAllDisplayDims || $effectiveResolveMetadata);
         $image = $this->pipeline->load($reference, $loader, $needsMetadata);
 
         [$width, $height, $resolvedSourceWidth] = $this->resolveDimensions(
@@ -191,14 +193,15 @@ final readonly class ImageHelper implements ImageHelperInterface
         $w = $sourceWidth ?? $image->width;
         $h = $sourceHeight ?? $image->height;
 
-        if (null === $width || null === $height) {
+        if (null !== $width && null !== $height) {
+            if ($resolveMetadata && null === $w && null !== $image->stream) {
+                // Both display dimensions are given: the source width only caps the srcset candidates
+                // (no upscaling), the displayed dimensions stay as given
+                return [$width, $height, $this->guessDimensions($image, $loaderName)['width']];
+            }
+        } else {
             if ($resolveMetadata && (null === $w || null === $h) && null !== $image->stream) {
-                $this->stopwatch?->start('picasso.metadata_guess', 'picasso');
-                $guessed = $this->metadataGuesser->guess(
-                    $image->resolveStream(...),
-                    $loaderName . ':' . $image->path,
-                );
-                $this->stopwatch?->stop('picasso.metadata_guess');
+                $guessed = $this->guessDimensions($image, $loaderName);
                 $w ??= $guessed['width'];
                 $h ??= $guessed['height'];
             }
@@ -230,6 +233,21 @@ final readonly class ImageHelper implements ImageHelperInterface
         }
 
         return [$width, $height, $w];
+    }
+
+    /**
+     * @return array{width: int|null, height: int|null}
+     */
+    private function guessDimensions(Image $image, string $loaderName): array
+    {
+        $this->stopwatch?->start('picasso.metadata_guess', 'picasso');
+        $guessed = $this->metadataGuesser->guess(
+            $image->resolveStream(...),
+            $loaderName . ':' . $image->path,
+        );
+        $this->stopwatch?->stop('picasso.metadata_guess');
+
+        return ['width' => $guessed['width'], 'height' => $guessed['height']];
     }
 
     /**
