@@ -561,8 +561,8 @@ backends), it defaults to `false` to avoid unnecessary network requests.
 
 When metadata resolution is enabled, the source dimensions are read even if
 both `width` and `height` are given: they only cap the `srcset` candidates to
-the source width, so an image is never upscaled, while the rendered `width`
-and `height` stay as given. With resolution disabled, giving both display
+the source dimensions (width, and height for a crop), so an image is never
+upscaled, while the rendered `width` and `height` stay as given. With resolution disabled, giving both display
 dimensions skips the read.
 
 In responsive mode (`sizes`), every `srcset` candidate keeps the aspect ratio

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Responsive `srcset` candidates (with `sizes`) ignored the given `height`: an image rendered at `width=1200 height=500` with `fit=cover` had a fallback cropped to 12:5 but candidates in the source's aspect ratio, so the browser could show a differently framed image, and large candidates of a portrait source were huge (a 3840w candidate of a 1800x2700 photo came out 3840x5760, beyond a 256M `memory_limit` with GD). Every candidate now keeps the aspect ratio of the given `width` and `height`.
 - With both `width` and `height` given, `srcset` candidates were not capped to the source width, so small sources were upscaled up to the largest device size. Loaders that resolve metadata (`resolve_metadata`, `true` for filesystem loaders by default) now read the source dimensions in that case too, only to cap the candidates; the rendered `width` and `height` stay as given.
+- Crops taller than the source (e.g. a 1:2 crop of a 3:2 photo) were upscaled in height, as candidates were only capped to the source width. They are now also capped to the width whose height matches the source height.
 - Glide `lock`: a request waiting for the render in progress of the same variant waited as long as that render held its lock, up to `lock.ttl` (30 seconds by default), and could run out of `max_execution_time`: a fatal error, which also ends a FrankenPHP worker. It now waits at most `lock.wait` seconds (new option, default 10), then renders the variant itself.
 
 ## [2.0.0] - 2026-10-02
