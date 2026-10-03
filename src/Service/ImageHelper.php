@@ -137,7 +137,7 @@ final readonly class ImageHelper implements ImageHelperInterface
         $needsMetadata = !$hasAllSourceDims && (!$hasAllDisplayDims || $effectiveResolveMetadata);
         $image = $this->pipeline->load($reference, $loader, $needsMetadata);
 
-        [$width, $height, $resolvedSourceWidth] = $this->resolveDimensions(
+        [$width, $height, $resolvedSourceWidth, $resolvedSourceHeight] = $this->resolveDimensions(
             $image, $loaderName, $width, $height, $sourceWidth, $sourceHeight, $effectiveResolveMetadata,
         );
 
@@ -155,7 +155,7 @@ final readonly class ImageHelper implements ImageHelperInterface
 
         [$sources, $fallbackSrc, $fallbackSrcset] = $this->generateSources(
             $imageTransformer, $image, $transformerContext,
-            $resolvedSourceWidth, $width, $height, $sizes, $quality, $fit,
+            $resolvedSourceWidth, $resolvedSourceHeight, $width, $height, $sizes, $quality, $fit,
         );
 
         return new ImageRenderData(
@@ -179,7 +179,7 @@ final readonly class ImageHelper implements ImageHelperInterface
     /**
      * Resolve source and display dimensions from explicit props, loader metadata, or stream detection.
      *
-     * @return array{0: int|null, 1: int|null, 2: int|null} [width, height, sourceWidth]
+     * @return array{0: int|null, 1: int|null, 2: int|null, 3: int|null} [width, height, sourceWidth, sourceHeight]
      */
     private function resolveDimensions(
         Image $image,
@@ -195,9 +195,11 @@ final readonly class ImageHelper implements ImageHelperInterface
 
         if (null !== $width && null !== $height) {
             if ($resolveMetadata && null === $w && null !== $image->stream) {
-                // Both display dimensions are given: the source width only caps the srcset candidates
-                // (no upscaling), the displayed dimensions stay as given
-                return [$width, $height, $this->guessDimensions($image, $loaderName)['width']];
+                // Both display dimensions are given: the source dimensions only cap the srcset
+                // candidates (no upscaling), the displayed dimensions stay as given
+                $guessed = $this->guessDimensions($image, $loaderName);
+
+                return [$width, $height, $guessed['width'], $guessed['height']];
             }
         } else {
             if ($resolveMetadata && (null === $w || null === $h) && null !== $image->stream) {
@@ -232,7 +234,7 @@ final readonly class ImageHelper implements ImageHelperInterface
             $height = $h;
         }
 
-        return [$width, $height, $w];
+        return [$width, $height, $w, $h];
     }
 
     /**
@@ -296,6 +298,7 @@ final readonly class ImageHelper implements ImageHelperInterface
         Image $image,
         array $transformerContext,
         ?int $sourceWidth,
+        ?int $sourceHeight,
         ?int $width,
         ?int $height,
         ?string $sizes,
@@ -323,6 +326,7 @@ final readonly class ImageHelper implements ImageHelperInterface
                 fit: $fit,
                 context: $transformerContext,
                 sourceWidth: $sourceWidth,
+                sourceHeight: $sourceHeight,
             );
 
             $srcsetString = $this->srcsetGenerator->buildSrcsetString($entries);

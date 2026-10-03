@@ -78,16 +78,23 @@ class SrcsetGenerator
         ?string $fit = null,
         array $context = [],
         ?int $sourceWidth = null,
+        ?int $sourceHeight = null,
     ): array {
         $quality ??= $this->defaultQuality;
         $fit ??= $this->defaultFit;
         $widths = $this->getWidths($sizes, $width);
         $isFixed = null === $sizes && null !== $width;
 
-        // Prevent upscaling: cap widths to source width
-        if (null !== $sourceWidth && $sourceWidth > 0) {
+        // Prevent upscaling: cap widths to source width, and for a crop with a given ratio,
+        // to the width whose height matches the source height
+        $maxWidth = null !== $sourceWidth && $sourceWidth > 0 ? $sourceWidth : null;
+        if (null !== $sourceHeight && $sourceHeight > 0 && null !== $width && $width > 0 && null !== $height && $height > 0) {
+            $maxWidthForHeight = max(1, (int) floor($sourceHeight * $width / $height));
+            $maxWidth = null === $maxWidth ? $maxWidthForHeight : min($maxWidth, $maxWidthForHeight);
+        }
+        if (null !== $maxWidth) {
             $widths = array_values(array_unique(array_map(
-                static fn (int $w): int => min($w, $sourceWidth),
+                static fn (int $w): int => min($w, $maxWidth),
                 $widths,
             )));
         }

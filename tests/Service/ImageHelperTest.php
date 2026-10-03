@@ -804,8 +804,9 @@ class ImageHelperTest extends TestCase
                 ?string $fit = null,
                 array $context = [],
                 ?int $sourceWidth = null,
+                ?int $sourceHeight = null,
             ) use (&$sourceWidths): array {
-                $sourceWidths[] = $sourceWidth;
+                $sourceWidths[] = [$sourceWidth, $sourceHeight];
 
                 return [new SrcsetEntry('/img/photo.jpg?w=640', '640w')];
             });
@@ -820,8 +821,8 @@ class ImageHelperTest extends TestCase
             sizes: '100vw',
         );
 
-        // Candidates are capped to the source width, the displayed dimensions stay as given
-        self::assertSame([1800, 1800, 1800], $sourceWidths);
+        // Candidates are capped to the source dimensions, the displayed dimensions stay as given
+        self::assertSame([[1800, 2700], [1800, 2700], [1800, 2700]], $sourceWidths);
         self::assertSame(1200, $data->width);
         self::assertSame(500, $data->height);
     }
