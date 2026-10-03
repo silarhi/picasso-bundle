@@ -147,6 +147,48 @@ class SrcsetGeneratorTest extends TestCase
         self::assertStringContainsString('h=400', $entries[1]->url);
     }
 
+    public function testGenerateSrcsetResponsivePreservesAspectRatio(): void
+    {
+        $image = new Image(path: 'photo.jpg');
+
+        // A 1200x500 banner: every candidate keeps the 12:5 crop, not the source's ratio
+        $entries = $this->generator->generateSrcset(
+            transformer: $this->transformer,
+            image: $image,
+            format: 'jpg',
+            width: 1200,
+            height: 500,
+            sizes: '100vw',
+        );
+
+        $heights = [];
+        foreach ($entries as $entry) {
+            parse_str((string) parse_url($entry->url, \PHP_URL_QUERY), $query);
+            self::assertArrayHasKey('h', $query, $entry->url);
+            $heights[(int) $query['w']] = (int) $query['h'];
+        }
+
+        self::assertSame(267, $heights[640]);
+        self::assertSame(800, $heights[1920]);
+    }
+
+    public function testGenerateSrcsetResponsiveWithoutHeightKeepsSourceRatio(): void
+    {
+        $image = new Image(path: 'photo.jpg');
+
+        $entries = $this->generator->generateSrcset(
+            transformer: $this->transformer,
+            image: $image,
+            format: 'jpg',
+            width: 1200,
+            sizes: '100vw',
+        );
+
+        foreach ($entries as $entry) {
+            self::assertStringNotContainsString('h=', $entry->url);
+        }
+    }
+
     public function testGenerateSrcsetUsesCustomQuality(): void
     {
         $image = new Image(path: 'photo.jpg');

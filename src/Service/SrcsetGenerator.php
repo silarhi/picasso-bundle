@@ -94,8 +94,10 @@ class SrcsetGenerator
         $entries = [];
 
         foreach ($widths as $index => $w) {
+            // Every candidate keeps the requested aspect ratio, like the fallback src: without a height,
+            // a responsive candidate would come out in the source's ratio (and size) instead of the crop
             $h = null;
-            if ($isFixed && $width > 0 && null !== $height && $height > 0) {
+            if (null !== $width && $width > 0 && null !== $height && $height > 0) {
                 $h = (int) round($w * $height / $width);
             }
 
