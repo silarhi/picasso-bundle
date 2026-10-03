@@ -147,6 +147,97 @@ class SrcsetGeneratorTest extends TestCase
         self::assertStringContainsString('h=400', $entries[1]->url);
     }
 
+    public function testGenerateSrcsetResponsivePreservesAspectRatio(): void
+    {
+        $image = new Image(path: 'photo.jpg');
+
+        // A 1200x500 banner: every candidate keeps the 12:5 crop, not the source's ratio
+        $entries = $this->generator->generateSrcset(
+            transformer: $this->transformer,
+            image: $image,
+            format: 'jpg',
+            width: 1200,
+            height: 500,
+            sizes: '100vw',
+        );
+
+        $heights = [];
+        foreach ($entries as $entry) {
+            parse_str((string) parse_url($entry->url, \PHP_URL_QUERY), $query);
+            self::assertArrayHasKey('h', $query, $entry->url);
+            $heights[(int) $query['w']] = (int) $query['h'];
+        }
+
+        self::assertSame(267, $heights[640]);
+        self::assertSame(800, $heights[1920]);
+    }
+
+    public function testGenerateSrcsetResponsiveWithoutHeightKeepsSourceRatio(): void
+    {
+        $image = new Image(path: 'photo.jpg');
+
+        $entries = $this->generator->generateSrcset(
+            transformer: $this->transformer,
+            image: $image,
+            format: 'jpg',
+            width: 1200,
+            sizes: '100vw',
+        );
+
+        foreach ($entries as $entry) {
+            self::assertStringNotContainsString('h=', $entry->url);
+        }
+    }
+
+    public function testGenerateSrcsetCapsTallCropsToSourceHeight(): void
+    {
+        $image = new Image(path: 'photo.jpg');
+
+        // A 1:2 crop of a 1800x1200 photo: past 600w, the crop would be taller than the source
+        $entries = $this->generator->generateSrcset(
+            transformer: $this->transformer,
+            image: $image,
+            format: 'jpg',
+            width: 500,
+            height: 1000,
+            sizes: '100vw',
+            sourceWidth: 1800,
+            sourceHeight: 1200,
+        );
+
+        $widestCandidate = 0;
+        $tallestCandidate = 0;
+        foreach ($entries as $entry) {
+            parse_str((string) parse_url($entry->url, \PHP_URL_QUERY), $query);
+            $widestCandidate = max($widestCandidate, (int) $query['w']);
+            $tallestCandidate = max($tallestCandidate, (int) $query['h']);
+        }
+
+        self::assertSame(600, $widestCandidate);
+        self::assertSame(1200, $tallestCandidate);
+    }
+
+    public function testGenerateSrcsetCapsWideCropsToSourceWidth(): void
+    {
+        $image = new Image(path: 'photo.jpg');
+
+        // A 12:5 banner of a 1800x2700 photo: the source width is the limit
+        $entries = $this->generator->generateSrcset(
+            transformer: $this->transformer,
+            image: $image,
+            format: 'jpg',
+            width: 1200,
+            height: 500,
+            sizes: '100vw',
+            sourceWidth: 1800,
+            sourceHeight: 2700,
+        );
+
+        $widest = array_pop($entries);
+        self::assertNotNull($widest);
+        self::assertStringContainsString('w=1800&h=750', $widest->url);
+    }
+
     public function testGenerateSrcsetUsesCustomQuality(): void
     {
         $image = new Image(path: 'photo.jpg');
