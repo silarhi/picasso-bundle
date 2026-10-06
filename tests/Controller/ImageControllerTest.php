@@ -75,6 +75,27 @@ class ImageControllerTest extends TestCase
         self::assertSame(200, $controller->__invoke('g', 'p', 'photo.jpg', $request)->getStatusCode());
     }
 
+    public function testInvokeThrowsNotFoundForPrivateLoader(): void
+    {
+        $transformer = $this->createMock(LocalTransformerInterface::class);
+        $transformer->expects(self::never())->method('serve');
+
+        $loaderContainer = self::createStub(ContainerInterface::class);
+        $loaderContainer->method('has')->willReturn(true);
+        $loaderRegistry = new LoaderRegistry($loaderContainer, privateLoaders: ['documents' => true]);
+
+        $controller = new ImageController(
+            $this->createRegistry(TransformerRegistry::class, 'glide', $transformer),
+            $loaderRegistry,
+            self::cacheControl(),
+            new UrlAliases(['documents' => 'd'], []),
+        );
+
+        $this->expectException(NotFoundHttpException::class);
+        $this->expectExceptionMessage('Loader "d" is private.');
+        $controller->__invoke('glide', 'd', 'photo.jpg', new Request());
+    }
+
     public function testInvokeThrowsNotFoundForUnknownTransformer(): void
     {
         $transformerContainer = $this->createMock(ContainerInterface::class);

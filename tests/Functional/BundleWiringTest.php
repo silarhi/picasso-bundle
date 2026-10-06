@@ -36,6 +36,7 @@ use Silarhi\PicassoBundle\Placeholder\BlurHashPlaceholder;
 use Silarhi\PicassoBundle\Placeholder\PlaceholderInterface;
 use Silarhi\PicassoBundle\Placeholder\TransformerPlaceholder;
 use Silarhi\PicassoBundle\Service\ImageHelper;
+use Silarhi\PicassoBundle\Service\ImageServer;
 use Silarhi\PicassoBundle\Service\LegacyMetadataResolver;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Service\MetadataGuesser;
@@ -1066,6 +1067,36 @@ class BundleWiringTest extends TestCase
         ]);
     }
 
+    // --- Private loaders ---
+
+    public function testPrivateLoadersAreKnownToTheRegistryAndImageServerIsRegistered(): void
+    {
+        $container = $this->bootKernel([
+            'loaders' => [
+                'documents' => [
+                    'type' => 'filesystem',
+                    'path' => __DIR__ . '/../Fixtures',
+                    'private' => true,
+                ],
+                'public' => [
+                    'type' => 'filesystem',
+                    'path' => __DIR__ . '/../Fixtures',
+                ],
+            ],
+            'transformers' => [
+                'glide' => [
+                    'sign_key' => 'test',
+                ],
+            ],
+        ]);
+
+        $loaders = $container->get('picasso.loader_registry');
+        self::assertInstanceOf(LoaderRegistry::class, $loaders);
+        self::assertTrue($loaders->isPrivate('documents'));
+        self::assertFalse($loaders->isPrivate('public'));
+        self::assertInstanceOf(ImageServer::class, $container->get('picasso.image_server'));
+    }
+
     // --- Attribute autoconfiguration ---
 
     public function testAttributeTaggedServicesAreRegisteredWithTheirLoaderDefaults(): void
@@ -1089,6 +1120,8 @@ class BundleWiringTest extends TestCase
         self::assertSame('stub', $loaders->getDefaultPlaceholder('configured'));
         self::assertSame('stub', $loaders->getDefaultTransformer('configured'));
         self::assertFalse($loaders->getResolveMetadata('configured'));
+        self::assertTrue($loaders->isPrivate('configured'));
+        self::assertFalse($loaders->isPrivate('filesystem'));
 
         $transformers = $container->get('picasso.transformer_registry');
         self::assertInstanceOf(TransformerRegistry::class, $transformers);

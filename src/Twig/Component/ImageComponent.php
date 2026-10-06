@@ -75,6 +75,12 @@ class ImageComponent
     /** Whether to resolve image metadata (dimensions) from the source. Null inherits from loader/global config. */
     public ?bool $resolveMetadata = null;
 
+    /** Application route serving the image (through ImageServer) instead of the bundle's, e.g. behind security voters. */
+    public ?string $route = null;
+
+    /** @var array<string, mixed> Parameters of the route. */
+    public array $routeParameters = [];
+
     // --- Computed state (set in PostMount, used by template) ---
 
     /** @internal */
@@ -120,6 +126,8 @@ class ImageComponent
             sourceHeight: $this->sourceHeight,
             resolveMetadata: $this->resolveMetadata,
             context: $this->context,
+            route: $this->route,
+            routeParameters: $this->routeParameters,
         );
 
         $this->placeholderUri = $data->placeholderUri;

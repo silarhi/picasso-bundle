@@ -46,6 +46,7 @@ use Silarhi\PicassoBundle\Placeholder\TransformerPlaceholder;
 use Silarhi\PicassoBundle\Service\ImageHelper;
 use Silarhi\PicassoBundle\Service\ImageHelperInterface;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
+use Silarhi\PicassoBundle\Service\ImageServer;
 use Silarhi\PicassoBundle\Service\LegacyMetadataResolver;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Service\MetadataGuesser;
@@ -102,6 +103,9 @@ final class PicassoBundle extends AbstractBundle
                 if (null !== $attribute->urlAlias) {
                     $tag['url_alias'] = $attribute->urlAlias;
                 }
+                if ($attribute->private) {
+                    $tag['private'] = true;
+                }
                 $definition->addTag('picasso.loader', $tag);
             },
         );
@@ -142,9 +146,11 @@ final class PicassoBundle extends AbstractBundle
                 $transformers = $definition->getArgument(2);
                 /** @var array<string, bool> $resolveMetadataMap */
                 $resolveMetadataMap = $definition->getArgument(3);
+                /** @var array<string, bool> $privateLoaders */
+                $privateLoaders = $definition->getArgument(4);
 
                 foreach ($container->findTaggedServiceIds('picasso.loader') as $tags) {
-                    /** @var array{key?: string, default_placeholder?: string, default_transformer?: string, resolve_metadata?: bool} $tag */
+                    /** @var array{key?: string, default_placeholder?: string, default_transformer?: string, resolve_metadata?: bool, private?: bool} $tag */
                     foreach ($tags as $tag) {
                         if (isset($tag['key'], $tag['default_placeholder'])) {
                             $placeholders[$tag['key']] ??= $tag['default_placeholder'];
@@ -155,12 +161,16 @@ final class PicassoBundle extends AbstractBundle
                         if (isset($tag['key'], $tag['resolve_metadata'])) {
                             $resolveMetadataMap[$tag['key']] ??= $tag['resolve_metadata'];
                         }
+                        if (isset($tag['key'], $tag['private']) && $tag['private']) {
+                            $privateLoaders[$tag['key']] = true;
+                        }
                     }
                 }
 
                 $definition->replaceArgument(1, $placeholders);
                 $definition->replaceArgument(2, $transformers);
                 $definition->replaceArgument(3, $resolveMetadataMap);
+                $definition->replaceArgument(4, $privateLoaders);
             }
         });
     }
@@ -357,6 +367,10 @@ final class PicassoBundle extends AbstractBundle
                                 ->defaultNull()
                                 ->info('Public name of this loader in image URLs and public-cache keys, instead of its name (e.g. "p" for /image/glide/p/…).')
                             ->end()
+                            ->booleanNode('private')
+                                ->defaultFalse()
+                                ->info('Only your own routes serve the images of this loader (through ImageServer, e.g. behind security voters): the bundle image route refuses it, and rendering requires a "route".')
+                            ->end()
                             ->scalarNode('resolve_metadata')
                                 ->defaultNull()
                                 ->info('Whether to resolve image metadata for this loader. Null inherits from global. Filesystem loaders default to true.')
@@ -468,7 +482,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_quality: int|null,
          *     default_fit: string,
          *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int|null, quality: int|null, fit: string|null, format: string|null, components_x: int, components_y: int, driver: string, service: string|null}>,
-         *     loaders: array<string, array{enabled: bool, type: string|null, path: string|null, paths: mixed, loaders: list<string>, mapping: string|null, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null, url_alias: string|null, resolve_metadata: bool|null}>,
+         *     loaders: array<string, array{enabled: bool, type: string|null, path: string|null, paths: mixed, loaders: list<string>, mapping: string|null, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null, url_alias: string|null, private: bool, resolve_metadata: bool|null}>,
          *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, api_key: string|null, http_client: string|null, request_factory: string|null, stream_factory: string|null, service: string|null, url_alias: string|null, defer_cache_write: bool, lock: array{enabled: bool, factory: string, ttl: float|int, wait: float|int}, public_cache: array{enabled: bool, prefix: string}}>
          * } $config
          */
@@ -506,6 +520,8 @@ final class PicassoBundle extends AbstractBundle
         $loaderTransformers = [];
         /** @var array<string, bool> $loaderResolveMetadata */
         $loaderResolveMetadata = [];
+        /** @var array<string, bool> $privateLoaders */
+        $privateLoaders = [];
         /** @var array<string, string> $loaderRoots Root → first loader reading it, for 1.x URLs (vich roots: VichLoaderPass) */
         $loaderRoots = [];
 
@@ -550,6 +566,11 @@ final class PicassoBundle extends AbstractBundle
             if (null !== $resolveMetadata) {
                 $tag['resolve_metadata'] = $resolveMetadata;
                 $loaderResolveMetadata[$name] = $resolveMetadata;
+            }
+
+            if ($loaderConfig['private']) {
+                $tag['private'] = true;
+                $privateLoaders[$name] = true;
             }
 
             switch ($type) {
@@ -637,7 +658,7 @@ final class PicassoBundle extends AbstractBundle
         // --- Registries ---
 
         $services->set('picasso.loader_registry', LoaderRegistry::class)
-            ->args([tagged_locator('picasso.loader', 'key'), $loaderPlaceholders, $loaderTransformers, $loaderResolveMetadata]);
+            ->args([tagged_locator('picasso.loader', 'key'), $loaderPlaceholders, $loaderTransformers, $loaderResolveMetadata, $privateLoaders]);
         $services->alias(LoaderRegistry::class, 'picasso.loader_registry');
 
         $services->set('picasso.transformer_registry', TransformerRegistry::class)
@@ -869,6 +890,16 @@ final class PicassoBundle extends AbstractBundle
                 $defaultTransformer,
             ]);
         $services->alias(ImagePipeline::class, 'picasso.pipeline');
+
+        // --- Image Server (images served by the application's own routes) ---
+
+        $services->set('picasso.image_server', ImageServer::class)
+            ->args([
+                service('picasso.pipeline'),
+                service('picasso.loader_registry'),
+                service('picasso.transformer_registry'),
+            ]);
+        $services->alias(ImageServer::class, 'picasso.image_server');
 
         // --- Srcset Generator ---
 

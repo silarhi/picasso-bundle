@@ -18,7 +18,9 @@ use function in_array;
 use Intervention\Image\Exceptions\DecoderException;
 use InvalidArgumentException;
 
+use function is_array;
 use function is_scalar;
+use function is_string;
 
 use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemOperator;
@@ -33,6 +35,7 @@ use League\Glide\Signatures\SignatureFactory;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
+use Silarhi\PicassoBundle\Exception\InvalidRouteException;
 use Silarhi\PicassoBundle\Exception\LoaderNotFoundException;
 use Silarhi\PicassoBundle\Exception\PurgeException;
 use Silarhi\PicassoBundle\Exception\TransformerNotFoundException;
@@ -62,6 +65,12 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
      * public-cache params segment apart from a plain image filename.
      */
     private const TRANSFORMATION_PARAMS = ['w', 'h', 'fm', 'q', 'fit', 'blur', 'dpr'];
+
+    /**
+     * Route parameters that would collide with the query string of a routed image
+     * URL: the transformation params, the signature, and the URL fragment.
+     */
+    private const RESERVED_ROUTE_PARAMETERS = [...self::TRANSFORMATION_PARAMS, 's', '_fragment'];
 
     /**
      * Reserved params segment of an untransformed image in public-cache mode.
@@ -195,6 +204,10 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         /** @var string $transformerName */
         $transformerName = $context['transformer'] ?? throw new TransformerNotFoundException('The "transformer" key is required in the context array.');
 
+        if (isset($context['route'])) {
+            return $this->routeUrl($path, $glideParams, $transformerName, $context);
+        }
+
         if ($this->isPublicCacheEnabled()) {
             // Move transformation params into the path, leaving only the signature in the query
             $paramsSegment = $this->buildParamsSegment($glideParams);
@@ -226,6 +239,46 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         $url = str_replace(',', '%2C', $url);
 
         return null !== $this->baseUrl ? $this->baseUrl . $url : $url;
+    }
+
+    /**
+     * The URL of a transformation on an application route, served through ImageServer.
+     *
+     * Route parameters that are not placeholders of the route path end up in the
+     * query string next to the transformation params, and serving validates the
+     * signature against the whole query: so the signature covers the query string
+     * the router actually generated, not only the transformation params.
+     *
+     * @param TransformerParams  $glideParams
+     * @param TransformerContext $context
+     *
+     * @throws InvalidRouteException When public cache is enabled, or a route parameter clashes with a transformation param
+     */
+    private function routeUrl(string $path, array $glideParams, string $transformerName, array $context): string
+    {
+        $route = $context['route'];
+        $routeParameters = $context['route_parameters'] ?? [];
+        if (!is_string($route) || !is_array($routeParameters)) {
+            throw new InvalidRouteException('The "route" context key must be a route name and "route_parameters" an array.');
+        }
+
+        if ($this->isPublicCacheEnabled()) {
+            // Public-cache variants are stored at paths the web server serves without
+            // running the application, so it would answer them without your route.
+            throw new InvalidRouteException(sprintf('Transformer "%s" cannot serve images from route "%s": its public cache is served without running your route. Use a Glide transformer without "public_cache".', $transformerName, $route));
+        }
+
+        $clashes = array_intersect(array_map(strval(...), array_keys($routeParameters)), self::RESERVED_ROUTE_PARAMETERS);
+        if ([] !== $clashes) {
+            throw new InvalidRouteException(sprintf('Route "%s": the parameters "%s" are reserved for the image transformation. Rename them in your route.', $route, implode('", "', $clashes)));
+        }
+
+        $url = $this->router->generate($route, [...$routeParameters, ...$glideParams], UrlGeneratorInterface::ABSOLUTE_PATH);
+
+        $query = parse_url($url, \PHP_URL_QUERY);
+        parse_str(is_string($query) ? $query : '', $params);
+
+        return $url . (is_string($query) ? '&' : '?') . http_build_query(['s' => $this->signature->generateSignature($path, $params)]);
     }
 
     public function serve(ServableLoaderInterface $loader, string $path, Request $request, array $context = []): Response

@@ -18,7 +18,7 @@ use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
 
-#[AsImageLoader('configured', defaultPlaceholder: 'stub', defaultTransformer: 'stub', resolveMetadata: false, urlAlias: 'cfg')]
+#[AsImageLoader('configured', defaultPlaceholder: 'stub', defaultTransformer: 'stub', resolveMetadata: false, urlAlias: 'cfg', private: true)]
 final class StubConfiguredAttributeLoader implements ImageLoaderInterface
 {
     public function load(ImageReference $reference, bool $withMetadata = false): Image

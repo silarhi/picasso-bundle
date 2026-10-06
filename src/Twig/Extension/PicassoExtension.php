@@ -41,8 +41,10 @@ final class PicassoExtension extends AbstractExtension
      *
      * Intended for consumers that do not install symfony/ux-twig-component.
      *
-     * @param array<string, mixed>       $context    Extra context passed to the loader (e.g. entity, field for Vich).
-     * @param array<string, scalar|null> $attributes extra HTML attributes forwarded to the inner <img> tag (alt, class, id, data-*, …)
+     * @param array<string, mixed>       $context         Extra context passed to the loader (e.g. entity, field for Vich).
+     * @param array<string, scalar|null> $attributes      extra HTML attributes forwarded to the inner <img> tag (alt, class, id, data-*, …)
+     * @param string|null                $route           Application route serving the image (through ImageServer) instead of the bundle's
+     * @param array<string, mixed>       $routeParameters Parameters of that route
      */
     public function renderImage(
         Environment $env,
@@ -65,6 +67,8 @@ final class PicassoExtension extends AbstractExtension
         ?bool $resolveMetadata = null,
         array $context = [],
         array $attributes = [],
+        ?string $route = null,
+        array $routeParameters = [],
     ): string {
         $data = $this->imageHelper->imageData(
             src: $src,
@@ -86,6 +90,8 @@ final class PicassoExtension extends AbstractExtension
             resolveMetadata: $resolveMetadata,
             context: $context,
             attributes: $attributes,
+            route: $route,
+            routeParameters: $routeParameters,
         );
 
         return $env->render('@Picasso/image.html.twig', [

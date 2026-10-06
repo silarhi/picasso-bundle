@@ -17,6 +17,7 @@ use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
+use Silarhi\PicassoBundle\Exception\InvalidRouteException;
 use Silarhi\PicassoBundle\Exception\LoaderNotFoundException;
 use Silarhi\PicassoBundle\Exception\TransformerNotFoundException;
 use Silarhi\PicassoBundle\Transformer\PurgableTransformerInterface;
@@ -35,12 +36,19 @@ readonly class ImagePipeline
 
     /**
      * Full pipeline: load image + generate transformed URL.
+     *
+     * @param string|null          $route           Application route serving the image (through ImageServer) instead of the bundle's
+     * @param array<string, mixed> $routeParameters Parameters of that route
+     *
+     * @throws InvalidRouteException When the loader is private and no route is given, or the transformer cannot serve a route
      */
     public function url(
         ImageReference $reference,
         ImageTransformation $transformation,
         ?string $loader = null,
         ?string $transformer = null,
+        ?string $route = null,
+        array $routeParameters = [],
     ): string {
         $loaderName = $this->resolveLoaderName($loader);
         $transformerName = $this->resolveTransformerName($transformer);
@@ -48,7 +56,7 @@ readonly class ImagePipeline
         $image = $this->loaderRegistry->get($loaderName)->load($reference);
         $imageTransformer = $this->transformerRegistry->get($transformerName);
 
-        return $imageTransformer->url($image, $transformation, ['loader' => $image->loader ?? $loaderName, 'transformer' => $transformerName]);
+        return $imageTransformer->url($image, $transformation, (new TransformerContextFactory($this->loaderRegistry, $this->transformerRegistry))->create($image, $loaderName, $transformerName, $route, $routeParameters));
     }
 
     /**

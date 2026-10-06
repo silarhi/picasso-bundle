@@ -74,6 +74,11 @@ final readonly class ImageController
             throw $this->notFound(sprintf('Loader "%s" not found.', $loader), new LoaderNotFoundException(sprintf('Loader "%s" not found.', $loader)));
         }
 
+        if ($this->loaderRegistry->isPrivate($loaderName)) {
+            // Only the application's routes, and their access checks, serve these images
+            throw $this->notFound(sprintf('Loader "%s" is private.', $loader));
+        }
+
         $imageLoader = $this->loaderRegistry->get($loaderName);
         if (!$imageLoader instanceof ServableLoaderInterface) {
             throw $this->notFound(sprintf('Loader "%s" does not support serving.', $loader));

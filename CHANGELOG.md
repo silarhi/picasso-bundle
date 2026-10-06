@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - Unreleased
+
+### Added
+
+- Private images, served by your own routes behind your firewall and security voters, with the same `<picture>` as public ones (srcset of each format, fallback, transformer placeholder):
+    - `route` and `routeParameters` on the `<twig:Picasso:Image>` component, `picasso_image()`, `picasso_image_url()` and `ImageHelperInterface`: every generated URL points at that route, with the transformation and its signature in the query string. Only local transformers (Glide, without `public_cache`) serve routes.
+    - `ImageServer::serve($request, $image, $loader)`, called by your route once it has authorized the image (e.g. the entity a voter checked). The signature must match that image, so the URL only chooses among the transformations your application generated. Responses are `Cache-Control: private, no-cache`.
+    - `private` loader option (`private` on `#[AsImageLoader]`): the bundle route refuses the loader, and rendering it without a route throws.
+- `InvalidRouteException`, thrown when a private loader is rendered without a route, a route is used with a transformer that cannot serve it (Imgix, Glide with `public_cache`), or a route parameter is named like a transformation param.
+
+### Changed
+
+- `ImageHelperInterface::imageUrl()` and `imageData()` take two optional parameters, `route` and `routeParameters`. Custom implementations of the interface (e.g. decorators) must add them.
+
 ## [2.1.0] - 2026-10-03
 
 ### Fixed
@@ -159,6 +173,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release.
 
+[2.2.0]: https://github.com/silarhi/picasso-bundle/compare/v2.1.0...HEAD
 [2.1.0]: https://github.com/silarhi/picasso-bundle/compare/v2.0.1...v2.1.0
 [2.0.1]: https://github.com/silarhi/picasso-bundle/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/silarhi/picasso-bundle/compare/v1.3.2...v2.0.0
