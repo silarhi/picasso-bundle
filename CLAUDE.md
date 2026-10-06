@@ -22,7 +22,8 @@ src/
 │                       #   following error_max_age), LegacyUrlController (@internal: redirects 1.x URLs)
 ├── DependencyInjection/ # VichLoaderPass (binds each vich loader to its VichUploader mapping),
 │                       #   UrlAliasPass (collects loader/transformer url_alias from their tags)
-├── DataCollector/      # PicassoDataCollector + CollectingImageHelper decorator (web profiler integration)
+├── DataCollector/      # PicassoDataCollector + CollectingImageHelper, CollectingMetadataGuesser decorators
+│                       #   (web profiler integration)
 │   └── Dto/            #   RenderEntry, UrlEntry, MetadataEntry, Totals (collector payload DTOs)
 ├── Dto/                # Image, ImageReference, ImageRenderData, ImageSource, ImageTransformation, SrcsetEntry
 ├── Exception/          # Domain exceptions (PicassoExceptionInterface and implementations)
@@ -101,9 +102,10 @@ docker build -f benchmarks/Dockerfile -t picasso-bench . && docker run --rm pica
 
 - Uses **Laminas CI Matrix Action** (`.github/workflows/continuous-integration.yml`)
 - Configured extensions: `gd`, `pcov`
-- Ignores PHP platform requirements for PHP 8.4+ (future versions)
+- Ignores PHP platform requirements for PHP 8.4, 8.5, 8.6; PHPUnit is excluded on 8.6 and README Linting is excluded
 - Additional check (`.laminas-ci.json`): `composer validate --strict && composer normalize --dry-run --diff` on lowest PHP with latest dependencies
 - Runs on: `ubuntu-latest`
+- `coverage` job calls the reusable `silarhi/.github/.github/workflows/coverage-report.yml@main` (uploads `coverage/clover.xml` from the latest-deps PHPUnit jobs); a `CI passed` gate job aggregates `matrix` + `qa`
 
 ## Architecture Notes
 
@@ -154,7 +156,7 @@ docker build -f benchmarks/Dockerfile -t picasso-bench . && docker run --rm pica
     - Keep it that way: no 1.x code in `ImageController`, `serve()`, rendering or the config tree. Dropping 1.x support is deleting these pieces and their wiring.
 - **Metadata resolution** (`resolve_metadata`): Controls whether the `MetadataGuesser` reads image streams to detect dimensions. Configurable globally (default: `false`), per-loader (filesystem defaults to `true`), or at runtime via the `resolveMetadata` parameter. To reduce CLS, `width` and `height` attributes are only rendered when **both** are available. When both display dimensions are given, the source is still read if metadata resolution is enabled, only to cap the srcset candidates to the source dimensions (width, and height for a crop: `sourceHeight * width / height`), so nothing is upscaled: the rendered dimensions are never changed by that read. The guesser reads streams progressively (64KB initially, doubling up to a 2MB cap) so dimensions are found even when large EXIF/ICC/XMP segments push the image header past the first read; results are cached under a versioned namespace (`metadata.v2`) in the configured PSR-6 pool.
 - **SrcsetGenerator** builds responsive srcset strings across configured widths and formats.
-- **PicassoDataCollector** is an opt-in `AbstractDataCollector` for the Symfony web profiler. Enabled via the bundle `collector` option (default: `false`). When enabled, the bundle registers `CollectingImageHelper`, a decorator over `ImageHelperInterface` that times every `imageData()` / `imageUrl()` call and forwards the result to the collector. Recorded entries are stored as typed DTOs in `src/DataCollector/Dto/` (`RenderEntry`, `UrlEntry`, `MetadataEntry`, `Totals`) so the template consumes property access instead of array shapes. Entries record _resolved_ loader/transformer/placeholder names, never `(default)`: render entries read them from `ImageRenderData` (which exposes `loader`, `transformer` and `placeholder` resolved by `ImageHelper`), and URL entries resolve them through `ImagePipeline::resolveLoaderName()` / `resolveTransformerName($transformer, $loaderName)` — the same methods and arguments `ImagePipeline::url()` uses internally. When nothing was recorded (`Totals::$handled`, derived in the DTO together with `headline`), the toolbar item is hidden, the menu entry disabled and the panel replaced by an empty state. The toolbar headline counts `renders + urls` (direct Twig calls); the full panel breaks down each operation type with durations.
+- **PicassoDataCollector** is an opt-in `AbstractDataCollector` for the Symfony web profiler. Enabled via the bundle `collector` option (default: `false`). When enabled, the bundle registers `CollectingImageHelper`, a decorator over `ImageHelperInterface` that times every `imageData()` / `imageUrl()` call and forwards the result to the collector, and `CollectingMetadataGuesser`, a decorator over `MetadataGuesserInterface` that records metadata guesses. Recorded entries are stored as typed DTOs in `src/DataCollector/Dto/` (`RenderEntry`, `UrlEntry`, `MetadataEntry`, `Totals`) so the template consumes property access instead of array shapes. Entries record _resolved_ loader/transformer/placeholder names, never `(default)`: render entries read them from `ImageRenderData` (which exposes `loader`, `transformer` and `placeholder` resolved by `ImageHelper`), and URL entries resolve them through `ImagePipeline::resolveLoaderName()` / `resolveTransformerName($transformer, $loaderName)` — the same methods and arguments `ImagePipeline::url()` uses internally. When nothing was recorded (`Totals::$handled`, derived in the DTO together with `headline`), the toolbar item is hidden, the menu entry disabled and the panel replaced by an empty state. The toolbar headline counts `renders + urls` (direct Twig calls); the full panel breaks down each operation type with durations.
 - All bundle configuration and service wiring lives in `PicassoBundle.php` (uses `AbstractBundle`).
 
 ## Domain Exceptions
@@ -211,9 +213,9 @@ The project uses PHPStan custom type aliases to avoid duplicating complex type a
 
 | Alias                  | Type                                                                 | Defined on                   | Imported in                                                                                                                                                        |
 | ---------------------- | -------------------------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `ImageGuessedMetadata` | `array{width: int\|null, height: int\|null, mimeType: string\|null}` | `MetadataGuesserInterface`   | `MetadataGuesser`                                                                                                                                                  |
+| `ImageGuessedMetadata` | `array{width: int\|null, height: int\|null, mimeType: string\|null}` | `MetadataGuesserInterface`   | `MetadataGuesser`, `CollectingMetadataGuesser`                                                                                                                     |
 | `ImageDimensions`      | `array{0: int, 1: int}`                                              | `VichMappingHelperInterface` | `VichMappingHelper`                                                                                                                                                |
-| `TransformerContext`   | `array<string, mixed>`                                               | `ImageTransformerInterface`  | `GlideTransformer`, `ImgixTransformer`, `PurgableTransformerInterface`, `PlaceholderInterface`, `TransformerPlaceholder`, `BlurHashPlaceholder`, `SrcsetGenerator` |
+| `TransformerContext`   | `array<string, mixed>`                                               | `ImageTransformerInterface`  | `GlideTransformer`, `ImgixTransformer`, `PurgableTransformerInterface`, `PlaceholderInterface`, `TransformerPlaceholder`, `BlurHashPlaceholder`, `SrcsetGenerator`, `ImageHelper`, `TransformerContextFactory` |
 
 **Guidelines for adding new custom types:**
 
