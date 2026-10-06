@@ -15,6 +15,12 @@ namespace Silarhi\PicassoBundle\Attribute;
 
 use Attribute;
 
+/**
+ * Registers an image loader.
+ *
+ * Set $private when only your own routes serve its images (through ImageServer, e.g. behind
+ * security voters): the bundle image route then refuses it, and rendering requires a route.
+ */
 #[Attribute(Attribute::TARGET_CLASS)]
 final readonly class AsImageLoader
 {
@@ -24,6 +30,7 @@ final readonly class AsImageLoader
         public ?string $defaultTransformer = null,
         public ?bool $resolveMetadata = null,
         public ?string $urlAlias = null,
+        public bool $private = false,
     ) {
     }
 }

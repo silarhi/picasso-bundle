@@ -27,12 +27,14 @@ final readonly class LoaderRegistry
      * @param array<string, string> $defaultPlaceholders Loader name → default placeholder name
      * @param array<string, string> $defaultTransformers Loader name → default transformer name
      * @param array<string, bool>   $resolveMetadataMap  Loader name → resolve metadata flag
+     * @param array<string, bool>   $privateLoaders      Loader name → true when only the application's own routes serve its images
      */
     public function __construct(
         private ContainerInterface $loaders,
         private array $defaultPlaceholders = [],
         private array $defaultTransformers = [],
         private array $resolveMetadataMap = [],
+        private array $privateLoaders = [],
     ) {
     }
 
@@ -66,5 +68,14 @@ final readonly class LoaderRegistry
     public function getResolveMetadata(string $loaderName): ?bool
     {
         return $this->resolveMetadataMap[$loaderName] ?? null;
+    }
+
+    /**
+     * Whether only the application's own routes serve the images of a loader
+     * (through ImageServer): the bundle's image route refuses it.
+     */
+    public function isPrivate(string $loaderName): bool
+    {
+        return $this->privateLoaders[$loaderName] ?? false;
     }
 }

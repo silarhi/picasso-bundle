@@ -139,6 +139,7 @@ PicassoBundle solves this the same way Next.js Image did for React:
     - [Custom Transformer](#custom-transformer)
 - [Routes](#routes)
     - [URL Aliases](#url-aliases)
+    - [Private Images](#private-images)
     - [Error Responses](#error-responses)
     - [1.x URLs](#1x-urls)
 - [Cache Purge](#cache-purge)
@@ -164,6 +165,7 @@ PicassoBundle solves this the same way Next.js Image did for React:
   [Glide](https://glide.thephpleague.com/) for self-hosted,
   [Imgix](https://imgix.com/) for CDN, or bring your own
 - **Signed URLs** — HMAC-signed transformation URLs prevent abuse
+- **Private images** — serve thumbnails from your own routes, behind your security voters, with the same srcset and formats
 - **PSR-6 metadata caching** — dimension detection and BlurHash results cached
 - **Fully extensible** — add custom loaders, transformers, or placeholders
   with PHP attributes (`#[AsImageLoader]`, `#[AsImageTransformer]`,
@@ -347,6 +349,7 @@ picasso:
             # url_alias: ~  # name of this loader in image URLs (see Routes)
             # default_placeholder: ~  # overrides the global default_placeholder for this loader
             # default_transformer: ~  # overrides the global default_transformer for this loader
+            # private: false  # true: only your own routes serve its images (see Private Images)
 
         # my_flysystem:
         #     type: flysystem
@@ -487,26 +490,28 @@ with a full srcset.
 
 #### Component Properties
 
-| Property          | Type           | Default | Description                                                      |
-| ----------------- | -------------- | ------- | ---------------------------------------------------------------- |
-| `src`             | `string`       | —       | Image path relative to the loader's base                         |
-| `width`           | `int`          | auto    | Display width (auto-detected from source)                        |
-| `height`          | `int`          | auto    | Display height (auto-detected from source)                       |
-| `sizes`           | `string`       | —       | Responsive `sizes` attribute                                     |
-| `sourceWidth`     | `int`          | auto    | Explicit source width (skips detection)                          |
-| `sourceHeight`    | `int`          | auto    | Explicit source height (skips detection)                         |
-| `loader`          | `string`       | —       | Override default loader                                          |
-| `transformer`     | `string`       | —       | Override default transformer                                     |
-| `quality`         | `int`          | 75      | Override quality (1–100)                                         |
-| `fit`             | `string`       | contain | Fit mode: `contain`, `cover`, `crop`, `fill`                     |
-| `placeholder`     | `string\|bool` | —       | `true`/`false` to enable/disable, or a placeholder name          |
-| `placeholderData` | `string`       | —       | Literal data URI, bypasses placeholder services                  |
-| `priority`        | `bool`         | false   | Eager loading, `fetchpriority="high"`, no placeholder            |
-| `loading`         | `string`       | lazy    | `lazy` or `eager`. Auto-set when priority                        |
-| `fetchPriority`   | `string`       | —       | `high`, `low`, `auto`. Auto-set when priority                    |
-| `unoptimized`     | `bool`         | false   | Serve original image without transformation                      |
-| `resolveMetadata` | `bool`         | —       | Override metadata resolution (see [below](#metadata-resolution)) |
-| `context`         | `array`        | `[]`    | Extra context for the loader (e.g. Vich)                         |
+| Property          | Type           | Default | Description                                                          |
+| ----------------- | -------------- | ------- | -------------------------------------------------------------------- |
+| `src`             | `string`       | —       | Image path relative to the loader's base                             |
+| `width`           | `int`          | auto    | Display width (auto-detected from source)                            |
+| `height`          | `int`          | auto    | Display height (auto-detected from source)                           |
+| `sizes`           | `string`       | —       | Responsive `sizes` attribute                                         |
+| `sourceWidth`     | `int`          | auto    | Explicit source width (skips detection)                              |
+| `sourceHeight`    | `int`          | auto    | Explicit source height (skips detection)                             |
+| `loader`          | `string`       | —       | Override default loader                                              |
+| `transformer`     | `string`       | —       | Override default transformer                                         |
+| `quality`         | `int`          | 75      | Override quality (1–100)                                             |
+| `fit`             | `string`       | contain | Fit mode: `contain`, `cover`, `crop`, `fill`                         |
+| `placeholder`     | `string\|bool` | —       | `true`/`false` to enable/disable, or a placeholder name              |
+| `placeholderData` | `string`       | —       | Literal data URI, bypasses placeholder services                      |
+| `priority`        | `bool`         | false   | Eager loading, `fetchpriority="high"`, no placeholder                |
+| `loading`         | `string`       | lazy    | `lazy` or `eager`. Auto-set when priority                            |
+| `fetchPriority`   | `string`       | —       | `high`, `low`, `auto`. Auto-set when priority                        |
+| `unoptimized`     | `bool`         | false   | Serve original image without transformation                          |
+| `resolveMetadata` | `bool`         | —       | Override metadata resolution (see [below](#metadata-resolution))     |
+| `context`         | `array`        | `[]`    | Extra context for the loader (e.g. Vich)                             |
+| `route`           | `string`       | —       | Your route serving the image (see [Private Images](#private-images)) |
+| `routeParameters` | `array`        | `[]`    | Parameters of that route                                             |
 
 #### Automatic Dimension Detection
 
@@ -625,7 +630,7 @@ All available parameters mirror the `<twig:Picasso:Image>` component:
 `src`, `width`, `height`, `sizes`, `sourceWidth`, `sourceHeight`, `loader`,
 `transformer`, `quality`, `fit`, `placeholder`, `placeholderData`, `priority`,
 `loading`, `fetchPriority`, `unoptimized`, `resolveMetadata`, `context`,
-`attributes`.
+`attributes`, `route`, `routeParameters`.
 
 See [Component Properties](#component-properties) for the full reference.
 
@@ -663,18 +668,20 @@ All available parameters:
 ) }}
 ```
 
-| Parameter     | Type     | Description                                   |
-| ------------- | -------- | --------------------------------------------- |
-| `width`       | `int`    | Target width in pixels                        |
-| `height`      | `int`    | Target height in pixels                       |
-| `format`      | `string` | Output format (`avif`, `webp`, `jpg`, etc.)   |
-| `quality`     | `int`    | Output quality (1–100)                        |
-| `fit`         | `string` | Fit mode (`contain`, `cover`, `crop`, `fill`) |
-| `blur`        | `int`    | Blur radius                                   |
-| `dpr`         | `int`    | Device pixel ratio                            |
-| `loader`      | `string` | Override default loader                       |
-| `transformer` | `string` | Override default transformer                  |
-| `context`     | `array`  | Extra context for the loader                  |
+| Parameter         | Type     | Description                                                          |
+| ----------------- | -------- | -------------------------------------------------------------------- |
+| `width`           | `int`    | Target width in pixels                                               |
+| `height`          | `int`    | Target height in pixels                                              |
+| `format`          | `string` | Output format (`avif`, `webp`, `jpg`, etc.)                          |
+| `quality`         | `int`    | Output quality (1–100)                                               |
+| `fit`             | `string` | Fit mode (`contain`, `cover`, `crop`, `fill`)                        |
+| `blur`            | `int`    | Blur radius                                                          |
+| `dpr`             | `int`    | Device pixel ratio                                                   |
+| `loader`          | `string` | Override default loader                                              |
+| `transformer`     | `string` | Override default transformer                                         |
+| `context`         | `array`  | Extra context for the loader                                         |
+| `route`           | `string` | Your route serving the image (see [Private Images](#private-images)) |
+| `routeParameters` | `array`  | Parameters of that route                                             |
 
 ### ImageHelper Service
 
@@ -1343,6 +1350,55 @@ Loaders and transformers registered with the attributes take it as `urlAlias`: `
 - URLs naming a loader or transformer by its name keep being served after it gets an alias, so adding one does not break the URLs already published.
 - An alias may contain letters, digits, `_` and `-`. It must not be the alias or the name of another loader (or transformer, for a transformer alias). A loader and a transformer can share one, since they fill different URL segments. Conflicts fail at container build.
 - With `public_cache`, cache keys use the aliases as well, so they keep mirroring the URL path. Setting or changing an alias moves the cache keys like renaming would: purge the variants first, or let the old ones be.
+
+### Private Images
+
+The bundle route serves any image whose URL is signed: the signature proves the URL was generated by your application, not that the visitor may see the image. For private content (invoices, contracts, documents of a customer space), serve the images from your own routes instead, where your firewall and security voters decide, while Picasso keeps rendering the `<picture>`: srcset, formats, placeholder.
+
+1. Mark the loader `private`. The bundle route then refuses its images, and rendering one without a route fails, so no URL can bypass your routes:
+
+    ```yaml
+    picasso:
+        loaders:
+            documents: { type: vich, mapping: document_file, private: true }
+        transformers:
+            glide: { sign_key: '%env(PICASSO_SIGN_KEY)%' } # no public_cache
+    ```
+
+    Loaders registered with the attribute take it as `#[AsImageLoader('documents', private: true)]`.
+
+2. Serve the images from your route with `ImageServer`. Pass it the image (here the entity your voter just authorized): the URL only says which transformation to render, and its signature must match that image.
+
+    ```php
+    use Silarhi\PicassoBundle\Dto\ImageReference;
+    use Silarhi\PicassoBundle\Service\ImageServer;
+
+    #[Route('/portal/{tenant}/documents/{id}/image', name: 'portal_document_image', methods: ['GET'])]
+    #[IsGranted('TENANT_DOCUMENT_VIEW', 'document')]
+    public function image(Document $document, Request $request, ImageServer $images): Response
+    {
+        return $images->serve($request, new ImageReference(context: ['entity' => $document]), loader: 'documents');
+    }
+    ```
+
+3. Render with that route. Every URL of the `<picture>` (each srcset candidate of each format, the fallback, the transformer placeholder) points at it, with the transformation and its signature in the query string:
+
+    ```twig
+    <twig:Picasso:Image context="{{ {entity: document} }}" loader="documents" sizes="(min-width: 768px) 33vw, 100vw"
+        route="portal_document_image" routeParameters="{{ {tenant: tenant.slug, id: document.id} }}" />
+    {# → /portal/acme/documents/42/image?w=640&fm=webp&q=75&fit=contain&s=… #}
+    ```
+
+    `picasso_image()`, `picasso_image_url()` and `ImageHelperInterface` take the same `route` and `routeParameters` arguments.
+
+Each of your routes guards the same images its own way: give every route its own action calling `ImageServer`, and render each page with its route. They share one Glide cache, since a variant is cached by image and transformation, not by URL.
+
+- `ImageServer::serve()` answers `Cache-Control: private, no-cache`: browsers keep the image, but ask your route again before reusing it, so a revoked access takes effect at once, and shared caches (CDNs, proxies) never store it. Change the headers on the returned response if needed.
+- It throws a `NotFoundHttpException` when the image is missing or cannot be decoded, or when the signature does not match the image (a tampered transformation, or the URL of another image), never cacheable.
+- It accepts a path (`$images->serve($request, 'contracts/42.jpg', 'private_files')`) as well as an `ImageReference`. The transformer defaults like when rendering: the loader's `default_transformer`, else the global one.
+- Only local transformers (Glide) serve routes; a route with Imgix, or with a Glide transformer using `public_cache` (whose files the web server serves without your route), throws an `InvalidRouteException`, as do route parameters named like a transformation param (`w`, `h`, `fm`, `q`, `fit`, `blur`, `dpr`), `s` or `_fragment`. `base_url` is not applied to these URLs: they belong to your application.
+- Route parameters that are not placeholders of the route path end up in the query string, and are signed with it.
+- Keep the originals out of `public/`: a private loader only protects what the web server does not serve directly.
 
 ### Error Responses
 

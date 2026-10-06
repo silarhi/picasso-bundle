@@ -81,4 +81,12 @@ class LoaderRegistryTest extends TestCase
 
         self::assertNull($registry->getResolveMetadata('filesystem'));
     }
+
+    public function testIsPrivateReturnsConfiguredValue(): void
+    {
+        $registry = new LoaderRegistry(self::createStub(ContainerInterface::class), privateLoaders: ['documents' => true]);
+
+        self::assertTrue($registry->isPrivate('documents'));
+        self::assertFalse($registry->isPrivate('filesystem'));
+    }
 }

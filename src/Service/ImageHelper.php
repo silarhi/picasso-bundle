@@ -23,6 +23,9 @@ use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 use Symfony\Component\Stopwatch\Stopwatch;
 
+/**
+ * @phpstan-import-type TransformerContext from ImageTransformerInterface
+ */
 final readonly class ImageHelper implements ImageHelperInterface
 {
     /**
@@ -47,7 +50,9 @@ final readonly class ImageHelper implements ImageHelperInterface
     /**
      * Generate a single image URL with named parameters.
      *
-     * @param array<string, mixed> $context Extra context passed to the loader (e.g. entity, field for Vich).
+     * @param array<string, mixed> $context         Extra context passed to the loader (e.g. entity, field for Vich).
+     * @param string|null          $route           Application route serving the image (through ImageServer) instead of the bundle's
+     * @param array<string, mixed> $routeParameters Parameters of that route
      */
     public function imageUrl(
         string $path,
@@ -61,6 +66,8 @@ final readonly class ImageHelper implements ImageHelperInterface
         ?string $loader = null,
         ?string $transformer = null,
         array $context = [],
+        ?string $route = null,
+        array $routeParameters = [],
     ): string {
         $transformation = new ImageTransformation(
             width: $width,
@@ -72,7 +79,7 @@ final readonly class ImageHelper implements ImageHelperInterface
             dpr: $dpr,
         );
 
-        return $this->pipeline->url(new ImageReference($path, $context), $transformation, $loader, $transformer);
+        return $this->pipeline->url(new ImageReference($path, $context), $transformation, $loader, $transformer, $route, $routeParameters);
     }
 
     /**
@@ -80,8 +87,10 @@ final readonly class ImageHelper implements ImageHelperInterface
      *
      * Returns an immutable DTO suitable for both Twig component rendering and JSON API responses.
      *
-     * @param array<string, mixed>       $context    Extra context for the loader
-     * @param array<string, scalar|null> $attributes Extra HTML attributes (alt, class, …)
+     * @param array<string, mixed>       $context         Extra context for the loader
+     * @param array<string, scalar|null> $attributes      Extra HTML attributes (alt, class, …)
+     * @param string|null                $route           Application route serving the image (through ImageServer) instead of the bundle's
+     * @param array<string, mixed>       $routeParameters Parameters of that route
      */
     public function imageData(
         ?string $src = null,
@@ -103,6 +112,8 @@ final readonly class ImageHelper implements ImageHelperInterface
         ?bool $resolveMetadata = null,
         array $context = [],
         array $attributes = [],
+        ?string $route = null,
+        array $routeParameters = [],
     ): ImageRenderData {
         $loading ??= $priority ? 'eager' : 'lazy';
         $fetchPriority ??= $priority ? 'high' : null;
@@ -144,7 +155,9 @@ final readonly class ImageHelper implements ImageHelperInterface
         $transformerName = $this->resolveTransformerName($transformer, $loaderName);
         $imageTransformer = $this->transformerRegistry->get($transformerName);
         // A delegating loader (e.g. a chain) names the loader that loaded the image, which serves it
-        $transformerContext = ['loader' => $image->loader ?? $loaderName, 'transformer' => $transformerName];
+        $servingLoader = $image->loader ?? $loaderName;
+        $transformerContext = (new TransformerContextFactory($this->loaderRegistry, $this->transformerRegistry))
+            ->create($image, $loaderName, $transformerName, $route, $routeParameters);
 
         $placeholderName = $this->resolvePlaceholderName($placeholder, $loaderName);
         $placeholderUri = $this->generatePlaceholder(
@@ -170,7 +183,7 @@ final readonly class ImageHelper implements ImageHelperInterface
             sizes: $sizes,
             unoptimized: false,
             attributes: $attributes,
-            loader: $transformerContext['loader'],
+            loader: $servingLoader,
             transformer: $transformerName,
             placeholder: $placeholderName,
         );
@@ -253,7 +266,7 @@ final readonly class ImageHelper implements ImageHelperInterface
     }
 
     /**
-     * @param array<string, string> $transformerContext
+     * @param TransformerContext $transformerContext
      */
     private function generatePlaceholder(
         Image $image,
@@ -289,7 +302,7 @@ final readonly class ImageHelper implements ImageHelperInterface
     }
 
     /**
-     * @param array<string, string> $transformerContext
+     * @param TransformerContext $transformerContext
      *
      * @return array{0: ImageSource[], 1: string|null, 2: string|null} [sources, fallbackSrc, fallbackSrcset]
      */

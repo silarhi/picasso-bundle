@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Tests\DataCollector;
 
+use function array_slice;
+
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\DataCollector\CollectingImageHelper;
@@ -30,7 +32,7 @@ class CollectingImageHelperTest extends TestCase
         $inner = $this->createMock(ImageHelperInterface::class);
         $inner->expects(self::once())
             ->method('imageUrl')
-            ->with('hero.jpg', 800, 600, 'webp', 80, 'cover', null, null, 'filesystem', 'glide', ['ctx' => 1])
+            ->with('hero.jpg', 800, 600, 'webp', 80, 'cover', null, null, 'filesystem', 'glide', ['ctx' => 1], 'document_image', ['id' => 42])
             ->willReturn('/result.webp');
 
         $collector = new PicassoDataCollector();
@@ -46,6 +48,8 @@ class CollectingImageHelperTest extends TestCase
             loader: 'filesystem',
             transformer: 'glide',
             context: ['ctx' => 1],
+            route: 'document_image',
+            routeParameters: ['id' => 42],
         );
 
         self::assertSame('/result.webp', $result);
@@ -100,17 +104,23 @@ class CollectingImageHelperTest extends TestCase
             placeholder: 'blur',
         );
 
+        $forwarded = [];
         $inner = $this->createMock(ImageHelperInterface::class);
         $inner->expects(self::once())
             ->method('imageData')
-            ->willReturn($renderData);
+            ->willReturnCallback(static function (mixed ...$arguments) use (&$forwarded, $renderData): ImageRenderData {
+                $forwarded = $arguments;
+
+                return $renderData;
+            });
 
         $collector = new PicassoDataCollector();
         $decorator = new CollectingImageHelper($inner, $collector, $this->createPipeline());
 
-        $result = $decorator->imageData(src: 'hero.jpg', width: 1920, height: 1080);
+        $result = $decorator->imageData(src: 'hero.jpg', width: 1920, height: 1080, route: 'document_image', routeParameters: ['id' => 42]);
 
         self::assertSame($renderData, $result);
+        self::assertSame(['document_image', ['id' => 42]], array_slice($forwarded, -2), 'the route reaches the inner helper');
 
         $collector->collect(new Request(), new Response());
         $renders = $collector->getRenders();
