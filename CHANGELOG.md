@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `ImageHelperInterface::imageUrl()` and `imageData()` take two optional parameters, `route` and `routeParameters`. Custom implementations of the interface (e.g. decorators) must add them.
 
+### Fixed
+
+- `picasso_image_url()`, `ImageHelperInterface::imageUrl()`, `ImagePipeline::url()` and `ImagePipeline::purge()` ignored the loader's `default_transformer` and used the global `default_transformer`, unlike `<twig:Picasso:Image>` and `picasso_image()`. URLs of such loaders now use the loader's transformer, and purges purge its cache. A private image URL from `picasso_image_url()` was signed with another transformer's key than the one `ImageServer` checks, and was not served.
+- The web profiler recorded `picasso_image_url()` calls under the global `default_transformer` instead of the loader's.
+
 ## [2.1.0] - 2026-10-03
 
 ### Fixed

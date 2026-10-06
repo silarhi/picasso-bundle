@@ -22,6 +22,7 @@ use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
+use Silarhi\PicassoBundle\Exception\TransformerNotFoundException;
 use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
@@ -150,6 +151,105 @@ class ImagePipelineTest extends TestCase
         $this->pipeline->purge('uploads/photo.jpg');
     }
 
+    public function testUrlUsesLoaderDefaultTransformer(): void
+    {
+        $image = new Image(path: 'contracts/42.jpg');
+        $reference = new ImageReference('contracts/42.jpg');
+        $transformation = new ImageTransformation(width: 300);
+
+        $this->loader->expects(self::once())->method('load')->with($reference)->willReturn($image);
+        $privateGlide = $this->createMock(ImageTransformerInterface::class);
+        $privateGlide->expects(self::once())
+            ->method('url')
+            ->with($image, $transformation, ['loader' => 'private_files', 'transformer' => 'private_glide'])
+            ->willReturn('/image/private_glide/private_files/contracts/42.jpg?w=300&s=abc');
+        $this->transformer->expects(self::never())->method('url');
+
+        $pipeline = $this->createPipeline(
+            ['private_files' => $this->loader],
+            ['glide' => $this->transformer, 'private_glide' => $privateGlide],
+            ['private_files' => 'private_glide'],
+        );
+
+        self::assertSame(
+            '/image/private_glide/private_files/contracts/42.jpg?w=300&s=abc',
+            $pipeline->url($reference, $transformation, 'private_files'),
+        );
+    }
+
+    public function testUrlUsesDefaultLoaderDefaultTransformer(): void
+    {
+        $image = new Image(path: 'photo.jpg');
+
+        $this->loader->expects(self::once())->method('load')->willReturn($image);
+        $imgix = $this->createMock(ImageTransformerInterface::class);
+        $imgix->expects(self::once())->method('url')->willReturn('https://cdn.example/photo.jpg');
+        $this->transformer->expects(self::never())->method('url');
+
+        $pipeline = $this->createPipeline(
+            ['filesystem' => $this->loader],
+            ['glide' => $this->transformer, 'imgix' => $imgix],
+            ['filesystem' => 'imgix'],
+        );
+
+        self::assertSame('https://cdn.example/photo.jpg', $pipeline->url(new ImageReference('photo.jpg'), new ImageTransformation()));
+    }
+
+    public function testUrlExplicitTransformerOverridesLoaderDefault(): void
+    {
+        $image = new Image(path: 'photo.jpg');
+
+        $this->loader->expects(self::once())->method('load')->willReturn($image);
+        $imgix = $this->createMock(ImageTransformerInterface::class);
+        $imgix->expects(self::never())->method('url');
+        $this->transformer->expects(self::once())
+            ->method('url')
+            ->with($image, self::anything(), ['loader' => 'filesystem', 'transformer' => 'glide'])
+            ->willReturn('/image/glide/filesystem/photo.jpg');
+
+        $pipeline = $this->createPipeline(
+            ['filesystem' => $this->loader],
+            ['glide' => $this->transformer, 'imgix' => $imgix],
+            ['filesystem' => 'imgix'],
+        );
+
+        self::assertSame('/image/glide/filesystem/photo.jpg', $pipeline->url(new ImageReference('photo.jpg'), new ImageTransformation(), transformer: 'glide'));
+    }
+
+    public function testPurgeUsesLoaderDefaultTransformer(): void
+    {
+        $privateGlide = $this->createMock(PurgableTransformerInterface::class);
+        $privateGlide->expects(self::once())
+            ->method('purge')
+            ->with('contracts/42.jpg', ['loader' => 'private_files', 'transformer' => 'private_glide']);
+        $this->expectNoLoadOrUrlOnSetUpMocks();
+
+        $pipeline = $this->createPipeline([], ['glide' => $this->transformer, 'private_glide' => $privateGlide], ['private_files' => 'private_glide']);
+
+        $pipeline->purge('contracts/42.jpg', 'private_files');
+    }
+
+    public function testResolveTransformerName(): void
+    {
+        $this->expectNoLoadOrUrlOnSetUpMocks();
+        $pipeline = $this->createPipeline([], [], ['private_files' => 'private_glide']);
+
+        self::assertSame('imgix', $pipeline->resolveTransformerName('imgix', 'private_files'), 'the given transformer wins');
+        self::assertSame('private_glide', $pipeline->resolveTransformerName(null, 'private_files'), 'then the loader default');
+        self::assertSame('glide', $pipeline->resolveTransformerName(null, 'filesystem'), 'then the global default');
+        self::assertSame('glide', $pipeline->resolveTransformerName(), 'no loader name skips loader defaults');
+    }
+
+    public function testResolveTransformerNameThrowsWithoutAnyDefault(): void
+    {
+        $this->expectNoLoadOrUrlOnSetUpMocks();
+        $pipeline = new ImagePipeline(new LoaderRegistry(new ServiceLocator([])), new TransformerRegistry(new ServiceLocator([])), 'filesystem', null);
+
+        $this->expectException(TransformerNotFoundException::class);
+
+        $pipeline->resolveTransformerName(null, 'filesystem');
+    }
+
     private function expectNoLoadOrUrlOnSetUpMocks(): void
     {
         $this->loader->expects(self::never())->method('load');
@@ -163,6 +263,27 @@ class ImagePipelineTest extends TestCase
     {
         return new ImagePipeline(
             new LoaderRegistry(new ServiceLocator([])),
+            new TransformerRegistry(new ServiceLocator(array_map(
+                static fn (ImageTransformerInterface $transformer): Closure => static fn (): ImageTransformerInterface => $transformer,
+                $transformers,
+            ))),
+            'filesystem',
+            'glide',
+        );
+    }
+
+    /**
+     * @param array<string, ImageLoaderInterface>      $loaders
+     * @param array<string, ImageTransformerInterface> $transformers
+     * @param array<string, string>                    $defaultTransformers Loader name → default transformer name
+     */
+    private function createPipeline(array $loaders, array $transformers, array $defaultTransformers): ImagePipeline
+    {
+        return new ImagePipeline(
+            new LoaderRegistry(new ServiceLocator(array_map(
+                static fn (ImageLoaderInterface $loader): Closure => static fn (): ImageLoaderInterface => $loader,
+                $loaders,
+            )), defaultTransformers: $defaultTransformers),
             new TransformerRegistry(new ServiceLocator(array_map(
                 static fn (ImageTransformerInterface $transformer): Closure => static fn (): ImageTransformerInterface => $transformer,
                 $transformers,

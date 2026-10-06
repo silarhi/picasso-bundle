@@ -1473,7 +1473,8 @@ class ImageManager
 
     public function deleteImage(string $path): void
     {
-        // Purge all cached variants
+        // Purge all cached variants (default loader, and its default_transformer
+        // or else the global one, like when rendering)
         $this->pipeline->purge($path);
 
         // Or specify loader/transformer explicitly

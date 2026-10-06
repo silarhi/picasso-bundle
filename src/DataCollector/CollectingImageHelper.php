@@ -68,10 +68,11 @@ final readonly class CollectingImageHelper implements ImageHelperInterface
         $duration = (microtime(true) - $start) * 1000;
 
         // The inner call resolved these same names without throwing, so resolution cannot fail here.
+        $loaderName = $this->pipeline->resolveLoaderName($loader);
         $this->collector->collectImageUrl(
             src: $path,
-            loader: $this->pipeline->resolveLoaderName($loader),
-            transformer: $this->pipeline->resolveTransformerName($transformer),
+            loader: $loaderName,
+            transformer: $this->pipeline->resolveTransformerName($transformer, $loaderName),
             transformation: new ImageTransformation(
                 width: $width,
                 height: $height,

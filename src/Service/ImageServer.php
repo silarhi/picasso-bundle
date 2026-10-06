@@ -63,7 +63,8 @@ final readonly class ImageServer
     public function serve(Request $request, ImageReference|string $source, ?string $loader = null, ?string $transformer = null): Response
     {
         $loaderName = $this->pipeline->resolveLoaderName($loader);
-        $transformerName = $this->resolveTransformerName($transformer, $loaderName);
+        // Resolved like when rendering: URLs are signed with that transformer's key, so both must agree
+        $transformerName = $this->pipeline->resolveTransformerName($transformer, $loaderName);
 
         $imageTransformer = $this->transformerRegistry->get($transformerName);
         if (!$imageTransformer instanceof LocalTransformerInterface) {
@@ -97,16 +98,5 @@ final readonly class ImageServer
         $response->headers->remove('Expires');
 
         return $response;
-    }
-
-    /**
-     * Resolved like when rendering: the given transformer, else the loader's default, else the
-     * global default. URLs are signed with that transformer's key, so both must agree.
-     */
-    private function resolveTransformerName(?string $transformer, string $loaderName): string
-    {
-        return $transformer
-            ?? $this->loaderRegistry->getDefaultTransformer($loaderName)
-            ?? $this->pipeline->resolveTransformerName();
     }
 }

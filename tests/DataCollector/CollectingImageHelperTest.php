@@ -22,6 +22,9 @@ use Silarhi\PicassoBundle\DataCollector\PicassoDataCollector;
 use Silarhi\PicassoBundle\Dto\ImageRenderData;
 use Silarhi\PicassoBundle\Service\ImageHelperInterface;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
+use Silarhi\PicassoBundle\Service\LoaderRegistry;
+use Silarhi\PicassoBundle\Service\TransformerRegistry;
+use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -86,6 +89,32 @@ class CollectingImageHelperTest extends TestCase
         self::assertSame('glide', $urls[0]->transformer, 'null transformer is recorded under its resolved default name');
     }
 
+    public function testImageUrlRecordsLoaderDefaultTransformer(): void
+    {
+        $inner = $this->createMock(ImageHelperInterface::class);
+        $inner->expects(self::exactly(3))->method('imageUrl')->willReturn('/result.webp');
+
+        $collector = new PicassoDataCollector();
+        $pipeline = new ImagePipeline(
+            new LoaderRegistry(new ServiceLocator([]), defaultTransformers: ['private_files' => 'private_glide']),
+            new TransformerRegistry(new ServiceLocator([])),
+            'filesystem',
+            'glide',
+        );
+        $decorator = new CollectingImageHelper($inner, $collector, $pipeline);
+
+        $decorator->imageUrl(path: 'contracts/42.jpg', loader: 'private_files');
+        $decorator->imageUrl(path: 'contracts/42.jpg', loader: 'private_files', transformer: 'glide');
+        $decorator->imageUrl(path: 'photo.jpg');
+
+        $collector->collect(new Request(), new Response());
+        $urls = $collector->getUrls();
+        self::assertCount(3, $urls);
+        self::assertSame('private_glide', $urls[0]->transformer, 'the loader default_transformer is recorded, like ImagePipeline::url() uses it');
+        self::assertSame('glide', $urls[1]->transformer, 'an explicit transformer overrides the loader default');
+        self::assertSame('glide', $urls[2]->transformer, 'a loader without default_transformer falls back to the global default');
+    }
+
     public function testImageDataForwardsToInnerAndRecordsResolvedRender(): void
     {
         $renderData = new ImageRenderData(
@@ -141,7 +170,7 @@ class CollectingImageHelperTest extends TestCase
         $pipeline->method('resolveLoaderName')
             ->willReturnCallback(static fn (?string $loader): string => $loader ?? 'filesystem');
         $pipeline->method('resolveTransformerName')
-            ->willReturnCallback(static fn (?string $transformer): string => $transformer ?? 'glide');
+            ->willReturnCallback(static fn (?string $transformer, ?string $loaderName = null): string => $transformer ?? 'glide');
 
         return $pipeline;
     }

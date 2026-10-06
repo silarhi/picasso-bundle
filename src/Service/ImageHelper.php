@@ -152,7 +152,7 @@ final readonly class ImageHelper implements ImageHelperInterface
             $image, $loaderName, $width, $height, $sourceWidth, $sourceHeight, $effectiveResolveMetadata,
         );
 
-        $transformerName = $this->resolveTransformerName($transformer, $loaderName);
+        $transformerName = $this->pipeline->resolveTransformerName($transformer, $loaderName);
         $imageTransformer = $this->transformerRegistry->get($transformerName);
         // A delegating loader (e.g. a chain) names the loader that loaded the image, which serves it
         $servingLoader = $image->loader ?? $loaderName;
@@ -365,16 +365,6 @@ final readonly class ImageHelper implements ImageHelperInterface
         }
 
         return [$sources, $fallbackSrc, $fallbackSrcset];
-    }
-
-    private function resolveTransformerName(?string $transformer, string $loaderName): string
-    {
-        if (null !== $transformer) {
-            return $this->pipeline->resolveTransformerName($transformer);
-        }
-
-        return $this->loaderRegistry->getDefaultTransformer($loaderName)
-            ?? $this->pipeline->resolveTransformerName(null);
     }
 
     private function resolvePlaceholderName(string|bool|null $placeholder, string $loaderName): ?string
