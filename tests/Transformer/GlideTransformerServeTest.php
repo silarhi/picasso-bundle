@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Silarhi\PicassoBundle\Tests\Transformer;
 
 use function assert;
+use function dirname;
 use function extension_loaded;
 use function in_array;
 use function is_string;
@@ -431,6 +432,50 @@ class GlideTransformerServeTest extends TestCase
         self::assertFileExists($this->tempDir . '/cache/image/glide/filesystem/photo.jpg/fm_webp,w_10.webp');
     }
 
+    public function testServeWritesWorldReadablePublicCacheVariants(): void
+    {
+        // The usual umask of PHP-FPM: Flysystem's private default (0700) is explicit, whatever the umask
+        $previousUmask = umask(0o022);
+
+        try {
+            $transformer = $this->createTransformer($this->tempDir . '/cache', publicCache: true, cachePrefix: 'image');
+            $transformer->serve(
+                $this->createLoader(__DIR__ . '/../Fixtures'),
+                'photo.jpg/fm_webp,w_10.webp',
+                $this->createSignedRequest('photo.jpg/fm_webp,w_10.webp', []),
+                ['transformer' => 'glide', 'loader' => 'filesystem'],
+            );
+        } finally {
+            umask($previousUmask);
+        }
+
+        // The web server serves these files itself, possibly as another user than PHP
+        $variant = $this->tempDir . '/cache/image/glide/filesystem/photo.jpg/fm_webp,w_10.webp';
+        self::assertSame('0644', $this->permissions($variant));
+        for ($directory = dirname($variant); $directory !== $this->tempDir . '/cache'; $directory = dirname($directory)) {
+            self::assertSame('0755', $this->permissions($directory), $directory);
+        }
+    }
+
+    public function testServeKeepsPrivateCacheDirectoriesPrivate(): void
+    {
+        $transformer = $this->createTransformer($this->tempDir . '/cache');
+        $transformer->serve(
+            $this->createLoader(__DIR__ . '/../Fixtures'),
+            'photo.jpg',
+            $this->createSignedRequest('photo.jpg', ['w' => '10', 'fm' => 'webp']),
+            ['transformer' => 'glide', 'loader' => 'filesystem'],
+        );
+
+        // Only PHP reads a cache without public_cache
+        $directories = glob($this->tempDir . '/cache/*', \GLOB_ONLYDIR);
+        self::assertIsArray($directories);
+        self::assertNotEmpty($directories);
+        foreach ($directories as $directory) {
+            self::assertSame('0700', $this->permissions($directory), $directory);
+        }
+    }
+
     public function testServeMovesADeferredMissToTheCacheOnlyWhenFlushed(): void
     {
         $writer = new DeferredCacheWriter();
@@ -740,6 +785,11 @@ class GlideTransformerServeTest extends TestCase
         $response->sendContent();
 
         return (string) ob_get_clean();
+    }
+
+    private function permissions(string $path): string
+    {
+        return sprintf('%04o', fileperms($path) & 0o777);
     }
 
     private function createTransformer(string $cache, ?FlysystemRegistry $flysystemRegistry = null, bool $publicCache = false, string $cachePrefix = '', ?DeferredCacheWriter $deferredCacheWriter = null, ?LockFactory $lockFactory = null, string $driver = 'gd', float $lockWait = 10.0): GlideTransformer

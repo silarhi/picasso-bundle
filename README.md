@@ -1225,6 +1225,8 @@ picasso:
 ```
 
 > **Note:** `public_cache: enabled: true` writes rendered files at a path your web server is expected to serve directly. Combined with a remote Flysystem cache, that only works if the underlying bucket is publicly served at the matching URL prefix (see [Serving thumbnails from a CDN](#serving-thumbnails-from-a-cdn)) — otherwise leave `public_cache` disabled and let the bundle's controller stream the cached file.
+>
+> With a local path as `cache`, `public_cache` writes world-readable variants (`0644` files, `0755` directories): the web server serves them itself, and may run as another user than PHP (shared hosting), so Flysystem's default `0700` directories would make it answer `403`. With a local Flysystem storage as `cache`, give it the same permissions (`directory_visibility: public` in flysystem-bundle).
 
 #### Serving thumbnails from a CDN
 

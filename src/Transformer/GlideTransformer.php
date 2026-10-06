@@ -22,9 +22,12 @@ use function is_array;
 use function is_scalar;
 use function is_string;
 
+use League\Flysystem\Config;
 use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemOperator;
 use League\Flysystem\Local\LocalFilesystemAdapter;
+use League\Flysystem\UnixVisibility\PortableVisibilityConverter;
+use League\Flysystem\Visibility;
 use League\Glide\Filesystem\FileNotFoundException;
 use League\Glide\Filesystem\FilesystemException;
 use League\Glide\Server;
@@ -166,6 +169,15 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         $resolvedCache = null !== $flysystemRegistry && $flysystemRegistry->has($cache)
             ? $flysystemRegistry->get($cache)
             : $cache;
+
+        if ($publicCache && is_string($resolvedCache)) {
+            // The web server serves the public cache itself, possibly as another user than PHP
+            // (shared hosting): Flysystem's default 0700 directories would make it answer 403.
+            $resolvedCache = new Filesystem(
+                new LocalFilesystemAdapter($resolvedCache, PortableVisibilityConverter::fromArray([], Visibility::PUBLIC)),
+                [Config::OPTION_VISIBILITY => Visibility::PUBLIC, Config::OPTION_DIRECTORY_VISIBILITY => Visibility::PUBLIC],
+            );
+        }
 
         $serverConfig = [
             'source' => $resolvedCache,

@@ -5,7 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.2.0] - Unreleased
+## [2.2.1] - 2026-10-06
+
+### Fixed
+
+- `public_cache` with a local `cache` path wrote its directories `0700` (Flysystem's default), so a web server running as another user than PHP (shared hosting) answered `403` on every variant once the first one was cached, and could not even read the `.htaccess` files of those directories. The variants are now written world-readable: `0644` files, `0755` directories. A cache without `public_cache`, only read by PHP, keeps the private default.
+
+## [2.2.0] - 2026-10-06
 
 ### Added
 
@@ -178,7 +184,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release.
 
-[2.2.0]: https://github.com/silarhi/picasso-bundle/compare/v2.1.0...HEAD
+[2.2.1]: https://github.com/silarhi/picasso-bundle/compare/v2.2.0...v2.2.1
+[2.2.0]: https://github.com/silarhi/picasso-bundle/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/silarhi/picasso-bundle/compare/v2.0.1...v2.1.0
 [2.0.1]: https://github.com/silarhi/picasso-bundle/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/silarhi/picasso-bundle/compare/v1.3.2...v2.0.0
