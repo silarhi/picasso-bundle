@@ -1,8 +1,8 @@
 {
     "devDependencies": {
-        "husky": ">=6",
-        "lint-staged": ">=10",
-        "prettier": "^3.8.1"
+        "husky": ">=9",
+        "lint-staged": ">=17",
+        "prettier": "^3.9.9"
     },
     "lint-staged": {
         "*.{md,yml,yaml}": "prettier --write",
