@@ -20,11 +20,14 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 /**
  * A private loader whose images only an application route serves, through
- * ImageServer, next to a public loader served by the bundle route.
+ * ImageServer, next to a public loader served by the bundle route. The private
+ * loader has its own default_transformer (another sign key), so rendering and
+ * serving only agree when both resolve the loader's default.
  */
 class PrivateRouteKernel extends AbstractPicassoKernel
 {
     public const SIGN_KEY = 'private-route-key';
+    public const PRIVATE_SIGN_KEY = 'private-documents-key';
 
     protected function configureContainer(ContainerBuilder $container): void
     {
@@ -36,11 +39,13 @@ class PrivateRouteKernel extends AbstractPicassoKernel
 
         $container->loadFromExtension('picasso', [
             'default_loader' => 'documents',
+            'default_transformer' => 'glide',
             'loaders' => [
                 'documents' => [
                     'type' => 'filesystem',
                     'path' => dirname(__DIR__) . '/Fixtures',
                     'private' => true,
+                    'default_transformer' => 'private_glide',
                 ],
                 'public' => [
                     'type' => 'filesystem',
@@ -51,6 +56,11 @@ class PrivateRouteKernel extends AbstractPicassoKernel
                 'glide' => [
                     'sign_key' => self::SIGN_KEY,
                     'cache' => '%kernel.cache_dir%/glide',
+                ],
+                'private_glide' => [
+                    'type' => 'glide',
+                    'sign_key' => self::PRIVATE_SIGN_KEY,
+                    'cache' => '%kernel.cache_dir%/glide_private',
                 ],
             ],
             'placeholders' => [

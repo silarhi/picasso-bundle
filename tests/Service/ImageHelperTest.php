@@ -384,7 +384,8 @@ class ImageHelperTest extends TestCase
 
         $pipeline = $this->createMock(ImagePipeline::class);
         $pipeline->method('resolveLoaderName')->willReturn('filesystem');
-        $pipeline->expects(self::any())->method('resolveTransformerName')->with(null)->willReturn('glide');
+        // The pipeline resolves the loader default: ImageHelper must hand it the loader name and use its answer
+        $pipeline->expects(self::atLeastOnce())->method('resolveTransformerName')->with(null, 'filesystem')->willReturn('imgix');
         $pipeline->method('load')->willReturn(new Image(path: 'photo.jpg', stream: $stream));
         $this->metadataGuesser->method('guess')
             ->willReturn(['width' => 800, 'height' => 600, 'mimeType' => 'image/jpeg']);
@@ -409,6 +410,7 @@ class ImageHelperTest extends TestCase
         $data = $helper->imageData(src: 'photo.jpg', sizes: '100vw');
 
         self::assertNotNull($data->fallbackSrc);
+        self::assertSame('imgix', $data->transformer);
     }
 
     public function testGlobalDefaultTransformerUsedWhenLoaderHasNone(): void
@@ -434,7 +436,7 @@ class ImageHelperTest extends TestCase
 
         $pipeline = $this->createMock(ImagePipeline::class);
         $pipeline->method('resolveLoaderName')->willReturn('filesystem');
-        $pipeline->expects(self::any())->method('resolveTransformerName')->with('glide')->willReturn('glide');
+        $pipeline->expects(self::atLeastOnce())->method('resolveTransformerName')->with('glide', 'filesystem')->willReturn('glide');
         $pipeline->method('load')->willReturn(new Image(path: 'photo.jpg', stream: $stream));
         $this->metadataGuesser->method('guess')
             ->willReturn(['width' => 800, 'height' => 600, 'mimeType' => 'image/jpeg']);
@@ -459,6 +461,7 @@ class ImageHelperTest extends TestCase
         $data = $helper->imageData(src: 'photo.jpg', transformer: 'glide', sizes: '100vw');
 
         self::assertNotNull($data->fallbackSrc);
+        self::assertSame('glide', $data->transformer);
     }
 
     public function testImageDataGeneratesSourcesAndFallback(): void

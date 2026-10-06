@@ -51,7 +51,7 @@ readonly class ImagePipeline
         array $routeParameters = [],
     ): string {
         $loaderName = $this->resolveLoaderName($loader);
-        $transformerName = $this->resolveTransformerName($transformer);
+        $transformerName = $this->resolveTransformerName($transformer, $loaderName);
 
         $image = $this->loaderRegistry->get($loaderName)->load($reference);
         $imageTransformer = $this->transformerRegistry->get($transformerName);
@@ -81,7 +81,7 @@ readonly class ImagePipeline
         ?string $transformer = null,
     ): void {
         $loaderName = $this->resolveLoaderName($loader);
-        $transformerName = $this->resolveTransformerName($transformer);
+        $transformerName = $this->resolveTransformerName($transformer, $loaderName);
 
         $imageTransformer = $this->transformerRegistry->get($transformerName);
 
@@ -97,8 +97,22 @@ readonly class ImagePipeline
         return $loader ?? $this->defaultLoader ?? throw new LoaderNotFoundException('No loader specified and no default_loader configured.');
     }
 
-    public function resolveTransformerName(?string $transformer = null): string
+    /**
+     * The given transformer, else the loader's default_transformer, else the global default_transformer.
+     *
+     * Rendering, URL generation, purges and ImageServer all resolve the transformer here: Glide URLs
+     * are signed with the transformer's key, so generating and serving must pick the same one.
+     *
+     * @param string|null $loaderName Resolved name of the requested loader (see resolveLoaderName()), never
+     *                                the delegate a chain hands the image to; null skips the loader's default
+     *
+     * @throws TransformerNotFoundException When no transformer is given and none is configured by default
+     */
+    public function resolveTransformerName(?string $transformer = null, ?string $loaderName = null): string
     {
-        return $transformer ?? $this->defaultTransformer ?? throw new TransformerNotFoundException('No transformer specified and no default_transformer configured.');
+        return $transformer
+            ?? (null !== $loaderName ? $this->loaderRegistry->getDefaultTransformer($loaderName) : null)
+            ?? $this->defaultTransformer
+            ?? throw new TransformerNotFoundException('No transformer specified and no default_transformer configured.');
     }
 }
