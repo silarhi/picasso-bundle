@@ -355,6 +355,10 @@ final class PicassoBundle extends AbstractBundle
                                 ->defaultNull()
                                 ->info('PSR-17 request factory service ID for url loaders.')
                             ->end()
+                            ->arrayNode('allowed_hosts')
+                                ->scalarPrototype()->end()
+                                ->info('Hosts Glide may fetch the images of a url loader from: "example.com", or "*.example.com" for its subdomains. Empty allows any host.')
+                            ->end()
                             ->scalarNode('default_placeholder')
                                 ->defaultNull()
                                 ->info('Default placeholder name for this loader. Overrides the global default_placeholder.')
@@ -482,7 +486,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_quality: int|null,
          *     default_fit: string,
          *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int|null, quality: int|null, fit: string|null, format: string|null, components_x: int, components_y: int, driver: string, service: string|null}>,
-         *     loaders: array<string, array{enabled: bool, type: string|null, path: string|null, paths: mixed, loaders: list<string>, mapping: string|null, storage: string|null, http_client: string|null, request_factory: string|null, default_placeholder: string|null, default_transformer: string|null, url_alias: string|null, private: bool, resolve_metadata: bool|null}>,
+         *     loaders: array<string, array{enabled: bool, type: string|null, path: string|null, paths: mixed, loaders: list<string>, mapping: string|null, storage: string|null, http_client: string|null, request_factory: string|null, allowed_hosts: list<string>, default_placeholder: string|null, default_transformer: string|null, url_alias: string|null, private: bool, resolve_metadata: bool|null}>,
          *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, api_key: string|null, http_client: string|null, request_factory: string|null, stream_factory: string|null, service: string|null, url_alias: string|null, defer_cache_write: bool, lock: array{enabled: bool, factory: string, ttl: float|int, wait: float|int}, public_cache: array{enabled: bool, prefix: string}}>
          * } $config
          */
@@ -544,6 +548,10 @@ final class PicassoBundle extends AbstractBundle
                 throw new Exception\InvalidConfigurationException(sprintf('Loader "%s": the "mapping" option is only supported by vich loaders.', $name));
             }
 
+            if ([] !== $loaderConfig['allowed_hosts'] && 'url' !== $type) {
+                throw new Exception\InvalidConfigurationException(sprintf('Loader "%s": the "allowed_hosts" option is only supported by url loaders.', $name));
+            }
+
             if ([] !== $loaderConfig['loaders'] && 'chain' !== $type) {
                 throw new Exception\InvalidConfigurationException(sprintf('Loader "%s": the "loaders" option is only supported by chain loaders.', $name));
             }
@@ -600,6 +608,7 @@ final class PicassoBundle extends AbstractBundle
                         ->args([
                             service($httpClientService),
                             service($loaderConfig['request_factory'] ?? $httpClientService),
+                            $this->checkAllowedHosts($name, $loaderConfig['allowed_hosts']),
                         ])
                         ->tag('picasso.loader', $tag);
                     break;
@@ -1011,6 +1020,25 @@ final class PicassoBundle extends AbstractBundle
                 throw new Exception\InvalidConfigurationException(sprintf('Loader "%s": chain member "%s" must be a filesystem, flysystem or vich loader declared under "picasso.loaders".', $name, $loader));
             }
         }
+    }
+
+    /**
+     * Allowed hosts are host names, or "*." followed by a host name for its
+     * subdomains: a URL, a port or a bare "*" would never match.
+     *
+     * @param list<string> $hosts
+     *
+     * @return list<string> The hosts, lowercased
+     */
+    private function checkAllowedHosts(string $name, array $hosts): array
+    {
+        foreach ($hosts as $host) {
+            if (1 !== preg_match('/^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/i', $host)) {
+                throw new Exception\InvalidConfigurationException(sprintf('Loader "%s": allowed host "%s" must be a host name (e.g. "images.example.com"), or "*." followed by one for its subdomains (e.g. "*.example.com").', $name, $host));
+            }
+        }
+
+        return array_map(strtolower(...), $hosts);
     }
 
     /**

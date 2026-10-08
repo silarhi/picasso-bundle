@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - Unreleased
+
+### Added
+
+- `allowed_hosts` option on url loaders: the hosts Glide may fetch their images from (`images.example.com`, or `*.example.com` for subdomains). Empty, the default, allows any host.
+
+### Fixed
+
+- Glide now serves the images of url loaders: their URLs answered `404` (`Loader "url" does not support serving.`). The remote image is downloaded on the first request of each variant (one request, also telling whether it exists), then served from the Glide cache. Set a `sign_key` on the transformer, and `allowed_hosts` on the loader, so that your server cannot be made to fetch other URLs.
+
 ## [2.2.1] - 2026-10-06
 
 ### Fixed
@@ -184,6 +194,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release.
 
+[2.3.0]: https://github.com/silarhi/picasso-bundle/compare/v2.2.1...HEAD
 [2.2.1]: https://github.com/silarhi/picasso-bundle/compare/v2.2.0...v2.2.1
 [2.2.0]: https://github.com/silarhi/picasso-bundle/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/silarhi/picasso-bundle/compare/v2.0.1...v2.1.0
