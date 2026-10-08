@@ -15,12 +15,13 @@ namespace Silarhi\PicassoBundle\Tests\Functional;
 
 use function dirname;
 
+use Silarhi\PicassoBundle\Tests\Functional\Stub\StubUnavailableLoader;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 /**
  * Glide set up to sit behind a CDN whose origin is the cache bucket: URLs on the
  * CDN host, cache keys mirroring the URL path, misses stored after the response
- * is sent and 404s cacheable for a minute.
+ * is sent and 404s cacheable for a minute. The "down" loader's storage is unavailable.
  */
 class CdnKernel extends AbstractPicassoKernel
 {
@@ -48,6 +49,8 @@ class CdnKernel extends AbstractPicassoKernel
                 ],
             ],
         ]);
+
+        $container->register(StubUnavailableLoader::class, StubUnavailableLoader::class)->setAutoconfigured(true);
     }
 
     public function getCacheDir(): string

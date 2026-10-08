@@ -26,6 +26,7 @@ use League\Flysystem\UnableToReadFile;
 use League\Flysystem\UnableToRetrieveMetadata;
 use League\Flysystem\UnableToSetVisibility;
 use League\Flysystem\UnableToWriteFile;
+use Silarhi\PicassoBundle\Exception\ImageSourceUnavailableException;
 use Silarhi\PicassoBundle\Exception\PicassoExceptionInterface;
 
 /**
@@ -35,6 +36,11 @@ use Silarhi\PicassoBundle\Exception\PicassoExceptionInterface;
  * Bundle exceptions are translated to Flysystem ones so those libraries keep
  * their own error handling. Writes and metadata lookups are refused, and the
  * source exposes no directories: an image source is a flat path lookup.
+ *
+ * A source that cannot tell whether a file exists (ImageSourceUnavailableException)
+ * reports it as existing: Glide turns a failed existence check into "missing", a
+ * 404 that may be cached, while the read that follows tells the truth (the file,
+ * or the source's own error, kept as previous of the Flysystem exception).
  *
  * Only exception factories available in Flysystem 2 are used, as both 2.x and
  * 3.x are supported.
@@ -52,7 +58,9 @@ final readonly class ImageSourceFlysystemAdapter implements FilesystemAdapter
     {
         try {
             return $this->source->exists($path);
-        } catch (PicassoExceptionInterface $e) {
+        } catch (ImageSourceUnavailableException) {
+            return true;
+        } catch (PicassoExceptionInterface $e) { // @phpstan-ignore catch.neverThrown (custom sources may throw other bundle exceptions)
             throw UnableToCheckFileExistence::forLocation($path, $e);
         }
     }

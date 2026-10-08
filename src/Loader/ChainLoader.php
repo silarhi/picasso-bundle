@@ -18,6 +18,7 @@ use function assert;
 use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
+use Silarhi\PicassoBundle\Exception\ImageSourceUnavailableException;
 use Silarhi\PicassoBundle\Exception\InvalidImageReferenceException;
 
 use function sprintf;
@@ -31,6 +32,8 @@ use function sprintf;
  *
  * - a reference with a path goes to the first loader whose source has it, or
  *   to the first loader when none does (the URL then 404s, as with any loader);
+ *   a source that cannot tell (unavailable storage) counts as not having it,
+ *   so rendering goes on while the storage is down;
  * - a reference without a path (e.g. an entity) goes to the first loader that
  *   accepts it: vich loaders reject entities with no field using their mapping.
  *
@@ -69,7 +72,7 @@ final readonly class ChainLoader implements ImageLoaderInterface
 
             $image = new Image($image->path, $image->stream, $image->width, $image->height, $image->mimeType, $name);
 
-            if (null === $reference->path || $loader->getSource()->exists($image->path ?? '')) {
+            if (null === $reference->path || $this->holds($loader, $image->path ?? '')) {
                 return $image;
             }
 
@@ -77,5 +80,14 @@ final readonly class ChainLoader implements ImageLoaderInterface
         }
 
         return $fallback ?? throw new InvalidImageReferenceException(sprintf('No loader of chain "%s" (%s) accepts this image reference.', $this->name, implode(', ', $this->chain)));
+    }
+
+    private function holds(ServableLoaderInterface $loader, string $path): bool
+    {
+        try {
+            return $loader->getSource()->exists($path);
+        } catch (ImageSourceUnavailableException) {
+            return false;
+        }
     }
 }

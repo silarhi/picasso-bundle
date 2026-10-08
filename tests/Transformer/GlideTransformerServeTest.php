@@ -23,6 +23,8 @@ use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemAdapter;
 use League\Flysystem\FilesystemOperator;
 use League\Flysystem\Local\LocalFilesystemAdapter;
+use League\Flysystem\UnableToCheckFileExistence;
+use League\Flysystem\UnableToReadFile;
 use League\Glide\Filesystem\FilesystemException;
 use League\Glide\Signatures\SignatureFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -39,6 +41,7 @@ use RuntimeException;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
+use Silarhi\PicassoBundle\Exception\ImageSourceUnavailableException;
 use Silarhi\PicassoBundle\Exception\UndecodableImageException;
 use Silarhi\PicassoBundle\Loader\FlysystemRegistry;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
@@ -47,6 +50,7 @@ use Silarhi\PicassoBundle\Service\UrlAliases;
 use Silarhi\PicassoBundle\Source\FlysystemImageSource;
 use Silarhi\PicassoBundle\Source\ImageSourceInterface;
 use Silarhi\PicassoBundle\Source\LocalImageSource;
+use Silarhi\PicassoBundle\Tests\Source\Stub\ObjectStoreFailures;
 use Silarhi\PicassoBundle\Tests\Transformer\Stub\CountingFilesystem;
 use Silarhi\PicassoBundle\Tests\Transformer\Stub\RacyCacheAdapter;
 use Silarhi\PicassoBundle\Transformer\DeferredCacheWriter;
@@ -66,6 +70,8 @@ use Throwable;
 
 class GlideTransformerServeTest extends TestCase
 {
+    use ObjectStoreFailures;
+
     private const SIGN_KEY = 'test-secret-key';
 
     private string $tempDir;
@@ -298,6 +304,56 @@ class GlideTransformerServeTest extends TestCase
         } catch (RuntimeException $e) {
             self::assertSame($failure, $e, 'Errors that are not decoding failures must not be wrapped.');
         }
+    }
+
+    /**
+     * @return iterable<string, array{true|int|null}>
+     */
+    public static function existenceCheckProvider(): iterable
+    {
+        yield 'existence confirmed' => [true];
+        // Glide turns a failed check into "missing": the source must not report it as such
+        yield 'existence check without answer' => [null];
+        yield 'existence check answering 503' => [503];
+    }
+
+    #[DataProvider('existenceCheckProvider')]
+    public function testServeThrowsImageSourceUnavailableWhenTheSourceStorageIsDown(true|int|null $existence): void
+    {
+        $storage = self::createStub(FilesystemOperator::class);
+        true === $existence
+            ? $storage->method('fileExists')->willReturn(true)
+            : $storage->method('fileExists')->willThrowException(UnableToCheckFileExistence::forLocation('photo.jpg', self::objectStoreException($existence)));
+        $storage->method('readStream')->willThrowException(UnableToReadFile::fromLocation('photo.jpg', 'GetObject failed', self::objectStoreException(null)));
+
+        try {
+            $this->serveFromStorage($storage);
+            self::fail('A source storage that is down must not be a missing image.');
+        } catch (ImageSourceUnavailableException $e) {
+            self::assertInstanceOf(FilesystemException::class, $e->getPrevious(), 'Glide\'s exception is kept, its cause with it.');
+        }
+    }
+
+    public function testServeThrowsImageNotFoundWhenTheSourceReadFindsNothing(): void
+    {
+        // The existence check passed (e.g. an object store answering 403 to HEAD, which the AWS SDK reads as "exists")
+        $storage = self::createStub(FilesystemOperator::class);
+        $storage->method('fileExists')->willReturn(true);
+        $storage->method('readStream')->willThrowException(UnableToReadFile::fromLocation('photo.jpg', 'NoSuchKey', self::objectStoreException(404)));
+
+        $this->expectException(ImageNotFoundException::class);
+        $this->serveFromStorage($storage);
+    }
+
+    public function testServeRendersWhenOnlyTheExistenceCheckFailed(): void
+    {
+        $stream = fopen(__DIR__ . '/../Fixtures/photo.jpg', 'r');
+        self::assertIsResource($stream);
+        $storage = self::createStub(FilesystemOperator::class);
+        $storage->method('fileExists')->willThrowException(UnableToCheckFileExistence::forLocation('photo.jpg', self::objectStoreException(500)));
+        $storage->method('readStream')->willReturn($stream);
+
+        self::assertSame(200, $this->serveFromStorage($storage)->getStatusCode());
     }
 
     public function testServeRejectsAnEmptyPath(): void
@@ -793,6 +849,19 @@ class GlideTransformerServeTest extends TestCase
         $this->serveFixture($this->createTransformer($this->tempDir . '/cache'));
 
         $this->serveFixture($this->createTransformer($this->tempDir . '/cache', lockFactory: $lockFactory));
+    }
+
+    private function serveFromStorage(FilesystemOperator $storage): Response
+    {
+        $loader = self::createStub(ServableLoaderInterface::class);
+        $loader->method('getSource')->willReturn(new FlysystemImageSource($storage));
+
+        return $this->createTransformer($this->tempDir . '/cache')->serve(
+            $loader,
+            'photo.jpg',
+            $this->createSignedRequest('photo.jpg', ['w' => '10', 'fm' => 'webp']),
+            ['transformer' => 'glide', 'loader' => 'flysystem'],
+        );
     }
 
     private function serveFixture(GlideTransformer $transformer): Response

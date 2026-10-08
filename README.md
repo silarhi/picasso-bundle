@@ -1020,7 +1020,7 @@ picasso:
 
 Groups several filesystem, flysystem or vich loaders under one name, for images spread over several directories, storages or VichUploader mappings. Each image is rendered with the first loader of the chain holding it:
 
-- an image path goes to the first loader whose directory or storage has it (or to the first loader when none does: its URL then 404s, as with any loader);
+- an image path goes to the first loader whose directory or storage has it (or to the first loader when none does: its URL then 404s, as with any loader); a storage that is unavailable counts as not having it, so pages still render during its outage;
 - an entity goes to the first vich loader whose mapping one of its fields uses.
 
 ```yaml
@@ -1085,9 +1085,9 @@ A loader that hands images over to other loaders, as a chain does, returns them 
 If local transformers (like Glide) should serve your loader's images, implement `ServableLoaderInterface` instead. Its `getSource()` method returns the `ImageSourceInterface` all its originals are read from when a transformed image is requested: the loader name in the image URL is all that is needed to find the original again, so a servable loader reads from a single source. Two implementations ship with the bundle:
 
 - `LocalImageSource` reads from a local directory (paths escaping it via `..` are treated as missing).
-- `FlysystemImageSource` reads from a Flysystem storage.
+- `FlysystemImageSource` reads from a Flysystem storage. A storage that cannot be reached or answers with a transient error (`5xx`, `429`, a timeout) is not a missing file: it throws an `ImageSourceUnavailableException`, answered with a `503` (see [Error Responses](#error-responses)).
 
-Any other storage works by implementing the two methods of `ImageSourceInterface` yourself, without writing a Flysystem adapter:
+Any other storage works by implementing the two methods of `ImageSourceInterface` yourself, without writing a Flysystem adapter. Throw `ImageNotFoundException` for a missing file, and `ImageSourceUnavailableException` when the storage cannot tell right now:
 
 ```php
 use Silarhi\PicassoBundle\Attribute\AsImageLoader;
@@ -1437,6 +1437,18 @@ if ($throwable instanceof NotFoundHttpException
     // Safe to redirect to the original file
 }
 ```
+
+When the storage holding the source is unavailable (an `ImageSourceUnavailableException`: unreachable, timing out, answering `5xx` or `429`), the image may well exist: the controller, and `ImageServer::serve()`, answer a `503 Service Unavailable` instead, with `Retry-After: 30` and `Cache-Control: no-store` whatever `cache_control` says, so no CDN keeps it after the outage. It is a `ServiceUnavailableHttpException` whose previous exception is the `ImageSourceUnavailableException`. Symfony logs 5xx exceptions as `critical`; to keep an outage of your storage out of your error tracker, lower it:
+
+```yaml
+# config/packages/framework.yaml
+framework:
+    exceptions:
+        Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException:
+            log_level: warning
+```
+
+This needs Glide 3 or later: Glide 2 drops the source's exception, so such a read stays a `500` there.
 
 The controller, not the transformer, owns the `Cache-Control` of what it serves, configured under `picasso.cache_control`:
 

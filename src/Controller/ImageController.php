@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Silarhi\PicassoBundle\Controller;
 
 use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
+use Silarhi\PicassoBundle\Exception\ImageSourceUnavailableException;
 use Silarhi\PicassoBundle\Exception\LoaderNotFoundException;
 use Silarhi\PicassoBundle\Exception\TransformerNotFoundException;
 use Silarhi\PicassoBundle\Exception\UndecodableImageException;
@@ -35,6 +36,9 @@ use Throwable;
  * Serves images through local transformers (e.g. Glide) and owns the HTTP cache
  * headers of what it serves: transformers render, the controller decides how
  * long clients and CDNs may keep the result.
+ *
+ * A missing or undecodable source is a 404 (cacheable for error_max_age); a source
+ * storage that is unavailable is an uncacheable 503 with Retry-After.
  */
 final readonly class ImageController
 {
@@ -93,6 +97,8 @@ final readonly class ImageController
             ]);
         } catch (ImageNotFoundException|UndecodableImageException $e) {
             throw $this->notFound($e->getMessage(), $e);
+        } catch (ImageSourceUnavailableException $e) {
+            throw ServiceUnavailableExceptionFactory::create($e);
         } finally {
             $this->stopwatch?->stop('picasso.image_response');
         }

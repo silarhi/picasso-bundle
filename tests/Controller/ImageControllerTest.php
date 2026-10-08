@@ -18,6 +18,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Controller\ImageController;
 use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
+use Silarhi\PicassoBundle\Exception\ImageSourceUnavailableException;
 use Silarhi\PicassoBundle\Exception\UndecodableImageException;
 use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
@@ -30,6 +31,7 @@ use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 use Throwable;
 
 class ImageControllerTest extends TestCase
@@ -283,6 +285,22 @@ class ImageControllerTest extends TestCase
             self::fail('Expected a NotFoundHttpException.');
         } catch (NotFoundHttpException $e) {
             self::assertSame([], $e->getHeaders());
+        }
+    }
+
+    public function testAnUnavailableSourceIsAnUncacheable503(): void
+    {
+        $unavailable = new ImageSourceUnavailableException('Image "photo.jpg" could not be read: its storage is unavailable.');
+        // A CDN keeping the answer as long as a 404 would go on failing the image after the outage
+        $controller = $this->createControllerThrowing($unavailable, 60);
+
+        try {
+            $controller->__invoke('glide', 'filesystem', 'photo.jpg', new Request());
+            self::fail('Expected a ServiceUnavailableHttpException.');
+        } catch (ServiceUnavailableHttpException $e) {
+            self::assertSame(503, $e->getStatusCode());
+            self::assertSame($unavailable, $e->getPrevious());
+            self::assertSame(['Cache-Control' => 'no-store', 'Retry-After' => 30], $e->getHeaders());
         }
     }
 
