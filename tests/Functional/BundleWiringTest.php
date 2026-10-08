@@ -52,6 +52,9 @@ use Silarhi\PicassoBundle\Tests\Functional\Stub\StubServiceTransformer;
 use Silarhi\PicassoBundle\Transformer\DeferredCacheWriter;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 use Silarhi\PicassoBundle\Transformer\ImgixTransformer;
+
+use function sprintf;
+
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\TwigBundle\TwigBundle;
 use Symfony\Component\Config\Loader\LoaderInterface;
@@ -151,7 +154,7 @@ class BundleWiringTest extends TestCase
             ['uploads' => ['type' => 'filesystem', 'path' => '/uploads', 'enabled' => false], 'all' => ['type' => 'chain', 'loaders' => ['uploads']]],
             'Loader "all": chain member "uploads" must be a filesystem, flysystem or vich loader declared under "picasso.loaders".',
         ];
-        yield 'member that cannot tell whether it holds an image' => [
+        yield 'member that would fetch remote images to tell whether it holds one' => [
             ['url' => [], 'all' => ['type' => 'chain', 'loaders' => ['url']]],
             'Loader "all": chain member "url" must be a filesystem, flysystem or vich loader declared under "picasso.loaders".',
         ];
@@ -170,6 +173,49 @@ class BundleWiringTest extends TestCase
      */
     #[DataProvider('invalidChainProvider')]
     public function testInvalidChainLoaderIsRejected(array $loaders, string $message): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage($message);
+
+        $this->loadExtension(['loaders' => $loaders]);
+    }
+
+    public function testUrlLoaderAllowedHostsAreWired(): void
+    {
+        $container = $this->loadExtension([
+            'loaders' => [
+                'url' => [],
+                'remote' => ['type' => 'url', 'allowed_hosts' => ['Images.Example.com', '*.cdn.example.com']],
+            ],
+        ]);
+
+        self::assertSame([], $container->getDefinition('picasso.loader.url')->getArgument(2));
+        self::assertSame(['images.example.com', '*.cdn.example.com'], $container->getDefinition('picasso.loader.remote')->getArgument(2));
+    }
+
+    /**
+     * @return iterable<string, array{array<string, array<string, mixed>>, string}>
+     */
+    public static function invalidAllowedHostsProvider(): iterable
+    {
+        yield 'on another type' => [
+            ['uploads' => ['type' => 'filesystem', 'path' => '/uploads', 'allowed_hosts' => ['example.com']]],
+            'Loader "uploads": the "allowed_hosts" option is only supported by url loaders.',
+        ];
+
+        foreach (['https://example.com', 'example.com:8080', '*', '*example.com', 'images.*.example.com', '-example.com', ''] as $host) {
+            yield sprintf('"%s"', $host) => [
+                ['url' => ['allowed_hosts' => [$host]]],
+                sprintf('Loader "url": allowed host "%s" must be a host name (e.g. "images.example.com"), or "*." followed by one for its subdomains (e.g. "*.example.com").', $host),
+            ];
+        }
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $loaders
+     */
+    #[DataProvider('invalidAllowedHostsProvider')]
+    public function testInvalidAllowedHostsAreRejected(array $loaders, string $message): void
     {
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage($message);

@@ -27,6 +27,13 @@ use League\Glide\Filesystem\FilesystemException;
 use League\Glide\Signatures\SignatureFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Client\ClientExceptionInterface;
+use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\RequestFactoryInterface;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\StreamInterface;
+use Psr\Http\Message\UriInterface;
 use ReflectionProperty;
 use RuntimeException;
 use Silarhi\PicassoBundle\Dto\Image;
@@ -35,6 +42,7 @@ use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
 use Silarhi\PicassoBundle\Exception\UndecodableImageException;
 use Silarhi\PicassoBundle\Loader\FlysystemRegistry;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
+use Silarhi\PicassoBundle\Loader\UrlLoader;
 use Silarhi\PicassoBundle\Service\UrlAliases;
 use Silarhi\PicassoBundle\Source\FlysystemImageSource;
 use Silarhi\PicassoBundle\Source\ImageSourceInterface;
@@ -61,6 +69,9 @@ class GlideTransformerServeTest extends TestCase
     private const SIGN_KEY = 'test-secret-key';
 
     private string $tempDir;
+
+    /** @var list<string> URLs the url loader's HTTP client was asked for */
+    private array $remoteRequests = [];
 
     protected function setUp(): void
     {
@@ -193,6 +204,61 @@ class GlideTransformerServeTest extends TestCase
 
         self::assertSame(200, $response->getStatusCode());
         self::assertSame('image/webp', $response->headers->get('Content-Type'));
+    }
+
+    public function testServeFetchesTheRemoteImageOfAUrlLoaderOnceCached(): void
+    {
+        $transformer = $this->createTransformer($this->tempDir . '/cache');
+        $loader = $this->createUrlLoader(['https://cdn.example.com/photo.jpg' => 200]);
+
+        $url = $transformer->url(new Image(path: 'https://cdn.example.com/photo.jpg'), new ImageTransformation(width: 10, format: 'webp'), ['transformer' => 'glide', 'loader' => 'url']);
+        $miss = $this->serveRemoteUrl($transformer, $loader, $url);
+        $hit = $this->serveRemoteUrl($transformer, $loader, $url);
+
+        self::assertSame(200, $miss->getStatusCode());
+        self::assertSame('image/webp', $miss->headers->get('Content-Type'));
+        self::assertSame(200, $hit->getStatusCode());
+        // Existence and contents come from one request; a hit sends none
+        self::assertSame(['https://cdn.example.com/photo.jpg'], $this->remoteRequests);
+    }
+
+    public function testServeFetchesTheRemoteImageOfAUrlLoaderIntoThePublicCache(): void
+    {
+        $transformer = $this->createTransformer($this->tempDir . '/cache', publicCache: true);
+        $loader = $this->createUrlLoader(['https://cdn.example.com/photo.jpg' => 200]);
+
+        $url = $transformer->url(new Image(path: 'https://cdn.example.com/photo.jpg'), new ImageTransformation(width: 10, format: 'webp'), ['transformer' => 'glide', 'loader' => 'url']);
+        $response = $this->serveRemoteUrl($transformer, $loader, $url);
+
+        self::assertSame(200, $response->getStatusCode());
+        // Flysystem merges the slashes of the scheme, as web servers do when matching the URL path
+        self::assertFileExists($this->tempDir . '/cache/glide/url/https:/cdn.example.com/photo.jpg/fm_webp,w_10.webp');
+    }
+
+    public function testServeThrowsImageNotFoundForAMissingRemoteImage(): void
+    {
+        $transformer = $this->createTransformer($this->tempDir . '/cache');
+        $loader = $this->createUrlLoader(['https://cdn.example.com/missing.jpg' => 404]);
+
+        $url = $transformer->url(new Image(path: 'https://cdn.example.com/missing.jpg'), new ImageTransformation(width: 10), ['transformer' => 'glide', 'loader' => 'url']);
+
+        $this->expectException(ImageNotFoundException::class);
+        $this->serveRemoteUrl($transformer, $loader, $url);
+    }
+
+    public function testServeNeverFetchesARemoteImageOutsideTheAllowedHosts(): void
+    {
+        $transformer = $this->createTransformer($this->tempDir . '/cache');
+        $loader = $this->createUrlLoader(['http://169.254.169.254/latest/meta-data' => 200], ['images.example.com']);
+
+        $url = $transformer->url(new Image(path: 'http://169.254.169.254/latest/meta-data'), new ImageTransformation(width: 10), ['transformer' => 'glide', 'loader' => 'url']);
+
+        try {
+            $this->serveRemoteUrl($transformer, $loader, $url);
+            self::fail('A host outside the allowed hosts must not be served.');
+        } catch (ImageNotFoundException) {
+            self::assertSame([], $this->remoteRequests);
+        }
     }
 
     public function testServeThrowsImageNotFoundForPathEscapingTheSource(): void
@@ -837,6 +903,58 @@ class GlideTransformerServeTest extends TestCase
         $loader->method('getSource')->willReturn(new LocalImageSource($sourceDir));
 
         return $loader;
+    }
+
+    /**
+     * A url loader whose HTTP client answers the fixture photo, or an empty body
+     * with the given status when it is not successful.
+     *
+     * @param array<string, int> $statuses     Status by URL; other URLs are unreachable
+     * @param list<string>       $allowedHosts
+     */
+    private function createUrlLoader(array $statuses, array $allowedHosts = []): UrlLoader
+    {
+        $requestFactory = self::createStub(RequestFactoryInterface::class);
+        $requestFactory->method('createRequest')->willReturnCallback(static function (string $method, string $url): RequestInterface {
+            $uri = self::createStub(UriInterface::class);
+            $uri->method('__toString')->willReturn($url);
+            $request = self::createStub(RequestInterface::class);
+            $request->method('getUri')->willReturn($uri);
+
+            return $request;
+        });
+
+        $httpClient = self::createStub(ClientInterface::class);
+        $httpClient->method('sendRequest')->willReturnCallback(function (RequestInterface $request) use ($statuses): ResponseInterface {
+            $url = (string) $request->getUri();
+            $this->remoteRequests[] = $url;
+            $status = $statuses[$url] ?? throw new class('Could not resolve host.') extends RuntimeException implements ClientExceptionInterface {};
+
+            $stream = fopen(200 === $status ? __DIR__ . '/../Fixtures/photo.jpg' : 'php://memory', 'r');
+            assert(false !== $stream);
+            $body = self::createStub(StreamInterface::class);
+            $body->method('detach')->willReturn($stream);
+            $response = self::createStub(ResponseInterface::class);
+            $response->method('getStatusCode')->willReturn($status);
+            $response->method('getBody')->willReturn($body);
+
+            return $response;
+        });
+
+        return new UrlLoader($httpClient, $requestFactory, $allowedHosts);
+    }
+
+    /**
+     * Serve a URL the transformer minted for the "url" loader, as the image controller would route it.
+     */
+    private function serveRemoteUrl(GlideTransformer $transformer, UrlLoader $loader, string $url): Response
+    {
+        $prefix = '/picasso/glide/url/';
+        $urlPath = (string) parse_url($url, \PHP_URL_PATH);
+        self::assertStringStartsWith($prefix, $urlPath);
+        parse_str((string) parse_url($url, \PHP_URL_QUERY), $query);
+
+        return $transformer->serve($loader, rawurldecode(substr($urlPath, strlen($prefix))), new Request($query), ['transformer' => 'glide', 'loader' => 'url']);
     }
 
     private function copyFixtureToSource(string $path): void
