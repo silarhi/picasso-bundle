@@ -38,6 +38,10 @@
     Write one line of Twig. Get AVIF, WebP, responsive srcset, blur placeholders, and lazy loading — automatically.
 </p>
 
+<p align="center">
+    📖 <a href="https://picasso-bundle.silarhi.dev"><strong>Documentation</strong></a>
+</p>
+
 ---
 
 ### Before PicassoBundle
@@ -441,12 +445,12 @@ Supported formats: `avif`, `webp`, `jpg`, `jpeg`, `pjpg`, `png`, `gif`.
 
 Controls how images are resized within the target dimensions:
 
-| Fit       | Description                                                          |
-| --------- | -------------------------------------------------------------------- |
-| `contain` | Scales down to fit within the box, preserving aspect ratio (default) |
-| `cover`   | Scales to fill the box, cropping excess                              |
-| `crop`    | Crops to exact dimensions                                            |
-| `fill`    | Stretches to fill the box exactly                                    |
+| Fit       | Description                                                                      |
+| --------- | -------------------------------------------------------------------------------- |
+| `contain` | Fits inside the box, keeping the aspect ratio: one side may be shorter (default) |
+| `cover`   | Fills the box, keeping the aspect ratio, cropping the excess (same as `crop`)    |
+| `crop`    | Fills the box, keeping the aspect ratio, cropping the excess                     |
+| `fill`    | Fits inside the box, then pads it to the exact box size                          |
 
 #### `resolve_metadata`
 

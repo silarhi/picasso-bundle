@@ -1,0 +1,71 @@
+---
+title: Quick start
+description: Configure a loader and a transformer, import the routes, render a first responsive image.
+sidebar:
+    order: 2
+---
+
+import { Code, Steps } from '@astrojs/starlight/components'
+import quickStart from '../../../data/html/quick-start.html?raw'
+import stats from '../../../data/html/stats.json'
+import Flow from '@silarhi/docs-kit/components/Flow.astro'
+
+<Steps>
+
+1. **Configure** where images come from (a loader), what transforms them (a transformer), and optionally a placeholder:
+
+    ```yaml
+    # config/packages/picasso.yaml
+    picasso:
+        loaders:
+            filesystem:
+                path: '%kernel.project_dir%/public/uploads'
+        transformers:
+            glide:
+                sign_key: '%env(PICASSO_SIGN_KEY)%'
+        placeholders:
+            blur: { type: transformer } # optional: blurred preview while the image loads
+    ```
+
+    With a single loader and a single transformer, both are the defaults: no `default_loader` nor `default_transformer` to set.
+
+2. **Import the routes**, which serve the variants Glide renders:
+
+    ```yaml
+    # config/routes/picasso.yaml
+    picasso:
+        resource: '@PicassoBundle/config/routes.php'
+    ```
+
+3. **Render** an image:
+
+    ```twig
+    <twig:Picasso:Image
+        src="photo.jpg"
+        width="800"
+        height="600"
+        sizes="(max-width: 768px) 100vw, 800px"
+        alt="A beautiful landscape"
+    />
+    ```
+
+</Steps>
+
+## What you get
+
+This is the HTML the bundle renders for it, with our 2400 × 1608 sample photo as `src`. It is unedited, except for the srcsets, shortened to three candidates each:
+
+<Code code={quickStart} lang="html" title="Rendered HTML" />
+
+That single line of Twig is <strong>{stats['quick-start'].urls} signed URLs</strong>: {stats['quick-start'].widths / 3} widths in each of the 3 formats, the fallback `src` and the placeholder. The largest candidate is 2144 px wide, not 3840: at the 4:3 ratio of `width` and `height`, a 1608 px high source gives at most 2144 px, and Picasso never upscales. Nothing is rendered yet. Glide renders a variant the first time a browser asks for it, then serves it from its cache:
+
+<Flow
+    steps={[
+        { title: 'Browser', detail: 'picks one candidate of the srcset' },
+        { title: '/image/glide/…', detail: 'checks the signature', arrow: 'GET' },
+        { title: 'Glide', detail: 'renders on the first request only', accent: true },
+        { title: 'Cache', detail: 'serves every next request' },
+    ]}
+/>
+
+Next: choose the [`sizes`](/guides/responsive-images/) that match your layout, and pick a [placeholder](/guides/placeholders/).

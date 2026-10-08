@@ -1,0 +1,109 @@
+---
+title: Placeholders
+description: Show a blurred preview while an image loads, with a tiny image, a BlurHash or your own placeholder.
+sidebar:
+    order: 3
+---
+
+import PlaceholderDemo from '../../../components/PlaceholderDemo.astro'
+
+A placeholder fills the space of an image until it has loaded. The bundle inlines it as the `background-image` of the `<img>`, and removes it once the image has loaded. Pick one below and replay a slow connection:
+
+<PlaceholderDemo />
+
+Placeholders are opt-in: an image has none until you configure one.
+
+## Transformer placeholder (LQIP)
+
+A tiny version of the image (10 px by default), blurred and compressed by your transformer: Glide renders it like any other variant, Imgix on its CDN. No extra dependency, and it is the closest to the real image. It costs one more request per image, for a few hundred bytes.
+
+```yaml
+picasso:
+    default_placeholder: blur
+    placeholders:
+        blur:
+            type: transformer
+            size: 10 # tiny image width/height in px
+            blur: 5 # blur radius
+            quality: 30 # JPEG quality (1–100)
+```
+
+## BlurHash placeholder
+
+The image encoded as a [BlurHash](https://blurha.sh/), a short string of about 30 characters, decoded into a small PNG inlined in the page: no request at all, at the cost of reading the source once per image (the result is cached in the [`cache`](/reference/configuration/#cache) pool). The preview is a smooth gradient of the image's colours rather than a blurred image.
+
+```bash
+composer require kornrunner/blurhash imagine/imagine
+```
+
+```yaml
+picasso:
+    default_placeholder: blurhash
+    placeholders:
+        blurhash:
+            type: blurhash
+            components_x: 4 # horizontal components (1–9, higher = more detail)
+            components_y: 3 # vertical components (1–9, higher = more detail)
+            size: 32 # decoded placeholder image size in px
+            driver: gd # gd | imagick
+```
+
+## Which one?
+
+|                          | Transformer (LQIP)               | BlurHash                                |
+| ------------------------ | -------------------------------- | --------------------------------------- |
+| Looks like               | The image, blurred               | A gradient of its colours               |
+| Extra request per image  | One, cacheable                   | None, inlined in the HTML               |
+| Cost on the server       | A tiny render on the first visit | Reads the source once, then cached      |
+| Extra packages           | None                             | `kornrunner/blurhash`, `imagine/imagine` |
+| Works with remote images | Yes                              | Yes, but downloads the source once      |
+
+## Per image
+
+```twig
+{# The default placeholder from the config #}
+<twig:Picasso:Image src="photo.jpg" width="800" height="600" sizes="100vw" alt="Photo" />
+
+{# No placeholder for this image #}
+<twig:Picasso:Image src="icon.png" width="64" height="64" placeholder="{{ false }}" />
+
+{# Another named placeholder #}
+<twig:Picasso:Image src="hero.jpg" width="1200" height="800" placeholder="blurhash" />
+
+{# A data URI you already have, e.g. stored next to the image: no placeholder service is called #}
+<twig:Picasso:Image src="photo.jpg" width="800" height="600" placeholderData="data:image/png;base64,..." />
+```
+
+[Priority images](/guides/priority-images/) never get a placeholder: they should be on screen at once.
+
+## Your own placeholder
+
+Implement `PlaceholderInterface`, for instance to use [ThumbHash](https://evanw.github.io/thumbhash/) or a dominant colour stored with the image:
+
+```php
+use Silarhi\PicassoBundle\Attribute\AsPlaceholder;
+use Silarhi\PicassoBundle\Dto\Image;
+use Silarhi\PicassoBundle\Dto\ImageTransformation;
+use Silarhi\PicassoBundle\Placeholder\PlaceholderInterface;
+
+#[AsPlaceholder('thumbhash')]
+class ThumbHashPlaceholder implements PlaceholderInterface
+{
+    public function generate(Image $image, ImageTransformation $transformation, array $context = []): string
+    {
+        // Return a data URI (or a URL)
+        return 'data:image/png;base64,...';
+    }
+}
+```
+
+Or register an existing service:
+
+```yaml
+picasso:
+    default_placeholder: thumbhash
+    placeholders:
+        thumbhash:
+            type: service
+            service: 'App\Image\ThumbHashPlaceholder'
+```

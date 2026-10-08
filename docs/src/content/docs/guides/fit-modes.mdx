@@ -1,0 +1,51 @@
+---
+title: Fit modes
+description: How contain, cover, crop and fill place an image in the width × height you ask for, rendered side by side.
+sidebar:
+    order: 2
+---
+
+import Gallery from '@silarhi/docs-kit/components/Gallery.astro'
+import contain from '../../../assets/examples/fit-contain.jpg'
+import cover from '../../../assets/examples/fit-cover.jpg'
+import crop from '../../../assets/examples/fit-crop.jpg'
+import fill from '../../../assets/examples/fit-fill.jpg'
+import examples from '../../../data/examples.json'
+
+export const size = (fit) => `${examples.fit[fit].width} × ${examples.fit[fit].height}`
+
+When an image gets both a `width` and a `height`, `fit` decides how a source of another aspect ratio goes into that box. The same 3:2 photo, asked for as a 480 × 480 square:
+
+```twig
+<twig:Picasso:Image src="meeting.jpg" width="480" height="480" fit="contain" alt="…" />
+```
+
+<Gallery
+    frame
+    items={[
+        { src: contain, alt: 'contain: the whole photo, 480 wide and shorter than the box', label: 'contain', note: `${size('contain')}, the default` },
+        { src: cover, alt: 'cover: the box filled, the sides cropped', label: 'cover', note: `${size('cover')}, same as crop` },
+        { src: crop, alt: 'crop: the box filled, the sides cropped', label: 'crop', note: size('crop') },
+        { src: fill, alt: 'fill: the whole photo, padded with white bands', label: 'fill', note: `${size('fill')}, padded` },
+    ]}
+    caption="Rendered by Glide, the checkerboard marks the 480 × 480 box. contain returns a smaller image, fill pads it to the box."
+/>
+
+| Fit                   | Keeps the whole image | Output is exactly `width` × `height` | Use it for                                                |
+| --------------------- | --------------------- | ------------------------------------ | --------------------------------------------------------- |
+| `contain` _(default)_ | yes                   | no, one side may be shorter          | Photos in content, product shots, anything not to cut     |
+| `cover` / `crop`      | no, the excess is cut | yes                                  | Cards, avatars, grids of thumbnails of the same size      |
+| `fill`                | yes                   | yes, padded with bands               | Fixed-size slots where cropping is not an option (logos…) |
+
+## Choosing
+
+- **A grid of cards** whose images must line up: `crop`, and give every image the same `width` and `height`.
+- **An avatar**: `crop` on a square box.
+- **A photo in an article**: keep `contain`, and give only a `width` (the height follows the source ratio), so the browser reserves the right space.
+- **A logo in a fixed slot**: `fill` keeps it whole. Prefer a transparent PNG or WebP there: the bands are then transparent rather than white.
+
+Set the default for every image with [`default_fit`](/reference/configuration/#default_fit), and override it per image with the `fit` prop or the `fit` argument of [`picasso_image_url()`](/reference/twig-functions/).
+
+:::note[With Imgix]
+[Imgix](/transformers/imgix/) maps the same values to its own modes: `contain` to `clip`, `cover` and `crop` to `crop`, `fill` to `fill`, which pads like Glide does. Any other value is passed to Imgix unchanged.
+:::
