@@ -1,0 +1,92 @@
+{
+    "source": {
+        "width": 2400,
+        "height": 1608,
+        "bytes": 464756
+    },
+    "fit": {
+        "contain": {
+            "file": "fit-contain.jpg",
+            "bytes": 22245,
+            "width": 480,
+            "height": 322
+        },
+        "cover": {
+            "file": "fit-cover.jpg",
+            "bytes": 28578,
+            "width": 480,
+            "height": 480
+        },
+        "crop": {
+            "file": "fit-crop.jpg",
+            "bytes": 28578,
+            "width": 480,
+            "height": 480
+        },
+        "fill": {
+            "file": "fit-fill.jpg",
+            "bytes": 25095,
+            "width": 480,
+            "height": 480
+        }
+    },
+    "formats": {
+        "avif": {
+            "file": "format-800.avif",
+            "bytes": 37044,
+            "width": 800,
+            "height": 536
+        },
+        "webp": {
+            "file": "format-800.webp",
+            "bytes": 24344,
+            "width": 800,
+            "height": 536
+        },
+        "jpg": {
+            "file": "format-800.jpg",
+            "bytes": 45656,
+            "width": 800,
+            "height": 536
+        }
+    },
+    "srcset": {
+        "640": {
+            "file": "srcset-640.webp",
+            "bytes": 18194,
+            "width": 640,
+            "height": 429
+        },
+        "1080": {
+            "file": "srcset-1080.webp",
+            "bytes": 33760,
+            "width": 1080,
+            "height": 724
+        },
+        "1920": {
+            "file": "srcset-1920.webp",
+            "bytes": 67976,
+            "width": 1919,
+            "height": 1286
+        }
+    },
+    "full": {
+        "file": "full-1200.jpg",
+        "bytes": 80145,
+        "width": 1200,
+        "height": 800
+    },
+    "placeholders": {
+        "transformer": {
+            "file": "placeholder-transformer.jpg",
+            "bytes": 700,
+            "width": 10,
+            "height": 7,
+            "uri": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD//gA7Q1JFQVRPUjogZ2QtanBlZyB2MS4wICh1c2luZyBJSkcgSlBFRyB2ODApLCBxdWFsaXR5ID0gMzAK/9sAQwAbEhQXFBEbFxYXHhwbIChCKyglJShROj0wQmBVZWRfVV1baniZgWpxkHNbXYW1hpCeo6utq2eAvMm6pseZqKuk/9sAQwEcHh4oIyhOKytOpG5dbqSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSk/8AAEQgABwAKAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYHCAkKC//EALURAAIBAgQEAwQHBQQEAAECdwABAgMRBAUhMQYSQVEHYXETIjKBCBRCkaGxwQkjM1LwFWJy0QoWJDThJfEXGBkaJicoKSo1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoKDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uLj5OXm5+jp6vLz9PX29/j5+v/aAAwDAQACEQMRAD8Age2A5BpnkiiisLs6LH//2Q=="
+        },
+        "blurhash": {
+            "uri": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAVCAYAAAAnzezqAAAACXBIWXMAAA7EAAAOxAGVKw4bAAADVUlEQVRIiWWWYbLbRgyDP3CVvqSTW+Q2vVsvHC+J/iBXUqb20CvZkokFQVD6959fBmND2R1l0kVVUS6qEjuBRGykTbAJJSsg9IR4Xv2fEwV51urvbLgUCwMYZCMbZFRG6jukAheQf4Y+oD0reLK/QdwvPasC5M556fqB+pgaEDE/2iZsfIIGIhJRiN0A2MDnDvO5GeCEOulJLjeeK77+BtTXGIQarNWs0KWxhzMKnGhKgju5vcGfBuM9v9XcE+BABHIgFmFhxLW+/2TAUJP+vAt1/eBhwS8ANcnqA/7g+vS5Nzg52oJODquTE1gBDeBhIBQUIghKAwBRLxbsgsqJT4PI37g+qAZEPQCaQyEWaBFamAWKw8ADwIoBEYREDaC6FV3YhTNxbZydnPzWIPI31NUA6g0gQAvFQrpAqxmQuNbXjxbMyNMKSoGjgZS6Vk+LFq5N5cb5wXvhvWAHROAMqIXeALSQFsQFN4gABdf66+sBEDEsrAYwDPguw3hDJsoPtee6EJa6DQVk4EiwW02TXHcsiNUMxPUN1Hc6GpWjKZJWlwI1DBtVodywBRIlCJodKHwkXfEnA3Gh9QYxDMR1zUV6ksepWTOi06I2qkTSeIphnFJHmJHdsuRwF137k3g9LEjBFSMGJHySDkVSa0DSAKgmC4O71qyA7PpX9Ip79zoeMPXupCPGUwId+tFUohN6QMU5vn30FcHrnLHjc/0ZDOMq93dHKN0d17FAods2/ZoJ/a8mblM/3vr/czGmdZRwJHCc9bV6XPZquxSoekelmQ06G+AMi/CMs2o3dJ0hVV2eWcsHwlj4KUcPm75lBs7lrGG3d9pbnR3aoLpFhwtVEbcTvsTnA6xB2NX5Dh813KgBY2GZy7m7TgdAuXs03ILSiwK7Z0Amyk0cx6tEtdHMiLrZ6XK0wGvadFgTDYCdt3ioo2I/x0dgdBd0CTaR7YaR+7HeO2pmRmsCFVZhJ7Zm9629m4FWdXVrhdsoqt3xFtthoBJyE/Wh6jCxnyHkpKqQu32tnFbs3dfNQHA582kl91ODHNjTv66X4h8GVBsyidpUJeGXDqpt2D7+IXRYOExMZS9PF+jV2wPw/fG0WyWqejqgWnRHfJrpwWll389bI8fnMcku/gMv3uwUvd14TgAAAABJRU5ErkJggg==",
+            "bytes": 931
+        }
+    }
+}

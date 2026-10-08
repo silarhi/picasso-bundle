@@ -1,0 +1,14 @@
+{
+    "quick-start": {
+        "urls": 50,
+        "widths": 48
+    },
+    "fixed-size": {
+        "urls": 7,
+        "widths": 0
+    },
+    "priority": {
+        "urls": 49,
+        "widths": 48
+    }
+}

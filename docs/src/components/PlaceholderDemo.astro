@@ -1,0 +1,148 @@
+---
+/**
+ * Replays a slow image load with each placeholder, the way the bundle renders them: the placeholder is the
+ * background-image of the <img>, cleared once the image has loaded.
+ */
+import full from '../assets/examples/full-1200.jpg'
+import examples from '../data/examples.json'
+
+const placeholders = [
+    { id: 'none', label: 'No placeholder', uri: null, note: 'Empty box until the image arrives' },
+    {
+        id: 'transformer',
+        label: 'Transformer (LQIP)',
+        uri: examples.placeholders.transformer.uri,
+        note: `${examples.placeholders.transformer.bytes} bytes, a 10 px image blurred by the transformer`,
+    },
+    {
+        id: 'blurhash',
+        label: 'BlurHash',
+        uri: examples.placeholders.blurhash.uri,
+        note: `${examples.placeholders.blurhash.bytes} bytes once decoded, from a ~30 character hash`,
+    },
+]
+---
+
+<div class="placeholder-demo not-content" data-src={full.src}>
+    <div class="controls" role="radiogroup" aria-label="Placeholder">
+        {
+            placeholders.map((p, i) => (
+                <label>
+                    <input type="radio" name="placeholder" value={p.id} data-uri={p.uri ?? ''} data-note={p.note} checked={i === 1} />
+                    {p.label}
+                </label>
+            ))
+        }
+        <button type="button" class="replay">↻ Replay a slow load</button>
+    </div>
+    <div class="stage">
+        <img
+            src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+            alt="People meeting around a wooden table"
+            width={full.width}
+            height={full.height}
+        />
+        <span class="status">Loading…</span>
+    </div>
+    <p class="note"></p>
+</div>
+
+<script>
+    for (const demo of document.querySelectorAll<HTMLElement>('.placeholder-demo')) {
+        const img = demo.querySelector('img') as HTMLImageElement
+        const status = demo.querySelector('.status') as HTMLElement
+        const note = demo.querySelector('.note') as HTMLElement
+        let timer: number | undefined
+
+        const play = () => {
+            const choice = demo.querySelector<HTMLInputElement>('input:checked')
+            if (!choice) return
+            window.clearTimeout(timer)
+            const uri = choice.dataset.uri
+            // What the bundle's template outputs: the placeholder as background, the real image on top
+            // A transparent pixel until the image "arrives", so the browser shows the background, not a broken icon
+            img.onload = null
+            img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+            img.style.backgroundImage = uri ? `url(${uri})` : ''
+            note.textContent = choice.dataset.note ?? ''
+            status.hidden = false
+            // A slow network, simulated: the image arrives after 1.8 s
+            timer = window.setTimeout(() => {
+                img.onload = () => {
+                    img.style.backgroundImage = ''
+                    status.hidden = true
+                }
+                img.src = `${demo.dataset.src}?t=${Date.now()}`
+            }, 1800)
+        }
+
+        demo.querySelectorAll('input').forEach((input) => input.addEventListener('change', play))
+        demo.querySelector('.replay')?.addEventListener('click', play)
+        play()
+    }
+</script>
+
+<style>
+    .placeholder-demo {
+        margin-block: 1.5rem;
+    }
+    .controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem 1rem;
+        margin-bottom: 0.75rem;
+        font-size: var(--sl-text-sm);
+    }
+    .controls label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        cursor: pointer;
+    }
+    .replay {
+        margin-inline-start: auto;
+        padding: 0.35rem 0.75rem;
+        border: 1px solid var(--sl-color-gray-5);
+        border-radius: 999px;
+        background: var(--sl-color-gray-6);
+        color: var(--sl-color-white);
+        font: inherit;
+        cursor: pointer;
+    }
+    .replay:hover {
+        border-color: var(--sl-color-accent);
+    }
+    .stage {
+        position: relative;
+        border: 1px solid var(--sl-color-hairline);
+        border-radius: 0.6rem;
+        overflow: hidden;
+        background: var(--sl-color-gray-6);
+    }
+    .stage img {
+        display: block;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 3 / 2;
+        /* The inline style of the bundle's template */
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+    }
+    .status {
+        position: absolute;
+        inset-block-start: 0.75rem;
+        inset-inline-start: 0.75rem;
+        padding: 0.2rem 0.6rem;
+        border-radius: 999px;
+        background: rgb(0 0 0 / 0.55);
+        color: #fff;
+        font-size: var(--sl-text-xs);
+    }
+    .note {
+        margin-top: 0.5rem;
+        font-size: var(--sl-text-sm);
+        color: var(--sl-color-gray-3);
+    }
+</style>

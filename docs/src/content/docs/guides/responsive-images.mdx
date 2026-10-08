@@ -1,0 +1,81 @@
+---
+title: Responsive images
+description: How the sizes prop, device_sizes and image_sizes become a srcset, and how the browser picks a variant.
+sidebar:
+    order: 1
+---
+
+import { Code, Tabs, TabItem } from '@astrojs/starlight/components'
+import Gallery from '@silarhi/docs-kit/components/Gallery.astro'
+import s640 from '../../../assets/examples/srcset-640.webp'
+import s1080 from '../../../assets/examples/srcset-1080.webp'
+import s1920 from '../../../assets/examples/srcset-1920.webp'
+import examples from '../../../data/examples.json'
+import fixedSize from '../../../data/html/fixed-size.html?raw'
+
+export const kb = (width) => `${Math.round(examples.srcset[width].bytes / 1024)} KB`
+
+A responsive image lists several variants of the same image in a `srcset`, and lets the browser download the one that fits the screen. Picasso writes that list for you. The only thing it cannot guess is how wide the image is displayed in your layout: that is the `sizes` prop.
+
+## Two kinds of images
+
+<Tabs>
+<TabItem label="Fluid: with sizes">
+
+The image width depends on the viewport (full-width banner, column of a grid…). Give `sizes`, and the srcset lists every width of [`device_sizes`](/reference/configuration/#device_sizes-and-image_sizes) and `image_sizes`, up to the source width:
+
+```twig
+<twig:Picasso:Image src="photo.jpg" width="800" height="600" sizes="(max-width: 768px) 100vw, 800px" alt="…" />
+```
+
+```html
+srcset="…?w=16… 16w, …?w=32… 32w, … , …?w=1920… 1920w"
+```
+
+</TabItem>
+<TabItem label="Fixed: without sizes">
+
+The image is always displayed at the same size (avatar, logo, thumbnail). Leave `sizes` out: the srcset holds the 1x and 2x (retina) variants of `width`:
+
+```twig
+<twig:Picasso:Image src="photo.jpg" width="320" height="240" alt="…" />
+```
+
+<Code code={fixedSize} lang="html" title="Rendered HTML" />
+
+</TabItem>
+</Tabs>
+
+## What the browser picks
+
+`sizes` tells the browser how many CSS pixels the image takes, the screen density turns them into device pixels, and the browser takes the first variant at least that wide. With `sizes="(max-width: 768px) 100vw, 800px"`:
+
+<Gallery
+    minWidth="11rem"
+    items={[
+        { src: s640, alt: '640 px wide variant', label: '640w', note: `${kb(640)}: a 320 px wide phone at 2x` },
+        { src: s1080, alt: '1080 px wide variant', label: '1080w', note: `${kb(1080)}: a 360 px wide phone at 3x` },
+        { src: s1920, alt: '1920 px wide variant', label: '1920w', note: `${kb(1920)}: the 800 px column at 2x needs 1600, the next width is 1920` },
+    ]}
+    caption="WebP variants of the same source, rendered by Glide. Without a srcset, every screen would download the largest."
+/>
+
+Writing `sizes`:
+
+- Describe the **layout**, not the image: `(max-width: 768px) 100vw, 800px` reads "full width on small screens, 800 CSS pixels otherwise".
+- The first matching condition wins: list the narrow screens first.
+- An approximation is fine. Too large wastes bytes, too small blurs the image.
+- In a grid of three columns: `(max-width: 768px) 100vw, 33vw`.
+
+## Formats
+
+Each format of [`formats`](/reference/configuration/#formats) but the last becomes a `<source>`, tried in order, and the last one is the `<img>` fallback. The default `[avif, webp, jpg]` serves AVIF to browsers that support it, WebP to the others, and JPEG to the rest.
+
+Every format multiplies the variants of each image: 16 widths × 3 formats is 48 renders for a crawler fetching them all. Trimming the widths your layout never uses, or dropping WebP when you serve AVIF, cuts the [cost of a cold cache](/concepts/performance/#tuning-for-crawlers).
+
+## Avoiding layout shifts
+
+The browser reserves the space of an image from its `width` and `height` attributes, before it loads. Picasso only writes them when it knows **both**:
+
+- give both, or
+- give one, and let Picasso read the other from the source: this needs [metadata resolution](/reference/component/#metadata-resolution), on by default for filesystem loaders.

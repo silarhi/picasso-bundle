@@ -1,0 +1,30 @@
+---
+title: Priority images
+description: Load the largest image above the fold first, for a better Largest Contentful Paint.
+sidebar:
+    order: 4
+---
+
+import { Code } from '@astrojs/starlight/components'
+import priority from '../../../data/html/priority.html?raw'
+
+Images are lazy-loaded by default: the browser only fetches them when they come close to the viewport. That is right for every image but the one visible at once, often the largest element of the page, which [Largest Contentful Paint](https://web.dev/articles/lcp) measures. Mark that one `priority`:
+
+```twig
+<twig:Picasso:Image src="hero-banner.jpg" width="1920" height="1080" sizes="100vw" priority="{{ true }}" alt="Hero banner" />
+```
+
+<Code code={priority} lang="html" title="Rendered HTML" mark={['loading="eager"', 'fetchpriority="high"']} />
+
+- `loading="eager"`: fetched at once, not when scrolled to.
+- `fetchpriority="high"`: ahead of the other images and scripts of the page.
+- No placeholder, even with a default one: the image itself should be on screen as soon as possible.
+
+Use it on **one** image per page, two at most: if everything is a priority, nothing is.
+
+To fine-tune instead, set `loading` and `fetchPriority` yourself:
+
+```twig
+{# Visible at once, but not the main element #}
+<twig:Picasso:Image src="logo.png" width="200" height="80" loading="eager" alt="Logo" />
+```

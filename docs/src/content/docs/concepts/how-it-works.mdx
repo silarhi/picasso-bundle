@@ -1,0 +1,50 @@
+---
+title: How it works
+description: What happens between one line of Twig and a served variant, when a page renders and when a browser asks for an image.
+sidebar:
+    order: 1
+---
+
+import Flow from '@silarhi/docs-kit/components/Flow.astro'
+
+Picasso works in two separate moments: when your **page renders**, it only writes signed URLs; when a **browser asks for one of them**, the variant is rendered, once, then served from a cache.
+
+## When the page renders
+
+<Flow
+    steps={[
+        { title: 'Twig', detail: '<twig:Picasso:Image src="photo.jpg" …>' },
+        { title: 'Loader', detail: 'finds the source: directory, S3, entity, URL' },
+        { title: 'Metadata', detail: 'reads width × height, if needed (cached)' },
+        { title: 'Transformer', detail: 'signs one URL per width and format', accent: true },
+        { title: 'Placeholder', detail: 'tiny image or BlurHash, if any' },
+        { title: '<picture>', detail: 'sources, srcset, sizes, img' },
+    ]}
+/>
+
+1. The **[loader](/sources/filesystem/)** turns `src` (a path, an entity, a URL) into an image it knows how to read.
+2. If `width` or `height` is missing, the **metadata** of the source are read from its first bytes, and cached in the [`cache`](/reference/configuration/#cache) pool.
+3. The **[transformer](/transformers/glide/)** writes a URL for each width of the [srcset](/guides/responsive-images/) in each format. Glide signs them with `sign_key`; Imgix points them at its CDN.
+4. The **[placeholder](/guides/placeholders/)**, if any, adds a preview.
+5. Everything goes into one `<picture>`, with `loading="lazy"` unless the image is a [priority](/guides/priority-images/).
+
+No image is decoded or written at this point: a page with 30 responsive images renders in about 5 ms ([benchmarks](/concepts/performance/)).
+
+## When a browser asks for a variant
+
+With Glide, the URLs point at the bundle's route, [`/image/{transformer}/{loader}/{path}`](/reference/routes/):
+
+<Flow
+    steps={[
+        { title: 'Browser', detail: 'GET /image/glide/uploads/photo.jpg?w=640…' },
+        { title: 'Controller', detail: 'checks the signature: 404 if forged' },
+        { title: 'Glide cache', detail: 'hit: streamed as is', accent: true },
+        { title: 'Glide', detail: 'miss: reads the source, renders, stores', arrow: 'miss' },
+    ]}
+/>
+
+- The **first** request of a variant renders it: tens to hundreds of milliseconds depending on the size, format and [driver](/transformers/glide/#choosing-a-driver).
+- Every **next** request is a cache hit, about 0.1 ms on local disk, served with `Cache-Control: public, max-age=31536000, immutable`: browsers and CDNs keep it for a year.
+- The same image and transformation always give the same URL, so a thumbnail shown on several pages is rendered and downloaded once.
+
+To keep PHP out of hits entirely, put the cache in a bucket behind a CDN: [Serving from a CDN](/transformers/cdn/). With Imgix, all of this happens on Imgix's side.

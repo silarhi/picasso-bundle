@@ -1,0 +1,91 @@
+---
+title: Picasso Bundle
+description: The missing image component for Symfony. One line of Twig renders AVIF, WebP, a responsive srcset, a blur placeholder and lazy loading.
+template: splash
+hero:
+    tagline: The missing image component for Symfony, inspired by Next.js Image. Write one line of Twig, get AVIF, WebP, a responsive srcset, blur placeholders and lazy loading.
+    actions:
+        - text: Get started
+          link: /getting-started/quick-start/
+          icon: right-arrow
+        - text: View on GitHub
+          link: https://github.com/silarhi/picasso-bundle
+          icon: github
+          variant: minimal
+---
+
+import { Card, CardGrid, LinkCard, Tabs, TabItem } from '@astrojs/starlight/components'
+import Gallery from '@silarhi/docs-kit/components/Gallery.astro'
+import avif from '../../assets/examples/format-800.avif'
+import webp from '../../assets/examples/format-800.webp'
+import jpg from '../../assets/examples/format-800.jpg'
+import examples from '../../data/examples.json'
+
+export const kb = (bytes) => `${Math.round(bytes / 1024)} KB`
+
+```bash
+composer require silarhi/picasso-bundle
+```
+
+<Tabs>
+    <TabItem label="With Picasso">
+    ```twig
+    <twig:Picasso:Image src="hero.jpg" width="1920" height="1080" sizes="100vw" alt="Hero" />
+    ```
+    </TabItem>
+    <TabItem label="Without">
+    ```html
+    <!-- Written by hand… and maintained forever -->
+    <picture>
+        <source type="image/avif" srcset="/images/hero-640.avif 640w, /images/hero-1080.avif 1080w, /images/hero-1920.avif 1920w" sizes="100vw" />
+        <source type="image/webp" srcset="/images/hero-640.webp 640w, /images/hero-1080.webp 1080w, /images/hero-1920.webp 1920w" sizes="100vw" />
+        <img src="/images/hero-1080.jpg" srcset="/images/hero-640.jpg 640w, /images/hero-1080.jpg 1080w, /images/hero-1920.jpg 1920w"
+            sizes="100vw" width="1920" height="1080" loading="lazy" alt="Hero" />
+    </picture>
+    ```
+    </TabItem>
+</Tabs>
+
+## One source, every variant
+
+The same photo, 800 px wide, in the three default formats. The browser downloads the first one it supports.
+
+<Gallery
+    minWidth="12rem"
+    items={[
+        { src: avif, alt: 'AVIF variant', label: 'AVIF', note: kb(examples.formats.avif.bytes) },
+        { src: webp, alt: 'WebP variant', label: 'WebP', note: kb(examples.formats.webp.bytes) },
+        { src: jpg, alt: 'JPEG variant', label: 'JPEG', note: `${kb(examples.formats.jpg.bytes)}, the fallback` },
+    ]}
+    caption="Rendered by Glide (GD) at the default quality, 75."
+/>
+
+<CardGrid>
+    <Card title="Every format" icon="seti:image">
+        AVIF, WebP and JPEG `<source>` tags from your config: browsers pick the lightest they support.
+    </Card>
+    <Card title="Responsive srcset" icon="laptop">
+        Widths for every breakpoint, generated from the `sizes` prop. [How it works](/guides/responsive-images/)
+    </Card>
+    <Card title="Blur placeholders" icon="seti:pipeline">
+        LQIP, BlurHash or your own, shown while the image loads. [See them](/guides/placeholders/)
+    </Card>
+    <Card title="Core Web Vitals" icon="rocket">
+        Dimensions read from the source against layout shifts, one `priority` prop for the LCP image.
+    </Card>
+    <Card title="Any storage" icon="seti:folder">
+        Local directories, S3 and other Flysystem storages, VichUploader entities, remote URLs.
+    </Card>
+    <Card title="Local or CDN" icon="cloud-download">
+        Glide on your servers, Imgix, or any CDN through your own transformer.
+    </Card>
+</CardGrid>
+
+## Where to go next
+
+<CardGrid>
+    <LinkCard title="Quick start" description="A first responsive image in three steps." href="/getting-started/quick-start/" />
+    <LinkCard title="How it works" description="From one line of Twig to a served variant." href="/concepts/how-it-works/" />
+    <LinkCard title="Serving from a CDN" description="Hits never reach PHP, misses render on the fly." href="/transformers/cdn/" />
+    <LinkCard title="Private images" description="Thumbnails behind your security voters." href="/guides/private-images/" />
+</CardGrid>

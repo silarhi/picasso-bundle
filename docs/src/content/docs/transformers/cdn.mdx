@@ -1,0 +1,61 @@
+---
+title: 'Serving from a CDN'
+description: 'Keep the rendered variants in a bucket behind a CDN: hits never reach PHP, misses render on the fly.'
+sidebar:
+    order: 2
+---
+
+import Flow from '@silarhi/docs-kit/components/Flow.astro'
+
+For large catalogs, keep the rendered variants in a bucket and put a CDN in front of it, so that a thumbnail that already exists never reaches PHP. The application only handles misses, and still renders them on the fly:
+
+<Flow
+    caption="A hit: the CDN answers from its cache, or from the bucket. PHP never runs."
+    steps={[
+        { title: 'Browser', detail: 'img.example.com/image/glide/…' },
+        { title: 'CDN', detail: 'edge cache', accent: true },
+        { title: 'Bucket', detail: 'S3, R2, GCS…', arrow: 'origin', accent: true },
+    ]}
+/>
+
+<Flow
+    caption="A miss: the bucket has no such key, the CDN falls back to Symfony, which renders, stores and answers."
+    steps={[
+        { title: 'Browser' },
+        { title: 'CDN' },
+        { title: 'Bucket', detail: 'no such key', arrow: 'origin', muted: true },
+        { title: 'Symfony', detail: '/image/… renders the variant', arrow: '403 / 404', accent: true },
+        { title: 'Bucket', detail: 'stores it for the next hit', arrow: 'upload' },
+    ]}
+/>
+
+```yaml
+picasso:
+    cache_control:
+        error_max_age: 60 # let the CDN absorb repeated 404s for a minute
+    transformers:
+        glide:
+            sign_key: '%env(PICASSO_SIGN_KEY)%'
+            cache: 'thumbs.storage' # Flysystem storage of the bucket
+            base_url: 'https://img.example.com' # the CDN host
+            defer_cache_write: true # upload a miss after the response is sent
+            public_cache:
+                enabled: true
+                prefix: 'image' # the URL path before the transformer name (/image/glide/…)
+```
+
+- **`base_url`** makes every generated image URL point at the CDN: `https://img.example.com/image/glide/…`.
+- **`public_cache.prefix`** makes the cache key equal the URL path: the variant served at `/image/glide/flysystem/photo.jpg/fm_webp%2Cw_640.webp` is stored under the key `image/glide/flysystem/photo.jpg/fm_webp,w_640.webp`, which is exactly what the CDN looks up in the bucket. [URL aliases](/reference/routes/#url-aliases) appear in both alike. Set it to what comes before the transformer name in the URL path: `image` with the default [routes](/reference/routes/), or e.g. `media/image` when they are imported with a `/media` prefix.
+- **On a miss**, the application renders the variant, stores it in the bucket and returns it with `Cache-Control: public, max-age=31536000, immutable` (the `cache_control` defaults). The next request is a hit.
+- **`defer_cache_write`** keeps the upload out of the client's wait: a miss is rendered to a local temporary directory, answered from there, and moved to the bucket on `kernel.terminate`, after the client has been released (`fastcgi_finish_request()` under PHP-FPM and FrankenPHP, after the request in FrankenPHP worker mode). The directory is only created by a miss and deleted once its renders are uploaded, so only the variants of requests in flight are on local disk. A failed upload is logged, not thrown: the next request renders the variant again. It is a `warning` when the storage is unavailable (unreachable, `5xx`, `429`), an `error` otherwise. The upload still occupies the PHP worker until it completes, so size the worker pool for bursts of misses. The upload runs within the request's `max_execution_time` (it is not reset on `kernel.terminate`), so give your storage client a timeout that leaves room for it: a stalled upload would otherwise end in a fatal error after the response was sent.
+- **`cache_control.error_max_age`** makes the image controller's 404s cacheable (`Cache-Control: public, max-age=…`), so a CDN does not send every request for a missing image to the application. Without it, 404s stay uncacheable.
+
+The signature is only checked on a miss: that is all it needs to protect, since it guards the rendering, and a variant that already exists is public anyway.
+
+On the CDN side:
+
+- Use the bucket as the origin, and fall back to the application on `403`/`404` (CloudFront origin groups, a Cloudflare Worker reading R2, Fastly, or a reverse proxy such as nginx with `proxy_intercept_errors` and `error_page 403 404 = @app`). S3 answers `403` for a missing key when the reader cannot list the bucket.
+- Leave the query string (`s`) out of the cache key, but forward it to the application on a miss: it carries the signature.
+- Give hits served from the bucket a long lifetime in the CDN's cache policy (or response headers policy): the bundle does not set `Cache-Control` on the objects it stores.
+
+A variant URL never changes meaning, so its cache never needs revalidating. Changing the source file behind an unchanged path therefore needs a [purge](/guides/cache-purge/), which clears the bucket but not the CDN's edge caches. Uploads with unique file names (as VichUploaderBundle generates) never need either.
