@@ -18,6 +18,7 @@ use function is_resource;
 use League\Flysystem\FilesystemException;
 use League\Flysystem\FilesystemOperator;
 use Psr\Log\LoggerInterface;
+use Silarhi\PicassoBundle\Source\StorageFailure;
 
 use function spl_object_id;
 
@@ -35,10 +36,12 @@ use Symfony\Contracts\Service\ResetInterface;
  * carries a write over to the next request.
  *
  * A failed upload is logged, not thrown: the client already has the image, and
- * the next request for the variant renders it again. The local file is deleted
- * either way, and so is the render directory once everything in it is moved:
- * renders leave Glide's variant folders behind, and every PHP-FPM request gets a
- * directory of its own, so neither may accumulate.
+ * the next request for the variant renders it again. A transient failure (the
+ * storage unreachable, or answering 5xx, 429...: see StorageFailure) is a warning,
+ * any other an error. The local file is deleted either way, and so is the render
+ * directory once everything in it is moved: renders leave Glide's variant folders
+ * behind, and every PHP-FPM request gets a directory of its own, so neither may
+ * accumulate.
  *
  * A render lock (lock option) is released once its variant is stored: until then,
  * the requests waiting for that render would not find it in the cache storage.
@@ -83,16 +86,7 @@ final class DeferredCacheWriter implements ResetInterface
             try {
                 $this->move($from, $to, $path);
             } catch (FilesystemException $e) {
-                // Concurrent requests for the same variant all render and upload
-                // it; object stores may reject the losers. Nothing is lost when
-                // the variant is there.
-                if (!$this->isStored($to, $path)) {
-                    $this->logger?->error('Picasso could not store the rendered image "{path}" in the Glide cache: {message}', [
-                        'path' => $path,
-                        'message' => $e->getMessage(),
-                        'exception' => $e,
-                    ]);
-                }
+                $this->reportFailedMove($to, $path, $e);
             } finally {
                 try {
                     $from->delete($path);
@@ -143,6 +137,32 @@ final class DeferredCacheWriter implements ResetInterface
                 fclose($stream);
             }
         }
+    }
+
+    private function reportFailedMove(FilesystemOperator $to, string $path, FilesystemException $e): void
+    {
+        $failure = StorageFailure::of($e);
+        $context = [
+            'path' => $path,
+            'message' => $e->getMessage(),
+            'exception' => $e,
+        ];
+
+        if ($failure->transient) {
+            // Checking whether the variant is stored would only be one more call to a failing storage
+            $this->logger?->warning('Picasso could not store the rendered image "{path}" in the Glide cache, its storage is unavailable: {message}', $context);
+
+            return;
+        }
+
+        // Concurrent requests for the same variant all render and upload it; object
+        // stores may reject the losers (409, 412). Storages that do not speak HTTP
+        // give no status to recognize them by. Nothing is lost when the variant is there.
+        if ((null === $failure->status || $failure->isConflict()) && $this->isStored($to, $path)) {
+            return;
+        }
+
+        $this->logger?->error('Picasso could not store the rendered image "{path}" in the Glide cache: {message}', $context);
     }
 
     private function isStored(FilesystemOperator $storage, string $path): bool

@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - An image whose source storage is unavailable is answered with a `503 Service Unavailable`, `Retry-After: 30` and `Cache-Control: no-store`, by the image controller and by `ImageServer::serve()` (`ServiceUnavailableHttpException`, previous: the `ImageSourceUnavailableException`). Symfony logs 5xx exceptions as `critical`: lower `ServiceUnavailableHttpException` with `framework.exceptions` if an outage of your storage should not page you.
+- With `defer_cache_write`, an upload the storage refuses for being unavailable is logged as a `warning` instead of an `error`, without asking the storage whether the variant is there (one more call to a failing storage). That check is now only made for a conflicting write (`409`, `412`) or a storage that does not speak HTTP.
 
 ### Fixed
 
