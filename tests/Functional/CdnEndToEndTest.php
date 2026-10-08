@@ -15,6 +15,7 @@ namespace Silarhi\PicassoBundle\Tests\Functional;
 
 use function assert;
 
+use League\Glide\Api\Encoder;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
@@ -78,6 +79,10 @@ class CdnEndToEndTest extends KernelTestCase
 
     public function testAnUnavailableSourceIsAnUncacheable503(): void
     {
+        if (!class_exists(Encoder::class)) {
+            self::markTestSkipped('Glide 2 drops the exception of a failed source read, which stays a 500 there.');
+        }
+
         $url = $this->transformer()->url(new Image(path: 'photo.jpg'), new ImageTransformation(width: 10, format: 'webp'), ['transformer' => 'glide', 'loader' => 'down']);
         $request = Request::create($url);
 

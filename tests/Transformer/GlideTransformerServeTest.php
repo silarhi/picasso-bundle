@@ -25,6 +25,7 @@ use League\Flysystem\FilesystemOperator;
 use League\Flysystem\Local\LocalFilesystemAdapter;
 use League\Flysystem\UnableToCheckFileExistence;
 use League\Flysystem\UnableToReadFile;
+use League\Glide\Api\Encoder;
 use League\Glide\Filesystem\FilesystemException;
 use League\Glide\Signatures\SignatureFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -320,6 +321,10 @@ class GlideTransformerServeTest extends TestCase
     #[DataProvider('existenceCheckProvider')]
     public function testServeThrowsImageSourceUnavailableWhenTheSourceStorageIsDown(true|int|null $existence): void
     {
+        if (!class_exists(Encoder::class)) {
+            self::markTestSkipped('Glide 2 drops the exception of a failed source read, which stays a 500 there.');
+        }
+
         $storage = self::createStub(FilesystemOperator::class);
         true === $existence
             ? $storage->method('fileExists')->willReturn(true)
@@ -336,6 +341,10 @@ class GlideTransformerServeTest extends TestCase
 
     public function testServeThrowsImageNotFoundWhenTheSourceReadFindsNothing(): void
     {
+        if (!class_exists(Encoder::class)) {
+            self::markTestSkipped('Glide 2 drops the exception of a failed source read, which stays a 500 there.');
+        }
+
         // The existence check passed (e.g. an object store answering 403 to HEAD, which the AWS SDK reads as "exists")
         $storage = self::createStub(FilesystemOperator::class);
         $storage->method('fileExists')->willReturn(true);
