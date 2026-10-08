@@ -20,8 +20,10 @@ use League\Flysystem\UnableToDeleteDirectory;
 use League\Flysystem\UnableToDeleteFile;
 use League\Flysystem\UnableToReadFile;
 use League\Flysystem\UnableToWriteFile;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Silarhi\PicassoBundle\Tests\Source\Stub\ObjectStoreFailures;
 use Silarhi\PicassoBundle\Transformer\DeferredCacheWriter;
 use Symfony\Component\Filesystem\Filesystem as SymfonyFilesystem;
 use Symfony\Component\Lock\Exception\LockReleasingException;
@@ -29,6 +31,8 @@ use Symfony\Component\Lock\LockInterface;
 
 class DeferredCacheWriterTest extends TestCase
 {
+    use ObjectStoreFailures;
+
     private string $tempDir;
     private Filesystem $render;
     private Filesystem $cache;
@@ -194,6 +198,77 @@ class DeferredCacheWriterTest extends TestCase
 
         $writer = new DeferredCacheWriter($logger);
         $writer->defer($this->render, $broken, 'a.jpg/w_10.webp');
+        $writer->flush();
+    }
+
+    /**
+     * @return iterable<string, array{int|null}>
+     */
+    public static function unavailableStorageProvider(): iterable
+    {
+        yield 'no answer (connection refused, timeout)' => [null];
+        yield 'server error' => [500];
+        yield 'slow down' => [503];
+        yield 'too many requests' => [429];
+    }
+
+    #[DataProvider('unavailableStorageProvider')]
+    public function testAnUploadToAnUnavailableStorageIsAWarning(?int $status): void
+    {
+        $this->render->write('a.jpg/w_10.webp', 'a');
+        $down = $this->createMock(FilesystemOperator::class);
+        $down->method('writeStream')->willThrowException(UnableToWriteFile::atLocation('a.jpg/w_10.webp', 'PutObject failed', self::objectStoreException($status)));
+        // One more call to a storage that is down would only delay the next request of the worker
+        $down->expects(self::never())->method('fileExists');
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::never())->method('error');
+        $logger->expects(self::once())->method('warning')->with(self::stringContains('storage is unavailable'), self::callback(
+            static fn (array $context): bool => 'a.jpg/w_10.webp' === $context['path'] && $context['exception'] instanceof UnableToWriteFile,
+        ));
+
+        $writer = new DeferredCacheWriter($logger);
+        $writer->defer($this->render, $down, 'a.jpg/w_10.webp');
+        $writer->flush();
+
+        self::assertFalse($this->render->fileExists('a.jpg/w_10.webp'));
+    }
+
+    /**
+     * @return iterable<string, array{int}>
+     */
+    public static function conflictProvider(): iterable
+    {
+        yield 'conflict' => [409];
+        yield 'precondition failed' => [412];
+    }
+
+    #[DataProvider('conflictProvider')]
+    public function testAnUploadLosingAConcurrentWriteOfTheVariantIsNotAnError(int $status): void
+    {
+        $this->render->write('a.jpg/w_10.webp', 'a');
+        $racy = $this->createMock(FilesystemOperator::class);
+        $racy->method('writeStream')->willThrowException(UnableToWriteFile::atLocation('a.jpg/w_10.webp', 'PutObject failed', self::objectStoreException($status)));
+        $racy->expects(self::once())->method('fileExists')->with('a.jpg/w_10.webp')->willReturn(true);
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::never())->method('error');
+        $logger->expects(self::never())->method('warning');
+
+        $writer = new DeferredCacheWriter($logger);
+        $writer->defer($this->render, $racy, 'a.jpg/w_10.webp');
+        $writer->flush();
+    }
+
+    public function testAnUploadTheStorageRefusesIsAnErrorWithoutCheckingTheStorage(): void
+    {
+        $this->render->write('a.jpg/w_10.webp', 'a');
+        $denied = $this->createMock(FilesystemOperator::class);
+        $denied->method('writeStream')->willThrowException(UnableToWriteFile::atLocation('a.jpg/w_10.webp', 'AccessDenied', self::objectStoreException(403)));
+        $denied->expects(self::never())->method('fileExists');
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('error')->with(self::stringContains('could not store'));
+
+        $writer = new DeferredCacheWriter($logger);
+        $writer->defer($this->render, $denied, 'a.jpg/w_10.webp');
         $writer->flush();
     }
 

@@ -33,6 +33,7 @@ use League\Flysystem\UnableToWriteFile;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
+use Silarhi\PicassoBundle\Exception\ImageSourceUnavailableException;
 use Silarhi\PicassoBundle\Source\ImageSourceFlysystemAdapter;
 use Silarhi\PicassoBundle\Source\ImageSourceInterface;
 use Silarhi\PicassoBundle\Source\LocalImageSource;
@@ -78,6 +79,25 @@ class ImageSourceFlysystemAdapterTest extends TestCase
 
         $this->expectException(UnableToCheckFileExistence::class);
         (new ImageSourceFlysystemAdapter($source))->fileExists('photo.jpg');
+    }
+
+    public function testASourceThatCannotTellReportsTheFileAsExisting(): void
+    {
+        $unavailable = new ImageSourceUnavailableException('Storage down.');
+        $source = self::createStub(ImageSourceInterface::class);
+        $source->method('exists')->willThrowException($unavailable);
+        $source->method('readStream')->willThrowException($unavailable);
+        $adapter = new ImageSourceFlysystemAdapter($source);
+
+        // Glide would turn a failed existence check into a (cacheable) 404: the read tells the truth
+        self::assertTrue($adapter->fileExists('photo.jpg'));
+
+        try {
+            $adapter->readStream('photo.jpg');
+            self::fail('Reading from an unavailable source must fail.');
+        } catch (UnableToReadFile $e) {
+            self::assertSame($unavailable, $e->getPrevious());
+        }
     }
 
     public function testFilesystemWrapperRejectsPathTraversal(): void

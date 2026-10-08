@@ -13,6 +13,9 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Transformer;
 
+use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
+use Silarhi\PicassoBundle\Exception\ImageSourceUnavailableException;
+use Silarhi\PicassoBundle\Exception\UndecodableImageException;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -27,6 +30,10 @@ interface LocalTransformerInterface extends ImageTransformerInterface
 {
     /**
      * @param array<string, string> $context
+     *
+     * @throws ImageNotFoundException          When the source is missing or the signature is invalid (served as a 404)
+     * @throws UndecodableImageException       When the source is not a decodable image (served as a 404)
+     * @throws ImageSourceUnavailableException When the source cannot be read right now (served as an uncacheable 503)
      */
     public function serve(ServableLoaderInterface $loader, string $path, Request $request, array $context = []): Response;
 }

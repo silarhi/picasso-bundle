@@ -5,7 +5,24 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.3.0] - Unreleased
+## [2.4.0] - 2026-10-08
+
+### Added
+
+- `ImageSourceUnavailableException`, thrown by a source whose storage cannot be reached or answers with a transient error (`5xx`, `408`, `425`, `429`, a timeout, a dropped connection): the image may exist, it just cannot be read right now. `FlysystemImageSource` throws it from `readStream()` and `exists()`, telling those failures from a missing file by the HTTP client exception the object store adapter keeps as previous (AWS SDK, Guzzle, PSR-18, Symfony HttpClient). Custom sources may throw it too.
+
+### Changed
+
+- An image whose source storage is unavailable is answered with a `503 Service Unavailable`, `Retry-After: 30` and `Cache-Control: no-store`, by the image controller and by `ImageServer::serve()` (`ServiceUnavailableHttpException`, previous: the `ImageSourceUnavailableException`). Symfony logs 5xx exceptions as `critical`: lower `ServiceUnavailableHttpException` with `framework.exceptions` if an outage of your storage should not page you.
+- With `defer_cache_write`, an upload the storage refuses for being unavailable is logged as a `warning` instead of an `error`, without asking the storage whether the variant is there (one more call to a failing storage). That check is now only made for a conflicting write (`409`, `412`) or a storage that does not speak HTTP.
+
+### Fixed
+
+- An object store failing during a Glide miss (outage, `5xx`) answered a `500` (`League\Glide\Filesystem\FilesystemException: Could not read the image`), logged as `critical`, or a `404` that `error_max_age` let CDNs keep after the outage when the existence check failed. It is now the `503` above. Requires Glide 3 or later: Glide 2 drops the source's exception, so such a read stays a `500` there.
+- A source read finding nothing after the existence check passed (e.g. S3 answering `403` to the check, which the AWS SDK reads as "exists", then `404` to the read) answered a `500`; it is now a `404`.
+- A [chain](README.md#chain-loader) member whose storage is unavailable no longer fails the rendering: it counts as not holding the image.
+
+## [2.3.0] - 2026-10-08
 
 ### Added
 
@@ -194,7 +211,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release.
 
-[2.3.0]: https://github.com/silarhi/picasso-bundle/compare/v2.2.1...HEAD
+[2.4.0]: https://github.com/silarhi/picasso-bundle/compare/v2.3.0...v2.4.0
+[2.3.0]: https://github.com/silarhi/picasso-bundle/compare/v2.2.1...v2.3.0
 [2.2.1]: https://github.com/silarhi/picasso-bundle/compare/v2.2.0...v2.2.1
 [2.2.0]: https://github.com/silarhi/picasso-bundle/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/silarhi/picasso-bundle/compare/v2.0.1...v2.1.0

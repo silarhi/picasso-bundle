@@ -18,6 +18,7 @@ use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
+use Silarhi\PicassoBundle\Exception\ImageSourceUnavailableException;
 use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
 use Silarhi\PicassoBundle\Exception\UndecodableImageException;
 use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
@@ -32,6 +33,7 @@ use stdClass;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 use Throwable;
 
 class ImageServerTest extends TestCase
@@ -102,6 +104,23 @@ class ImageServerTest extends TestCase
             self::fail('A NotFoundHttpException was expected.');
         } catch (NotFoundHttpException $e) {
             self::assertSame($exception, $e->getPrevious());
+        }
+    }
+
+    public function testAnUnavailableSourceIsAnUncacheable503(): void
+    {
+        $unavailable = new ImageSourceUnavailableException('Storage down.');
+        $loader = self::createStub(ServableLoaderInterface::class);
+        $loader->method('load')->willReturn(new Image(path: 'photo.jpg'));
+        $transformer = self::createStub(LocalTransformerInterface::class);
+        $transformer->method('serve')->willThrowException($unavailable);
+
+        try {
+            $this->server(['documents' => $loader], $transformer)->serve(new Request(), 'photo.jpg', 'documents');
+            self::fail('A ServiceUnavailableHttpException was expected.');
+        } catch (ServiceUnavailableHttpException $e) {
+            self::assertSame($unavailable, $e->getPrevious());
+            self::assertSame('no-store', $e->getHeaders()['Cache-Control'] ?? null);
         }
     }
 

@@ -15,6 +15,7 @@ namespace Silarhi\PicassoBundle\Tests\Functional;
 
 use function assert;
 
+use League\Glide\Api\Encoder;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
@@ -74,6 +75,26 @@ class CdnEndToEndTest extends KernelTestCase
         self::assertSame(404, $response->getStatusCode());
         self::assertTrue($response->headers->hasCacheControlDirective('public'));
         self::assertSame('60', $response->headers->getCacheControlDirective('max-age'));
+    }
+
+    public function testAnUnavailableSourceIsAnUncacheable503(): void
+    {
+        if (!class_exists(Encoder::class)) {
+            self::markTestSkipped('Glide 2 drops the exception of a failed source read, which stays a 500 there.');
+        }
+
+        $url = $this->transformer()->url(new Image(path: 'photo.jpg'), new ImageTransformation(width: 10, format: 'webp'), ['transformer' => 'glide', 'loader' => 'down']);
+        $request = Request::create($url);
+
+        $response = $this->kernel()->handle($request);
+        $this->kernel()->terminate($request, $response);
+
+        self::assertSame(503, $response->getStatusCode());
+        self::assertSame('30', $response->headers->get('Retry-After'));
+        // The CDN must not keep it the minute it keeps a 404: the image is back once the storage is
+        self::assertTrue($response->headers->hasCacheControlDirective('no-store'));
+        self::assertFalse($response->headers->hasCacheControlDirective('public'));
+        self::assertFalse($response->headers->hasCacheControlDirective('max-age'));
     }
 
     private function transformer(): GlideTransformer

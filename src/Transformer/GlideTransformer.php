@@ -38,6 +38,7 @@ use League\Glide\Signatures\SignatureFactory;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
+use Silarhi\PicassoBundle\Exception\ImageSourceUnavailableException;
 use Silarhi\PicassoBundle\Exception\InvalidRouteException;
 use Silarhi\PicassoBundle\Exception\LoaderNotFoundException;
 use Silarhi\PicassoBundle\Exception\PurgeException;
@@ -396,6 +397,17 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         } catch (FileNotFoundException|InvalidArgumentException $e) {
             throw new ImageNotFoundException('Image not found.', $e->getCode(), previous: $e);
         } catch (FilesystemException $e) {
+            // Glide wraps a failed source read in its own exception, previous
+            // included since Glide 3 (Glide 2 drops it: the read stays a 500).
+            $sourceFailure = $this->sourceFailure($e);
+            if ($sourceFailure instanceof ImageSourceUnavailableException) {
+                throw new ImageSourceUnavailableException($sourceFailure->getMessage(), 0, $e);
+            }
+
+            if ($sourceFailure instanceof ImageNotFoundException) {
+                throw new ImageNotFoundException('Image not found.', 0, $e);
+            }
+
             // Concurrent requests for the same variant all render it and race to
             // write it; object stores may reject the losers (e.g. S3-compatible
             // storages answering 409 to a conflicting conditional write). Once
@@ -433,6 +445,20 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         }
 
         return false;
+    }
+
+    /**
+     * The source's own exception behind a Glide filesystem exception, if any.
+     */
+    private function sourceFailure(Throwable $e): ImageNotFoundException|ImageSourceUnavailableException|null
+    {
+        for ($cause = $e->getPrevious(); null !== $cause; $cause = $cause->getPrevious()) {
+            if ($cause instanceof ImageNotFoundException || $cause instanceof ImageSourceUnavailableException) {
+                return $cause;
+            }
+        }
+
+        return null;
     }
 
     private function isDecodingFailure(Throwable $e): bool

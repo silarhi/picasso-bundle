@@ -1020,7 +1020,7 @@ picasso:
 
 Groups several filesystem, flysystem or vich loaders under one name, for images spread over several directories, storages or VichUploader mappings. Each image is rendered with the first loader of the chain holding it:
 
-- an image path goes to the first loader whose directory or storage has it (or to the first loader when none does: its URL then 404s, as with any loader);
+- an image path goes to the first loader whose directory or storage has it (or to the first loader when none does: its URL then 404s, as with any loader); a storage that is unavailable counts as not having it, so pages still render during its outage;
 - an entity goes to the first vich loader whose mapping one of its fields uses.
 
 ```yaml
@@ -1085,9 +1085,9 @@ A loader that hands images over to other loaders, as a chain does, returns them 
 If local transformers (like Glide) should serve your loader's images, implement `ServableLoaderInterface` instead. Its `getSource()` method returns the `ImageSourceInterface` all its originals are read from when a transformed image is requested: the loader name in the image URL is all that is needed to find the original again, so a servable loader reads from a single source. Two implementations ship with the bundle:
 
 - `LocalImageSource` reads from a local directory (paths escaping it via `..` are treated as missing).
-- `FlysystemImageSource` reads from a Flysystem storage.
+- `FlysystemImageSource` reads from a Flysystem storage. A storage that cannot be reached or answers with a transient error (`5xx`, `429`, a timeout) is not a missing file: it throws an `ImageSourceUnavailableException`, answered with a `503` (see [Error Responses](#error-responses)).
 
-Any other storage works by implementing the two methods of `ImageSourceInterface` yourself, without writing a Flysystem adapter:
+Any other storage works by implementing the two methods of `ImageSourceInterface` yourself, without writing a Flysystem adapter. Throw `ImageNotFoundException` for a missing file, and `ImageSourceUnavailableException` when the storage cannot tell right now:
 
 ```php
 use Silarhi\PicassoBundle\Attribute\AsImageLoader;
@@ -1275,7 +1275,7 @@ picasso:
 - **`base_url`** makes every generated image URL point at the CDN: `https://img.example.com/image/glide/…`.
 - **`public_cache.prefix`** makes the cache key equal the URL path: the variant served at `/image/glide/flysystem/photo.jpg/fm_webp%2Cw_640.webp` is stored under the key `image/glide/flysystem/photo.jpg/fm_webp,w_640.webp`, which is exactly what the CDN looks up in the bucket. [URL aliases](#url-aliases) appear in both alike. Set it to what comes before the transformer name in the URL path: `image` with the default [routes](#routes), or e.g. `media/image` when they are imported with a `/media` prefix.
 - **On a miss**, the application renders the variant, stores it in the bucket and returns it with `Cache-Control: public, max-age=31536000, immutable` (the `cache_control` defaults). The next request is a hit.
-- **`defer_cache_write`** keeps the upload out of the client's wait: a miss is rendered to a local temporary directory, answered from there, and moved to the bucket on `kernel.terminate`, after the client has been released (`fastcgi_finish_request()` under PHP-FPM and FrankenPHP, after the request in FrankenPHP worker mode). The directory is only created by a miss and deleted once its renders are uploaded, so only the variants of requests in flight are on local disk. A failed upload is logged, not thrown: the next request renders the variant again. The upload still occupies the PHP worker until it completes, so size the worker pool for bursts of misses.
+- **`defer_cache_write`** keeps the upload out of the client's wait: a miss is rendered to a local temporary directory, answered from there, and moved to the bucket on `kernel.terminate`, after the client has been released (`fastcgi_finish_request()` under PHP-FPM and FrankenPHP, after the request in FrankenPHP worker mode). The directory is only created by a miss and deleted once its renders are uploaded, so only the variants of requests in flight are on local disk. A failed upload is logged, not thrown: the next request renders the variant again. It is a `warning` when the storage is unavailable (unreachable, `5xx`, `429`), an `error` otherwise. The upload still occupies the PHP worker until it completes, so size the worker pool for bursts of misses. The upload runs within the request's `max_execution_time` (it is not reset on `kernel.terminate`), so give your storage client a timeout that leaves room for it: a stalled upload would otherwise end in a fatal error after the response was sent.
 - **`cache_control.error_max_age`** makes the image controller's 404s cacheable (`Cache-Control: public, max-age=…`), so a CDN does not send every request for a missing image to the application. Without it, 404s stay uncacheable.
 
 The signature is only checked on a miss: that is all it needs to protect, since it guards the rendering, and a variant that already exists is public anyway.
@@ -1437,6 +1437,18 @@ if ($throwable instanceof NotFoundHttpException
     // Safe to redirect to the original file
 }
 ```
+
+When the storage holding the source is unavailable (an `ImageSourceUnavailableException`: unreachable, timing out, answering `5xx` or `429`), the image may well exist: the controller, and `ImageServer::serve()`, answer a `503 Service Unavailable` instead, with `Retry-After: 30` and `Cache-Control: no-store` whatever `cache_control` says, so no CDN keeps it after the outage. It is a `ServiceUnavailableHttpException` whose previous exception is the `ImageSourceUnavailableException`. Symfony logs 5xx exceptions as `critical`; to keep an outage of your storage out of your error tracker, lower it:
+
+```yaml
+# config/packages/framework.yaml
+framework:
+    exceptions:
+        Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException:
+            log_level: warning
+```
+
+This needs Glide 3 or later: Glide 2 drops the source's exception, so such a read stays a `500` there.
 
 The controller, not the transformer, owns the `Cache-Control` of what it serves, configured under `picasso.cache_control`:
 

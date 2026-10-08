@@ -16,6 +16,7 @@ namespace Silarhi\PicassoBundle\Tests\Loader;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
+use Silarhi\PicassoBundle\Exception\ImageSourceUnavailableException;
 use Silarhi\PicassoBundle\Exception\InvalidImageReferenceException;
 use Silarhi\PicassoBundle\Loader\ChainLoader;
 use Silarhi\PicassoBundle\Loader\FilesystemLoader;
@@ -53,6 +54,22 @@ class ChainLoaderTest extends TestCase
 
         self::assertSame('entities', $image->loader);
         self::assertSame('missing.jpg', $image->path);
+    }
+
+    public function testALoaderWhoseStorageIsUnavailableDoesNotHoldTheImage(): void
+    {
+        $down = self::createStub(ImageSourceInterface::class);
+        $down->method('exists')->willThrowException(new ImageSourceUnavailableException('Storage down.'));
+
+        $chain = $this->createChain([
+            'bucket' => $this->createLoader(new Image(path: 'photo.jpg'), $down),
+            'fixtures' => new FilesystemLoader(self::FIXTURES),
+        ]);
+
+        // Rendering goes on during the outage, with the next loader holding the image
+        self::assertSame('fixtures', $chain->load(new ImageReference('photo.jpg'))->loader);
+        // or the first loader accepting it, as for an image no loader holds
+        self::assertSame('bucket', $chain->load(new ImageReference('missing.jpg'))->loader);
     }
 
     public function testLoadsAnEntityWithTheFirstLoaderAcceptingIt(): void

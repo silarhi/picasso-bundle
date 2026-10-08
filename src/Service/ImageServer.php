@@ -15,8 +15,10 @@ namespace Silarhi\PicassoBundle\Service;
 
 use function is_string;
 
+use Silarhi\PicassoBundle\Controller\ServiceUnavailableExceptionFactory;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
+use Silarhi\PicassoBundle\Exception\ImageSourceUnavailableException;
 use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
 use Silarhi\PicassoBundle\Exception\UndecodableImageException;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
@@ -27,6 +29,7 @@ use function sprintf;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 
 /**
  * Serves images from the application's own routes, e.g. routes guarded by
@@ -57,8 +60,9 @@ final readonly class ImageServer
      * @param string|null           $loader      The loader the URL was generated with; null for the default one
      * @param string|null           $transformer The transformer the URL was generated with; null for the loader's default
      *
-     * @throws NotFoundHttpException         When the image is missing or cannot be decoded, or the signature does not match
-     * @throws InvalidConfigurationException When the loader cannot be served or the transformer cannot serve
+     * @throws NotFoundHttpException           When the image is missing or cannot be decoded, or the signature does not match
+     * @throws ServiceUnavailableHttpException When the image's storage is unavailable (uncacheable, with Retry-After)
+     * @throws InvalidConfigurationException   When the loader cannot be served or the transformer cannot serve
      */
     public function serve(Request $request, ImageReference|string $source, ?string $loader = null, ?string $transformer = null): Response
     {
@@ -90,6 +94,8 @@ final readonly class ImageServer
             ]);
         } catch (ImageNotFoundException|UndecodableImageException $e) {
             throw new NotFoundHttpException($e->getMessage(), $e);
+        } catch (ImageSourceUnavailableException $e) {
+            throw ServiceUnavailableExceptionFactory::create($e);
         }
 
         // Transformers answer for public images (Glide: public, a year); access to

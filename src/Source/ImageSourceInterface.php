@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Silarhi\PicassoBundle\Source;
 
 use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
+use Silarhi\PicassoBundle\Exception\ImageSourceUnavailableException;
 
 /**
  * Read access to the original images behind a servable loader.
@@ -26,6 +27,8 @@ interface ImageSourceInterface
 {
     /**
      * Whether a file exists at the given path.
+     *
+     * @throws ImageSourceUnavailableException When the source cannot tell right now (unreachable storage, transient error)
      */
     public function exists(string $path): bool;
 
@@ -34,7 +37,9 @@ interface ImageSourceInterface
      *
      * @return resource
      *
-     * @throws ImageNotFoundException When the file is missing or cannot be read
+     * @throws ImageNotFoundException          When the file is missing or cannot be read
+     * @throws ImageSourceUnavailableException When the source cannot be read right now (unreachable storage, transient
+     *                                         error): the file may exist
      */
     public function readStream(string $path);
 }
