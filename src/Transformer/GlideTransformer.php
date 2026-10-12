@@ -127,6 +127,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
     private ?string $baseUrl;
     private string $cachePrefix;
     private FilesystemOperator $cacheStorage;
+    private UrlTemplates $urlTemplates;
 
     /**
      * Local directory a miss is rendered to when cache writes are deferred. Only
@@ -164,6 +165,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         private float $lockWait = 10.0,
     ) {
         $this->signature = SignatureFactory::create($signKey);
+        $this->urlTemplates = new UrlTemplates($router);
         $this->baseUrl = null !== $baseUrl && '' !== $baseUrl ? rtrim($baseUrl, '/') : null;
         $this->cachePrefix = trim($cachePrefix, '/');
 
@@ -235,13 +237,15 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         $signature = $this->signature
             ->generateSignature($path, $glideParams);
 
-        $url = $this->router->generate('picasso_image', [
+        $routeParameters = [
             'transformer' => $this->urlAliases->transformerSegment($transformerName),
             'loader' => $this->urlAliases->loaderSegment($loaderName),
             'path' => $path,
-            ...$glideParams,
-            's' => $signature,
-        ], UrlGeneratorInterface::ABSOLUTE_PATH);
+        ];
+        // A public-cache path differs for every variant: a template would never be reused
+        $url = [] === $glideParams
+            ? $this->router->generate('picasso_image', [...$routeParameters, 's' => $signature], UrlGeneratorInterface::ABSOLUTE_PATH)
+            : $this->urlTemplates->generate('picasso_image', $routeParameters, [...$glideParams, 's' => $signature]);
 
         // The public-cache params segment is comma-separated, and Symfony's URL
         // generator leaves commas raw. Consumers that split a srcset attribute on

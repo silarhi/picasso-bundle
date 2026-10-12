@@ -15,11 +15,14 @@ namespace Silarhi\PicassoBundle\Tests\Twig\Extension;
 
 use function is_array;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\ImageRenderData;
 use Silarhi\PicassoBundle\Service\ImageHelperInterface;
 use Silarhi\PicassoBundle\Twig\Extension\PicassoExtension;
 use Twig\Environment;
+use Twig\Loader\ArrayLoader;
+use Twig\Markup;
 
 class PicassoExtensionTest extends TestCase
 {
@@ -33,6 +36,41 @@ class PicassoExtensionTest extends TestCase
         self::assertCount(2, $functions);
         self::assertSame('picasso_image_url', $functions[0]->getName());
         self::assertSame('picasso_image', $functions[1]->getName());
+    }
+
+    /**
+     * @return iterable<string, array{string|null, bool}>
+     */
+    public static function provideUrlsToEscape(): iterable
+    {
+        yield 'srcset' => ['/image/glide/fs/cat.jpg?w=320&fm=webp&s=ab 320w, /image/glide/fs/cat.jpg?w=640&fm=webp&s=cd 640w', true];
+        yield 'percent-encoded' => ['/image/glide/fs/%C3%A9t%C3%A9.jpg?fit=crop%2C50&s=ab', true];
+        yield 'already escaped' => ['/a.jpg?w=1&amp;s=2', true];
+        yield 'quote' => ['/a.jpg?alt="x"', false];
+        yield 'apostrophe' => ["/l'été.jpg", false];
+        yield 'tag' => ['/a.jpg?<script>', false];
+        yield 'non-ascii' => ['/été.jpg', false];
+        yield 'control character' => ["/a.jpg\n", false];
+        yield 'null' => [null, false];
+    }
+
+    #[DataProvider('provideUrlsToEscape')]
+    public function testEscapeUrlsGivesWhatTwigsEscaperGives(?string $urls, bool $fastPath): void
+    {
+        $env = new Environment(new ArrayLoader(['t' => '{{ urls|picasso_escape_urls }}']));
+        $env->addExtension(new PicassoExtension(self::createStub(ImageHelperInterface::class)));
+
+        $result = PicassoExtension::escapeUrls($env, $urls);
+
+        self::assertSame($fastPath, $result instanceof Markup);
+        self::assertSame(htmlspecialchars((string) $urls, \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8'), $env->render('t', ['urls' => $urls]));
+    }
+
+    public function testEscapeUrlsLeavesOtherCharsetsToTwig(): void
+    {
+        $env = new Environment(new ArrayLoader(), ['charset' => 'ISO-8859-1']);
+
+        self::assertSame('/a.jpg?w=1&s=2', PicassoExtension::escapeUrls($env, '/a.jpg?w=1&s=2'));
     }
 
     public function testPicassoImageUrlIsCallable(): void

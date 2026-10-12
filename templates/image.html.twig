@@ -17,8 +17,8 @@
 {% if data.fallbackSrc %}
     {% if data.unoptimized or data.sources is empty %}
         <img
-            src="{{ data.fallbackSrc }}"
-            {% if data.fallbackSrcset %}srcset="{{ data.fallbackSrcset }}"{% endif %}
+            src="{{ data.fallbackSrc|picasso_escape_urls }}"
+            {% if data.fallbackSrcset %}srcset="{{ data.fallbackSrcset|picasso_escape_urls }}"{% endif %}
             {% if data.sizes %}sizes="{{ data.sizes }}"{% endif %}
             {% if data.width and data.height %}width="{{ data.width }}" height="{{ data.height }}"{% endif %}
             loading="{{ data.loading }}"
@@ -32,14 +32,14 @@
             {% for source in data.sources %}
                 <source
                     type="{{ source.type }}"
-                    srcset="{{ source.srcset }}"
+                    srcset="{{ source.srcset|picasso_escape_urls }}"
                     {% if data.sizes %}sizes="{{ data.sizes }}"{% endif %}
                 />
             {% endfor %}
 
             <img
-                src="{{ data.fallbackSrc }}"
-                srcset="{{ data.fallbackSrcset }}"
+                src="{{ data.fallbackSrc|picasso_escape_urls }}"
+                srcset="{{ data.fallbackSrcset|picasso_escape_urls }}"
                 {% if data.sizes %}sizes="{{ data.sizes }}"{% endif %}
                 {% if data.width and data.height %}width="{{ data.width }}" height="{{ data.height }}"{% endif %}
                 loading="{{ data.loading }}"
