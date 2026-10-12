@@ -16,6 +16,8 @@ namespace Silarhi\PicassoBundle\Twig\Extension;
 use Silarhi\PicassoBundle\Service\ImageHelperInterface;
 use Twig\Environment;
 use Twig\Extension\AbstractExtension;
+use Twig\Markup;
+use Twig\TwigFilter;
 use Twig\TwigFunction;
 
 final class PicassoExtension extends AbstractExtension
@@ -23,6 +25,33 @@ final class PicassoExtension extends AbstractExtension
     public function __construct(
         private readonly ImageHelperInterface $imageHelper,
     ) {
+    }
+
+    public function getFilters(): array
+    {
+        return [
+            // @internal: used by @Picasso/image.html.twig
+            new TwigFilter('picasso_escape_urls', self::escapeUrls(...), ['needs_environment' => true]),
+        ];
+    }
+
+    /**
+     * HTML-escapes generated URLs (src, srcset) faster than Twig's escaper.
+     *
+     * Generated URLs are ASCII whose only HTML-special character is "&": for those,
+     * replacing "&" gives exactly what htmlspecialchars() gives, at a fraction of its
+     * cost on long srcset attributes. Anything else is returned as is, and Twig's
+     * autoescaping escapes it as usual.
+     *
+     * @internal
+     */
+    public static function escapeUrls(Environment $env, ?string $urls): Markup|string|null
+    {
+        if (null === $urls || 'UTF-8' !== $env->getCharset() || 1 === preg_match('/[^\x20\x21\x23-\x26\x28-\x3B\x3D\x3F-\x7E]/', $urls)) {
+            return $urls;
+        }
+
+        return new Markup(str_replace('&', '&amp;', $urls), 'UTF-8');
     }
 
     public function getFunctions(): array
