@@ -171,12 +171,18 @@ class GlideTransformerRouteTest extends TestCase
     }
 
     /**
-     * @return array<int|string, mixed>
+     * @return array<string, mixed>
      */
     private function query(string $url): array
     {
         $query = parse_url($url, \PHP_URL_QUERY);
-        parse_str(is_string($query) ? $query : '', $params);
+        parse_str(is_string($query) ? $query : '', $parsed);
+
+        // Glide 4.2+ declares string keys, parse_str() gives int|string ones
+        $params = [];
+        foreach ($parsed as $key => $value) {
+            $params[(string) $key] = $value;
+        }
 
         return $params;
     }
