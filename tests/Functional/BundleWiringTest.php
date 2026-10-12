@@ -279,7 +279,7 @@ class BundleWiringTest extends TestCase
         $this->bootKernel([
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -293,7 +293,7 @@ class BundleWiringTest extends TestCase
         $container = $this->bootKernel([
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -311,7 +311,7 @@ class BundleWiringTest extends TestCase
         $container = $this->bootKernel([
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -330,11 +330,11 @@ class BundleWiringTest extends TestCase
             'loaders' => [
                 'images_a' => [
                     'type' => 'filesystem',
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
                 'images_b' => [
                     'type' => 'filesystem',
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -352,7 +352,7 @@ class BundleWiringTest extends TestCase
         $container = $this->bootKernel([
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -373,7 +373,7 @@ class BundleWiringTest extends TestCase
         $container = $this->bootKernel([
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
                 'disabled_one' => [
                     'type' => 'filesystem',
@@ -506,7 +506,7 @@ class BundleWiringTest extends TestCase
         $container = $this->bootKernel([
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -556,7 +556,7 @@ class BundleWiringTest extends TestCase
         $container = $this->bootKernel([
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -576,7 +576,7 @@ class BundleWiringTest extends TestCase
         $container = $this->bootKernel([
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -601,7 +601,7 @@ class BundleWiringTest extends TestCase
         $container = $this->bootKernel([
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -628,7 +628,7 @@ class BundleWiringTest extends TestCase
         $container = $this->bootKernel([
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -655,7 +655,7 @@ class BundleWiringTest extends TestCase
         $container = $this->bootKernel([
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -680,7 +680,7 @@ class BundleWiringTest extends TestCase
         $container = $this->bootKernel([
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -704,7 +704,7 @@ class BundleWiringTest extends TestCase
         $container = $this->bootKernel([
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -730,7 +730,7 @@ class BundleWiringTest extends TestCase
         $this->bootKernel([
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -774,7 +774,7 @@ class BundleWiringTest extends TestCase
             'cache' => false,
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -794,7 +794,7 @@ class BundleWiringTest extends TestCase
             'cache' => 'cache.app',
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -815,7 +815,7 @@ class BundleWiringTest extends TestCase
             'default_placeholder' => 'blur',
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -844,7 +844,7 @@ class BundleWiringTest extends TestCase
         $container = $this->bootKernel([
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                     'default_placeholder' => 'blur',
                 ],
             ],
@@ -870,7 +870,7 @@ class BundleWiringTest extends TestCase
         $container = $this->bootKernel([
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -892,7 +892,7 @@ class BundleWiringTest extends TestCase
         $container = $this->bootKernel([
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                     'default_transformer' => 'glide',
                 ],
             ],
@@ -913,7 +913,7 @@ class BundleWiringTest extends TestCase
         $container = $this->bootKernel([
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -935,7 +935,7 @@ class BundleWiringTest extends TestCase
         $container = $this->bootKernel([
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -955,7 +955,7 @@ class BundleWiringTest extends TestCase
         $container = $this->bootKernel([
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                     'resolve_metadata' => false,
                 ],
             ],
@@ -1000,7 +1000,7 @@ class BundleWiringTest extends TestCase
             'default_loader' => 'nonexistent',
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -1020,7 +1020,7 @@ class BundleWiringTest extends TestCase
             'default_transformer' => 'nonexistent',
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -1040,7 +1040,7 @@ class BundleWiringTest extends TestCase
             'default_placeholder' => 'nonexistent',
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -1067,7 +1067,7 @@ class BundleWiringTest extends TestCase
                 'disabled_fs' => [
                     'type' => 'filesystem',
                     'enabled' => false,
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -1087,7 +1087,7 @@ class BundleWiringTest extends TestCase
             'default_transformer' => 'disabled_glide',
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -1109,7 +1109,7 @@ class BundleWiringTest extends TestCase
             'default_placeholder' => 'disabled_blur',
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [
@@ -1495,7 +1495,7 @@ class BundleWiringTestKernel extends Kernel
                 $container->register('test.flysystem.storage', \League\Flysystem\Filesystem::class)
                     ->addArgument(new \Symfony\Component\DependencyInjection\Definition(
                         \League\Flysystem\Local\LocalFilesystemAdapter::class,
-                        [dirname(__DIR__) . '/Fixtures'],
+                        [__DIR__ . '/../Fixtures'],
                     ));
             }
         });
@@ -1552,7 +1552,7 @@ class VichWiringTestKernel extends Kernel
 
     public function registerContainerConfiguration(LoaderInterface $loader): void
     {
-        $fixturesDir = dirname(__DIR__) . '/Fixtures';
+        $fixturesDir = __DIR__ . '/../Fixtures';
 
         $loader->load(static function (ContainerBuilder $container) use ($fixturesDir): void {
             $container->loadFromExtension('framework', [

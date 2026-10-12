@@ -86,7 +86,7 @@ final readonly class VichUploaderLoader implements ServableLoaderInterface
 
     public function getSource(): ImageSourceInterface
     {
-        if (null !== $this->flysystemRegistry && $this->flysystemRegistry->has($this->uploadDestination)) {
+        if ($this->flysystemRegistry instanceof FlysystemRegistry && $this->flysystemRegistry->has($this->uploadDestination)) {
             return new FlysystemImageSource($this->flysystemRegistry->get($this->uploadDestination));
         }
 

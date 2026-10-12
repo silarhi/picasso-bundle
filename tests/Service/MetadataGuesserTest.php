@@ -13,8 +13,6 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Tests\Service;
 
-use function dirname;
-
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Service\CacheKeyGenerator;
 use Silarhi\PicassoBundle\Service\MetadataGuesser;
@@ -31,7 +29,7 @@ class MetadataGuesserTest extends TestCase
 
     public function testGuessGifImage(): void
     {
-        $gif = file_get_contents(dirname(__DIR__) . '/Fixtures/pixel.gif');
+        $gif = file_get_contents(__DIR__ . '/../Fixtures/pixel.gif');
         self::assertNotFalse($gif);
         $stream = $this->createStream($gif);
 
@@ -44,7 +42,7 @@ class MetadataGuesserTest extends TestCase
 
     public function testGuessPngImage(): void
     {
-        $png = file_get_contents(dirname(__DIR__) . '/Fixtures/2x3.png');
+        $png = file_get_contents(__DIR__ . '/../Fixtures/2x3.png');
         self::assertNotFalse($png);
         $stream = $this->createStream($png);
 
@@ -57,7 +55,7 @@ class MetadataGuesserTest extends TestCase
 
     public function testGuessJpegImage(): void
     {
-        $jpeg = file_get_contents(dirname(__DIR__) . '/Fixtures/photo.jpg');
+        $jpeg = file_get_contents(__DIR__ . '/../Fixtures/photo.jpg');
         self::assertNotFalse($jpeg);
         $stream = $this->createStream($jpeg);
 
@@ -70,7 +68,7 @@ class MetadataGuesserTest extends TestCase
 
     public function testGuessJpegWithHeadersBeyondInitialReadSize(): void
     {
-        $jpeg = file_get_contents(dirname(__DIR__) . '/Fixtures/photo.jpg');
+        $jpeg = file_get_contents(__DIR__ . '/../Fixtures/photo.jpg');
         self::assertNotFalse($jpeg);
 
         // Insert two ~48KB APP1 segments after SOI so the SOF marker (which
@@ -111,7 +109,7 @@ class MetadataGuesserTest extends TestCase
         $cache->save($item);
 
         $guesser = new MetadataGuesser($cache);
-        $gif = file_get_contents(dirname(__DIR__) . '/Fixtures/pixel.gif');
+        $gif = file_get_contents(__DIR__ . '/../Fixtures/pixel.gif');
         self::assertNotFalse($gif);
 
         $result = $guesser->guess($this->createStream($gif), 'poisoned.gif');
@@ -145,7 +143,7 @@ class MetadataGuesserTest extends TestCase
 
     public function testGuessReadsFromOffset(): void
     {
-        $gif = file_get_contents(dirname(__DIR__) . '/Fixtures/pixel.gif');
+        $gif = file_get_contents(__DIR__ . '/../Fixtures/pixel.gif');
         self::assertNotFalse($gif);
         $stream = $this->createStream($gif);
 
@@ -164,7 +162,7 @@ class MetadataGuesserTest extends TestCase
         $cache = new ArrayAdapter();
         $guesser = new MetadataGuesser($cache);
 
-        $gif = file_get_contents(dirname(__DIR__) . '/Fixtures/pixel.gif');
+        $gif = file_get_contents(__DIR__ . '/../Fixtures/pixel.gif');
         self::assertNotFalse($gif);
         $stream = $this->createStream($gif);
 
@@ -187,7 +185,7 @@ class MetadataGuesserTest extends TestCase
         $cache = new ArrayAdapter();
         $guesser = new MetadataGuesser($cache);
 
-        $gif = file_get_contents(dirname(__DIR__) . '/Fixtures/pixel.gif');
+        $gif = file_get_contents(__DIR__ . '/../Fixtures/pixel.gif');
         self::assertNotFalse($gif);
         $stream = $this->createStream($gif);
 
@@ -202,7 +200,7 @@ class MetadataGuesserTest extends TestCase
 
     public function testGuessWithClosureResolvesLazily(): void
     {
-        $gif = file_get_contents(dirname(__DIR__) . '/Fixtures/pixel.gif');
+        $gif = file_get_contents(__DIR__ . '/../Fixtures/pixel.gif');
         self::assertNotFalse($gif);
 
         $invoked = false;
@@ -225,7 +223,7 @@ class MetadataGuesserTest extends TestCase
         $cache = new ArrayAdapter();
         $guesser = new MetadataGuesser($cache);
 
-        $gif = file_get_contents(dirname(__DIR__) . '/Fixtures/pixel.gif');
+        $gif = file_get_contents(__DIR__ . '/../Fixtures/pixel.gif');
         self::assertNotFalse($gif);
 
         // First call: populates cache with a real stream
@@ -249,7 +247,7 @@ class MetadataGuesserTest extends TestCase
 
     public function testGuessWithClosureReturningNullReturnsNulls(): void
     {
-        $result = $this->guesser->guess(static fn () => null);
+        $result = $this->guesser->guess(static fn (): null => null);
 
         self::assertNull($result['width']);
         self::assertNull($result['height']);

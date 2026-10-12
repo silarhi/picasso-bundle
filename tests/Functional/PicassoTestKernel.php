@@ -13,8 +13,6 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Tests\Functional;
 
-use function dirname;
-
 use Silarhi\PicassoBundle\PicassoBundle;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\TwigBundle\TwigBundle;
@@ -36,7 +34,7 @@ class PicassoTestKernel extends AbstractPicassoKernel
         $container->loadFromExtension('picasso', [
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [

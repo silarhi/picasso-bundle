@@ -24,7 +24,7 @@ class PublicCacheKernel extends AbstractPicassoKernel
         $container->loadFromExtension('picasso', [
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [

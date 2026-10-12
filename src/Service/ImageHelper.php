@@ -318,8 +318,8 @@ final readonly class ImageHelper implements ImageHelperInterface
         ?int $quality,
         ?string $fit,
     ): array {
-        $quality = $quality ?? $this->defaultQuality;
-        $fit = $fit ?? $this->defaultFit;
+        $quality ??= $this->defaultQuality;
+        $fit ??= $this->defaultFit;
         $formats = $this->formats;
         $fallbackFormat = false !== end($formats) ? end($formats) : 'jpg';
 

@@ -14,9 +14,6 @@ declare(strict_types=1);
 namespace Silarhi\PicassoBundle\Tests\Loader;
 
 use Closure;
-
-use function dirname;
-
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Loader\FilesystemLoader;
@@ -27,7 +24,7 @@ class FilesystemLoaderTest extends TestCase
 
     public static function setUpBeforeClass(): void
     {
-        self::$fixturesDir = dirname(__DIR__) . '/Fixtures';
+        self::$fixturesDir = __DIR__ . '/../Fixtures';
     }
 
     public function testLoadStripsLeadingSlash(): void

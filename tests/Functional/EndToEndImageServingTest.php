@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace Silarhi\PicassoBundle\Tests\Functional;
 
 use function assert;
-use function dirname;
 
 use League\Glide\Signatures\SignatureFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -277,7 +276,7 @@ class EndToEndImageServingTest extends KernelTestCase
     public function test1xUrlRedirectsToTheLoaderReadingItsRoot(string $loader): void
     {
         self::bootKernel();
-        $token = LegacyMetadataToken::mint('full-test-key', ['path' => dirname(__DIR__) . '/Fixtures']);
+        $token = LegacyMetadataToken::mint('full-test-key', ['path' => __DIR__ . '/../Fixtures']);
 
         [$response, $deprecations] = self::collectDeprecations(fn (): Response => $this->handleRequest($this->sign1xUrl($loader, 'photo.jpg', ['w' => '10', '_metadata' => $token])));
 
@@ -300,7 +299,7 @@ class EndToEndImageServingTest extends KernelTestCase
     public function test1xUrlWithAForgedSignatureIsNotFound(): void
     {
         self::bootKernel();
-        $token = LegacyMetadataToken::mint('full-test-key', ['path' => dirname(__DIR__) . '/Fixtures']);
+        $token = LegacyMetadataToken::mint('full-test-key', ['path' => __DIR__ . '/../Fixtures']);
 
         self::assertSame(404, $this->handleRequest('/image/local_glide/main/photo.jpg?' . http_build_query(['w' => '10', '_metadata' => $token, 's' => 'forged']))->getStatusCode());
     }
