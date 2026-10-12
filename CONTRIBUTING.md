@@ -1,0 +1,68 @@
+# Contributing
+
+Contributions are welcome! Bug reports and feature requests go to the
+[issue tracker](https://github.com/silarhi/picasso-bundle/issues), changes to a pull request against `main`.
+
+## Setup
+
+```bash
+composer install
+yarn install # Git hooks: lint-staged formats the staged files on commit
+```
+
+## Quality checks
+
+The CI runs them all, on every supported PHP and Symfony version:
+
+```bash
+# Tests
+vendor/bin/phpunit
+
+# Static analysis (level: max)
+vendor/bin/phpstan analyse
+
+# Code style (drop --dry-run --diff to fix)
+vendor/bin/php-cs-fixer fix --dry-run --diff
+
+# Twig code style (add --fix to fix)
+vendor/bin/twig-cs-fixer lint
+
+# Code modernization (drop --dry-run to apply)
+vendor/bin/rector process --dry-run
+
+# composer.json
+composer validate --strict
+composer normalize --dry-run
+```
+
+The Glide `vips` driver tests skip unless `intervention/image-driver-vips` is installed, with libvips and `ext-ffi`.
+
+## Benchmarks
+
+Changes on the rendering or serving path should keep the numbers of the
+[performance page](https://picasso-bundle.silarhi.dev/concepts/performance/):
+
+```bash
+XDEBUG_MODE=off php -d opcache.enable_cli=1 benchmarks/run.php            # every scenario, ~5 minutes
+XDEBUG_MODE=off php -d opcache.enable_cli=1 benchmarks/run.php hit herd   # some of: render hit notfound miss crawl herd memory
+```
+
+## Documentation
+
+The documentation site, [picasso-bundle.silarhi.dev](https://picasso-bundle.silarhi.dev), is built from the
+[`docs/`](docs) folder with [Starlight](https://starlight.astro.build). Document a change in the same pull request:
+
+```bash
+cd docs
+yarn install
+yarn dev # http://localhost:4321
+```
+
+The example images and HTML are rendered by the bundle itself: run `php docs/scripts/render-examples.php` and
+`php docs/scripts/render-html.php` after changing a transformation or the rendered markup, and commit their output.
+
+Pull requests touching `docs/` build the site; it is published once merged into `main`.
+
+## License
+
+By contributing, you agree that your contributions are released under the [MIT License](LICENSE).
