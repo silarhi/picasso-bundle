@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - Unreleased
+
+### Changed
+
+- Rendering is about 30% faster: a responsive image (42 URLs) takes 113 µs instead of 170 µs, a Twig page with 30 of them 4.2 ms instead of 5.5 ms ([Performance](README.md#performance), Linux; about 40% on macOS). Glide asks the router once per image and set of query keys, with placeholder values, then fills in the width, format and signature of the next URLs; a value the router would encode, a change of request context (worker mode) or a public-cache URL still go through the router. `image.html.twig` escapes the generated `src` and `srcset` with the `@internal` `picasso_escape_urls` filter, which gives what Twig's escaper gives for URLs at a fraction of its cost; templates overriding `image.html.twig` keep working, without that part of the gain.
+
 ## [2.4.0] - 2026-10-08
 
 ### Added

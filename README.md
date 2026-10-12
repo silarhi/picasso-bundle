@@ -1555,11 +1555,11 @@ Numbers from `benchmarks/run.php` in the official `php:8.4-cli-alpine` image ([`
 
 | Operation                                        | Time   |
 | ------------------------------------------------ | ------ |
-| One URL (`picasso_image_url()`)                  | 6.0 µs |
-| Image with fixed width and height (7 URLs)       | 35 µs  |
-| Responsive image, `sizes` set (42 URLs)          | 170 µs |
-| Responsive image + `resolveMetadata` (PSR-6 hit) | 166 µs |
-| Twig page with 30 responsive images              | 5.5 ms |
+| One URL (`picasso_image_url()`)                  | 4.2 µs |
+| Image with fixed width and height (7 URLs)       | 27 µs  |
+| Responsive image, `sizes` set (42 URLs)          | 113 µs |
+| Responsive image + `resolveMetadata` (PSR-6 hit) | 111 µs |
+| Twig page with 30 responsive images              | 4.2 ms |
 
 Rendering never touches the cache storage: a crawler fetching HTML pages costs URL signing (plus one `stat()` per image with the filesystem loader).
 
