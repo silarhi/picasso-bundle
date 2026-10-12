@@ -121,7 +121,12 @@ class PrivateRouteEndToEndTest extends KernelTestCase
         // ImageServer validates with the loader's default_transformer (private_glide), so
         // picasso_image_url() must sign with it too, not with the global default (glide)
         $url = trim($this->render("{{ picasso_image_url('photo.jpg', width=32, route='portal_document_image', routeParameters={tenant: 'acme', id: 42}) }}"));
-        parse_str((string) parse_url(html_entity_decode($url), \PHP_URL_QUERY), $query);
+        parse_str((string) parse_url(html_entity_decode($url), \PHP_URL_QUERY), $parsed);
+        // Glide 4.2+ declares string keys, parse_str() gives int|string ones
+        $query = [];
+        foreach ($parsed as $key => $value) {
+            $query[(string) $key] = $value;
+        }
         $signature = $query['s'] ?? null;
         unset($query['s'], $query['tenant'], $query['id']);
 

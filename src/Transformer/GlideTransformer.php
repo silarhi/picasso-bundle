@@ -293,7 +293,14 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         $url = $this->router->generate($route, [...$routeParameters, ...$glideParams], UrlGeneratorInterface::ABSOLUTE_PATH);
 
         $query = parse_url($url, \PHP_URL_QUERY);
-        parse_str(is_string($query) ? $query : '', $params);
+        parse_str(is_string($query) ? $query : '', $parsed);
+
+        // Glide 4.2+ declares string keys, parse_str() gives int|string ones ("?0=a"). Every parameter is kept, since
+        // serve() validates the whole request query; the cast is a no-op at runtime (PHP stores numeric keys as ints).
+        $params = [];
+        foreach ($parsed as $key => $value) {
+            $params[(string) $key] = $value;
+        }
 
         return $url . (is_string($query) ? '&' : '?') . http_build_query(['s' => $this->signature->generateSignature($path, $params)]);
     }
