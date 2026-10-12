@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Silarhi\PicassoBundle\Tests\Controller;
 
 use function assert;
+use function dirname;
 use function is_string;
 
 use League\Glide\Signatures\SignatureFactory;
@@ -125,6 +126,6 @@ class LegacyUrlControllerTest extends TestCase
             return '/image/' . $params['transformer'] . '/' . $params['loader'] . '/' . $params['path'];
         });
 
-        return new GlideTransformer($router, new UrlAliases([], []), self::SIGN_KEY, sys_get_temp_dir() . '/picasso-legacy-url-test', 'gd', null, false);
+        return new GlideTransformer($router, new UrlAliases([], []), self::SIGN_KEY, dirname(__DIR__, 2) . '/var/test/legacy_url', 'gd', null, false);
     }
 }

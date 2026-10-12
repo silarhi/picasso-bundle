@@ -1522,12 +1522,12 @@ class BundleWiringTestKernel extends Kernel
 
     public function getCacheDir(): string
     {
-        return sys_get_temp_dir() . '/picasso_wiring_test/cache/' . $this->environment;
+        return dirname(__DIR__, 2) . '/var/test/wiring/cache/' . $this->environment;
     }
 
     public function getLogDir(): string
     {
-        return sys_get_temp_dir() . '/picasso_wiring_test/log';
+        return dirname(__DIR__, 2) . '/var/test/wiring/log';
     }
 }
 
@@ -1631,11 +1631,11 @@ class VichWiringTestKernel extends Kernel
 
     public function getCacheDir(): string
     {
-        return sys_get_temp_dir() . '/picasso_vich_test/cache/' . $this->environment;
+        return dirname(__DIR__, 2) . '/var/test/vich/cache/' . $this->environment;
     }
 
     public function getLogDir(): string
     {
-        return sys_get_temp_dir() . '/picasso_vich_test/log';
+        return dirname(__DIR__, 2) . '/var/test/vich/log';
     }
 }

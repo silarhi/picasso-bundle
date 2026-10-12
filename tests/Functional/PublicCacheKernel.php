@@ -41,6 +41,6 @@ class PublicCacheKernel extends AbstractPicassoKernel
 
     public function getCacheDir(): string
     {
-        return sys_get_temp_dir() . '/picasso_test/cache/public_cache';
+        return dirname(__DIR__, 2) . '/var/test/cache/public_cache';
     }
 }

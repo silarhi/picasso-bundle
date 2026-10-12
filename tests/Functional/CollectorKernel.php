@@ -52,6 +52,6 @@ class CollectorKernel extends AbstractPicassoKernel
 
     public function getCacheDir(): string
     {
-        return sys_get_temp_dir() . '/picasso_test/collector_cache/' . $this->environment;
+        return dirname(__DIR__, 2) . '/var/test/collector_cache/' . $this->environment;
     }
 }

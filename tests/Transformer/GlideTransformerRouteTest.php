@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Tests\Transformer;
 
+use function dirname;
 use function is_string;
 
 use League\Glide\Signatures\SignatureFactory;
@@ -147,7 +148,7 @@ class GlideTransformerRouteTest extends TestCase
             new UrlGenerator($routes, new RequestContext()),
             new UrlAliases([], []),
             self::SIGN_KEY,
-            sys_get_temp_dir() . '/picasso_test/glide_route',
+            dirname(__DIR__, 2) . '/var/test/glide_route',
             'gd',
             null,
             $publicCache,

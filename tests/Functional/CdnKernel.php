@@ -55,6 +55,6 @@ class CdnKernel extends AbstractPicassoKernel
 
     public function getCacheDir(): string
     {
-        return sys_get_temp_dir() . '/picasso_test/cache/cdn';
+        return dirname(__DIR__, 2) . '/var/test/cache/cdn';
     }
 }
