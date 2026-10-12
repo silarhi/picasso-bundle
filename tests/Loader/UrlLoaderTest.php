@@ -72,6 +72,29 @@ class UrlLoaderTest extends TestCase
         self::assertInstanceOf(Closure::class, $image->stream);
     }
 
+    public function testResetClosesTheResponseItsSourceKept(): void
+    {
+        $resource = fopen('php://memory', 'r+');
+        self::assertIsResource($resource);
+
+        $body = self::createStub(StreamInterface::class);
+        $body->method('detach')->willReturn($resource);
+        $response = self::createStub(ResponseInterface::class);
+        $response->method('getStatusCode')->willReturn(200);
+        $response->method('getBody')->willReturn($body);
+        $httpClient = self::createStub(ClientInterface::class);
+        $httpClient->method('sendRequest')->willReturn($response);
+        $requestFactory = self::createStub(RequestFactoryInterface::class);
+        $requestFactory->method('createRequest')->willReturn(self::createStub(RequestInterface::class));
+
+        $loader = new UrlLoader($httpClient, $requestFactory);
+        self::assertTrue($loader->getSource()->exists('https://example.com/photo.jpg'));
+
+        $loader->reset();
+
+        self::assertSame('Unknown', get_resource_type($resource), 'The response is closed');
+    }
+
     public function testLoadWithMetadataFlagDoesNotChangeResult(): void
     {
         $httpClient = $this->createMock(ClientInterface::class);

@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Rendering is about 30% faster: a responsive image (42 URLs) takes 113 µs instead of 170 µs, a Twig page with 30 of them 4.2 ms instead of 5.5 ms ([Performance](README.md#performance), Linux; about 40% on macOS). Glide asks the router once per image and set of query keys, with placeholder values, then fills in the width, format and signature of the next URLs; a value the router would encode, a change of request context (worker mode) or a public-cache URL still go through the router. `image.html.twig` escapes the generated `src` and `srcset` with the `@internal` `picasso_escape_urls` filter, which gives what Twig's escaper gives for URLs at a fraction of its cost; templates overriding `image.html.twig` keep working, without that part of the gain.
 
+### Fixed
+
+- In long-running workers (FrankenPHP worker mode, RoadRunner), a `url` loader kept the response of an image checked by Glide when no read followed (an undecodable image, a failure in between) open until the next miss of that loader: an open connection to the remote host or a temporary file. `UrlLoader` and `HttpImageSource` now implement `ResetInterface`, and `url` loaders are tagged `kernel.reset`, so it is closed between requests.
+
 ## [2.4.0] - 2026-10-08
 
 ### Added

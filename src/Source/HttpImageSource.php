@@ -16,12 +16,15 @@ namespace Silarhi\PicassoBundle\Source;
 use function in_array;
 use function is_string;
 
+use Override;
 use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
 
 use function sprintf;
+
+use Symfony\Contracts\Service\ResetInterface;
 
 /**
  * Reads remote images by absolute http(s) URL: the path is the image URL.
@@ -35,7 +38,7 @@ use function sprintf;
  * and keeps the body for the readStream() call that follows: serving a miss
  * costs one request.
  */
-final class HttpImageSource implements ImageSourceInterface
+final class HttpImageSource implements ImageSourceInterface, ResetInterface
 {
     private const SCHEMES = ['http', 'https'];
 
@@ -58,6 +61,17 @@ final class HttpImageSource implements ImageSourceInterface
     }
 
     public function __destruct()
+    {
+        $this->discardPending();
+    }
+
+    /**
+     * Closes the response kept by exists() for the next readStream(). Long-running workers keep this source between
+     * requests: when no readStream() followed (the image could not be decoded, the request failed in between), the
+     * response would otherwise stay open (connection, temporary file) until the next exists().
+     */
+    #[Override]
+    public function reset(): void
     {
         $this->discardPending();
     }

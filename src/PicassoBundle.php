@@ -610,7 +610,8 @@ final class PicassoBundle extends AbstractBundle
                             service($loaderConfig['request_factory'] ?? $httpClientService),
                             $this->checkAllowedHosts($name, $loaderConfig['allowed_hosts']),
                         ])
-                        ->tag('picasso.loader', $tag);
+                        ->tag('picasso.loader', $tag)
+                        ->tag('kernel.reset', ['method' => 'reset']);
                     break;
 
                 case 'vich':

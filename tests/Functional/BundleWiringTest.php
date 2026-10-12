@@ -193,6 +193,19 @@ class BundleWiringTest extends TestCase
         self::assertSame(['images.example.com', '*.cdn.example.com'], $container->getDefinition('picasso.loader.remote')->getArgument(2));
     }
 
+    public function testUrlLoadersAreResetBetweenRequests(): void
+    {
+        $container = $this->loadExtension([
+            'loaders' => [
+                'url' => [],
+                'local' => ['type' => 'filesystem', 'path' => '%kernel.project_dir%/tests/Fixtures'],
+            ],
+        ]);
+
+        self::assertSame([['method' => 'reset']], $container->getDefinition('picasso.loader.url')->getTag('kernel.reset'));
+        self::assertSame([], $container->getDefinition('picasso.loader.local')->getTag('kernel.reset'));
+    }
+
     /**
      * @return iterable<string, array{array<string, array<string, mixed>>, string}>
      */

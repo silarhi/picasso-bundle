@@ -31,6 +31,9 @@ class HttpImageSourceTest extends TestCase
     /** @var list<string> */
     private array $requested = [];
 
+    /** @var list<resource> Bodies of the responses returned, in order */
+    private array $responses = [];
+
     public function testExistsFetchesTheImageAndReadStreamReusesTheResponse(): void
     {
         $source = $this->createSource(['https://example.com/photo.jpg' => [200, 'image-data']]);
@@ -40,6 +43,24 @@ class HttpImageSourceTest extends TestCase
 
         self::assertSame('image-data', stream_get_contents($stream));
         self::assertSame(['https://example.com/photo.jpg'], $this->requested);
+    }
+
+    public function testResetClosesTheResponseKeptForReadStream(): void
+    {
+        $source = $this->createSource(['https://example.com/photo.jpg' => [200, 'image-data']], respondToAll: true);
+
+        self::assertTrue($source->exists('https://example.com/photo.jpg'));
+        $pending = $this->responses[0];
+        self::assertSame('stream', get_resource_type($pending), 'The response is kept for readStream()');
+
+        // A long-running worker resets the service between requests: the response must not outlive the request
+        $source->reset();
+        self::assertSame('Unknown', get_resource_type($pending), 'The pending response is closed');
+
+        $source->readStream('https://example.com/photo.jpg');
+        self::assertCount(2, $this->requested, 'The next readStream() fetches the image again');
+
+        $source->reset();
     }
 
     public function testReadStreamFetchesAgainOnceTheResponseWasTaken(): void
@@ -211,6 +232,7 @@ class HttpImageSourceTest extends TestCase
     {
         $resource = fopen('php://memory', 'r+');
         self::assertIsResource($resource);
+        $this->responses[] = $resource;
         fwrite($resource, $contents);
         rewind($resource);
 
