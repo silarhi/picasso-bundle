@@ -127,7 +127,7 @@
     sitemap "^9.0.0"
     zod "^4.3.6"
 
-"@astrojs/starlight@^0.42.5":
+"@astrojs/starlight@^0.42.6":
   version "0.42.6"
   resolved "https://registry.yarnpkg.com/@astrojs/starlight/-/starlight-0.42.6.tgz#0a8a916654199fd30092fd13b730871c39dff50e"
   integrity sha512-Cfs7GdgzgNRCauDxQVsFUVL1thrGHK/rQdbv/SURv/xhGBXx+j5ypOHW9ENPraQxbIzUC8KAnJV7L9mvEVRuyQ==
@@ -807,16 +807,16 @@
     "@types/unist" "*"
 
 "@types/node@*":
-  version "26.6.4"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-26.6.4.tgz#5aaac1a7337945f7f9a2de4e0d14e7107157e813"
-  integrity sha512-ldVPDCzj7fsaGZrLB0NuHuTvJcsNasysBAqMolr/cgxrLd1xbqxIr3XJiPnHHJUCxj5sNF1vnRj9aWnrVh5Jcg==
+  version "26.6.5"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-26.6.5.tgz#cb35209e7767c503551b5fa42a48231c7441d979"
+  integrity sha512-uMzsv9stDdofIZBx4UGh4Z9ZgXnGC9seRDscilBcTHAeOFk67MZg/k9bWVfO+bk4qZmG+l52hRnLwUiH2LnJTg==
   dependencies:
     undici-types "~8.9.0"
 
 "@types/node@^24.9.2":
-  version "24.19.1"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-24.19.1.tgz#3a1c3ed9e9fc94fe48d4a72d83dfd0bfcf379c62"
-  integrity sha512-aS3/DG0oM05K0RIXXP+hKjinGG5IgSSVGzswZxW3O0sS3pH4/fycXundUC9XsszgKCk4gHXylTEK6hyFxVxnoQ==
+  version "24.19.2"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-24.19.2.tgz#8718eedbc0f89648de6525be9f4a9c61cdbaa502"
+  integrity sha512-93d49wCWJkCyN87MxLpNN6KXPCwFw7bVUg79mGUV1OS40JGWwVCr8n61DXCSqz7CV6/VfPkb7xec7uP2M+QHWQ==
   dependencies:
     undici-types ">=7.24.0 <7.24.7"
 
@@ -1563,9 +1563,9 @@ http-cache-semantics@^4.2.0:
   integrity sha512-M5t5LlJpS1UHMjvwRQVdFHvPISGeLAxNcrWuJkeGh0KxsqCHZ1O3NXZU/8x7cD0BDcGW8kapxMKTvwlqrNkHkA==
 
 i18next@^26.0.7:
-  version "26.4.2"
-  resolved "https://registry.yarnpkg.com/i18next/-/i18next-26.4.2.tgz#824233630f147359296bcaddf1404945d2b211bf"
-  integrity sha512-RX+R0VLg13IbvRuJSxnqykUFS9vQZTl8wYpWPCIUDWVrSGjsQywB5Y+pjzrkboxGAuYfJZVH1InFTdgBdxq6ug==
+  version "26.4.4"
+  resolved "https://registry.yarnpkg.com/i18next/-/i18next-26.4.4.tgz#adea13e4349ec06fd27eb3b0db7ff47f96d98ea1"
+  integrity sha512-O+rqmQUi54OwAgnZ4SAwO6aRrbXZt36VZXWt6zvq0FpC3vJbH46oQRs6u4Uwm1vf8ZI7UqOXQiJhQVTor7vRiQ==
 
 iron-webcrypto@^1.2.1:
   version "1.2.1"
@@ -2460,9 +2460,9 @@ p-limit@^7.3.3:
     yocto-queue "^1.2.1"
 
 p-queue@^9.3.3:
-  version "9.3.3"
-  resolved "https://registry.yarnpkg.com/p-queue/-/p-queue-9.3.3.tgz#c5e528c7eb361b7ba8eb5a9406902f7f2e75fc8f"
-  integrity sha512-NXAOdnEe5FsZJfT4oK84lE1Y5cFFdWlRuOo5tww8DyNMxyRXwn39fIkUtNLKppcPC+UYU/bXujNCUGDv01y7CA==
+  version "9.3.5"
+  resolved "https://registry.yarnpkg.com/p-queue/-/p-queue-9.3.5.tgz#59682b8c0fcdcbde9cf21cd385229543a396a844"
+  integrity sha512-Lki/zhXFVmDhesBUn/yHRLW9Bte7mE7xoFHzTR8sIomV7a2z+LxYAPkGvdfidNiu4fKSfjtawixxSHcZci5QcQ==
   dependencies:
     eventemitter3 "^5.0.4"
     p-timeout "^7.0.0"
@@ -2835,9 +2835,9 @@ sitemap@^9.0.0:
     sax "^1.4.1"
 
 smol-toml@^1.8.0, smol-toml@^1.9.0:
-  version "1.9.0"
-  resolved "https://registry.yarnpkg.com/smol-toml/-/smol-toml-1.9.0.tgz#f36b8dc7eb621c541c48f9fba6925dab95172817"
-  integrity sha512-hpd+HLON7HdZXqYchMM/+LaTTbdK0AU3NngIJ4KVyWbY9bfQqdL9cD+4yf6dUoU2Ap4VsU0JkQi6FxAI1B2mXQ==
+  version "1.9.1"
+  resolved "https://registry.yarnpkg.com/smol-toml/-/smol-toml-1.9.1.tgz#1262834a084c3ce2985900450956a580f95cf243"
+  integrity sha512-j7WyPdf0CJoutMzMoPLF/bVXHtKZIT9Rb4eGeEbWw8X2t5oirjPgpL+OpaENZrILYaXqYwnVH+qgUwVbl+pUJQ==
 
 source-map-js@^1.0.1, source-map-js@^1.2.1, source-map-js@^1.2.2:
   version "1.2.2"
@@ -3166,9 +3166,9 @@ yocto-queue@^1.2.1:
   integrity sha512-4LCcse/U2MHZ63HAJVE+v71o7yOdIe4cZ70Wpf8D/IyjDKYQLV5GD46B+hSTjJsvV5PztjvHoU580EftxjDZFQ==
 
 zod@^4.3.6, zod@^4.6.5:
-  version "4.6.5"
-  resolved "https://registry.yarnpkg.com/zod/-/zod-4.6.5.tgz#e3af3edbdc260239c52f73caad05dbbffe6e82cd"
-  integrity sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==
+  version "4.6.6"
+  resolved "https://registry.yarnpkg.com/zod/-/zod-4.6.6.tgz#0bb0cf57b87011a71ec28ed2e1b51f6455563f9a"
+  integrity sha512-4UmzQUF5fxvfcYHlbjBmejU+w+hbDnWFx4aS8kBx7nPBHcO2SqPbpAG8snbdg+Xse4pRefR98hgjFgIMCI/UhA==
 
 zwitch@^2.0.0, zwitch@^2.0.4:
   version "2.0.4"
