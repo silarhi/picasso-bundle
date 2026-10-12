@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - Unreleased
+
+### Fixed
+
+- In long-running workers (FrankenPHP worker mode, RoadRunner), a `url` loader kept the response of an image checked by Glide when no read followed (an undecodable image, a failure in between) open until the next miss of that loader: an open connection to the remote host or a temporary file. `UrlLoader` and `HttpImageSource` now implement `ResetInterface`, and `url` loaders are tagged `kernel.reset`, so it is closed between requests.
+
 ## [2.4.0] - 2026-10-08
 
 ### Added

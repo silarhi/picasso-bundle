@@ -13,19 +13,21 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Loader;
 
+use Override;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Source\HttpImageSource;
 use Silarhi\PicassoBundle\Source\ImageSourceInterface;
+use Symfony\Contracts\Service\ResetInterface;
 
 /**
  * Loads remote images by absolute URL. Local transformers (Glide) fetch them
  * from the allowed hosts only; rendering and other transformers (Imgix) are not
  * restricted, the latter fetching the image themselves.
  */
-final readonly class UrlLoader implements ServableLoaderInterface
+final readonly class UrlLoader implements ServableLoaderInterface, ResetInterface
 {
     private HttpImageSource $source;
 
@@ -68,5 +70,14 @@ final readonly class UrlLoader implements ServableLoaderInterface
         $response = $this->httpClient->sendRequest($request);
 
         return $response->getBody()->detach();
+    }
+
+    /**
+     * Tagged kernel.reset: see HttpImageSource::reset().
+     */
+    #[Override]
+    public function reset(): void
+    {
+        $this->source->reset();
     }
 }
