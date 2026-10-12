@@ -60,15 +60,15 @@ class FullConfigKernel extends AbstractPicassoKernel
             'loaders' => [
                 'main' => [
                     'type' => 'filesystem',
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
                 'secondary_fs' => [
                     'type' => 'filesystem',
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
                 'third_fs' => [
                     'type' => 'filesystem',
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
                 'disabled_loader' => [
                     'type' => 'filesystem',
@@ -78,7 +78,7 @@ class FullConfigKernel extends AbstractPicassoKernel
                 // Holds no image: the chain falls through to "main"
                 'entities_fs' => [
                     'type' => 'filesystem',
-                    'path' => dirname(__DIR__) . '/Fixtures/Entity',
+                    'path' => __DIR__ . '/../Fixtures/Entity',
                 ],
                 'chained' => [
                     'type' => 'chain',

@@ -43,13 +43,13 @@ class PrivateRouteKernel extends AbstractPicassoKernel
             'loaders' => [
                 'documents' => [
                     'type' => 'filesystem',
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                     'private' => true,
                     'default_transformer' => 'private_glide',
                 ],
                 'public' => [
                     'type' => 'filesystem',
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [

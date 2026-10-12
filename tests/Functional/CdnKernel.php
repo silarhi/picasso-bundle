@@ -33,7 +33,7 @@ class CdnKernel extends AbstractPicassoKernel
             ],
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [

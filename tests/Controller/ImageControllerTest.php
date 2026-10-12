@@ -51,7 +51,7 @@ class ImageControllerTest extends TestCase
         $transformerRegistry = $this->createRegistry(TransformerRegistry::class, 'glide', $transformer);
         $loaderRegistry = $this->createRegistry(LoaderRegistry::class, 'filesystem', $loader);
 
-        $controller = new ImageController($transformerRegistry, $loaderRegistry, self::cacheControl(), new UrlAliases([], []));
+        $controller = new ImageController($transformerRegistry, $loaderRegistry, $this->cacheControl(), new UrlAliases([], []));
         $response = $controller->__invoke('glide', 'filesystem', 'photo.jpg', $request);
 
         self::assertSame(200, $response->getStatusCode());
@@ -70,7 +70,7 @@ class ImageControllerTest extends TestCase
         $controller = new ImageController(
             $this->createRegistry(TransformerRegistry::class, 'glide', $transformer),
             $this->createRegistry(LoaderRegistry::class, 'product_image', $loader),
-            self::cacheControl(),
+            $this->cacheControl(),
             new UrlAliases(['product_image' => 'p'], ['glide' => 'g']),
         );
 
@@ -89,7 +89,7 @@ class ImageControllerTest extends TestCase
         $controller = new ImageController(
             $this->createRegistry(TransformerRegistry::class, 'glide', $transformer),
             $loaderRegistry,
-            self::cacheControl(),
+            $this->cacheControl(),
             new UrlAliases(['documents' => 'd'], []),
         );
 
@@ -107,7 +107,7 @@ class ImageControllerTest extends TestCase
         $loaderContainer = $this->createMock(ContainerInterface::class);
         $loaderRegistry = new LoaderRegistry($loaderContainer);
 
-        $controller = new ImageController($transformerRegistry, $loaderRegistry, self::cacheControl(), new UrlAliases([], []));
+        $controller = new ImageController($transformerRegistry, $loaderRegistry, $this->cacheControl(), new UrlAliases([], []));
 
         $this->expectException(NotFoundHttpException::class);
         $this->expectExceptionMessage('Transformer "unknown" not found.');
@@ -122,7 +122,7 @@ class ImageControllerTest extends TestCase
         $loaderContainer = $this->createMock(ContainerInterface::class);
         $loaderRegistry = new LoaderRegistry($loaderContainer);
 
-        $controller = new ImageController($transformerRegistry, $loaderRegistry, self::cacheControl(), new UrlAliases([], []));
+        $controller = new ImageController($transformerRegistry, $loaderRegistry, $this->cacheControl(), new UrlAliases([], []));
 
         $this->expectException(NotFoundHttpException::class);
         $this->expectExceptionMessage('does not support serving');
@@ -138,7 +138,7 @@ class ImageControllerTest extends TestCase
         $loaderContainer->expects(self::any())->method('has')->with('unknown')->willReturn(false);
         $loaderRegistry = new LoaderRegistry($loaderContainer);
 
-        $controller = new ImageController($transformerRegistry, $loaderRegistry, self::cacheControl(), new UrlAliases([], []));
+        $controller = new ImageController($transformerRegistry, $loaderRegistry, $this->cacheControl(), new UrlAliases([], []));
 
         $this->expectException(NotFoundHttpException::class);
         $this->expectExceptionMessage('Loader "unknown" not found.');
@@ -153,7 +153,7 @@ class ImageControllerTest extends TestCase
         $transformerRegistry = $this->createRegistry(TransformerRegistry::class, 'glide', $transformer);
         $loaderRegistry = $this->createRegistry(LoaderRegistry::class, 'remote', $loader);
 
-        $controller = new ImageController($transformerRegistry, $loaderRegistry, self::cacheControl(), new UrlAliases([], []));
+        $controller = new ImageController($transformerRegistry, $loaderRegistry, $this->cacheControl(), new UrlAliases([], []));
 
         $this->expectException(NotFoundHttpException::class);
         $this->expectExceptionMessage('does not support serving');
@@ -264,8 +264,8 @@ class ImageControllerTest extends TestCase
         $transformer = self::createStub(LocalTransformerInterface::class);
 
         foreach ([
-            'transformer' => new ImageController(new TransformerRegistry($missing), new LoaderRegistry($missing), self::cacheControl(errorMaxAge: 0), new UrlAliases([], [])),
-            'loader' => new ImageController($this->createRegistry(TransformerRegistry::class, 'glide', $transformer), new LoaderRegistry($missing), self::cacheControl(errorMaxAge: 0), new UrlAliases([], [])),
+            'transformer' => new ImageController(new TransformerRegistry($missing), new LoaderRegistry($missing), $this->cacheControl(errorMaxAge: 0), new UrlAliases([], [])),
+            'loader' => new ImageController($this->createRegistry(TransformerRegistry::class, 'glide', $transformer), new LoaderRegistry($missing), $this->cacheControl(errorMaxAge: 0), new UrlAliases([], [])),
         ] as $case => $controller) {
             try {
                 $controller->__invoke('glide', 'unknown', 'photo.jpg', new Request());
@@ -326,7 +326,7 @@ class ImageControllerTest extends TestCase
         return new ImageController(
             $this->createRegistry(TransformerRegistry::class, 'glide', $transformer),
             $this->createRegistry(LoaderRegistry::class, 'filesystem', $loader),
-            self::cacheControl($maxAge, $immutable),
+            $this->cacheControl($maxAge, $immutable),
             new UrlAliases([], []),
         );
     }
@@ -340,7 +340,7 @@ class ImageControllerTest extends TestCase
         return new ImageController(
             $this->createRegistry(TransformerRegistry::class, 'glide', $transformer),
             $this->createRegistry(LoaderRegistry::class, 'filesystem', $loader),
-            self::cacheControl(errorMaxAge: $errorMaxAge),
+            $this->cacheControl(errorMaxAge: $errorMaxAge),
             new UrlAliases([], []),
         );
     }
@@ -348,7 +348,7 @@ class ImageControllerTest extends TestCase
     /**
      * @return CacheControlConfig
      */
-    private static function cacheControl(?int $maxAge = null, bool $immutable = false, ?int $errorMaxAge = null): array
+    private function cacheControl(?int $maxAge = null, bool $immutable = false, ?int $errorMaxAge = null): array
     {
         return ['max_age' => $maxAge, 'immutable' => $immutable, 'error_max_age' => $errorMaxAge];
     }

@@ -29,7 +29,7 @@ class UrlAliasKernel extends AbstractPicassoKernel
             'loaders' => [
                 'product_image' => [
                     'type' => 'filesystem',
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                     'url_alias' => 'pi',
                 ],
             ],

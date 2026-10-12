@@ -38,7 +38,7 @@ class CollectorKernel extends AbstractPicassoKernel
             'cache' => false,
             'loaders' => [
                 'filesystem' => [
-                    'path' => dirname(__DIR__) . '/Fixtures',
+                    'path' => __DIR__ . '/../Fixtures',
                 ],
             ],
             'transformers' => [

@@ -169,7 +169,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         $this->baseUrl = null !== $baseUrl && '' !== $baseUrl ? rtrim($baseUrl, '/') : null;
         $this->cachePrefix = trim($cachePrefix, '/');
 
-        $resolvedCache = null !== $flysystemRegistry && $flysystemRegistry->has($cache)
+        $resolvedCache = $flysystemRegistry instanceof FlysystemRegistry && $flysystemRegistry->has($cache)
             ? $flysystemRegistry->get($cache)
             : $cache;
 
@@ -196,7 +196,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         $this->cacheStorage = $this->server->getCache();
         // One directory per instance, so per worker thread. Not created here: most
         // instances only generate URLs or serve hits, and each would leave one behind.
-        $this->renderDirectory = null !== $deferredCacheWriter
+        $this->renderDirectory = $deferredCacheWriter instanceof DeferredCacheWriter
             ? sys_get_temp_dir() . '/picasso-glide-' . bin2hex(random_bytes(8))
             : null;
     }
@@ -338,10 +338,8 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
             $params = [...$params, ...$cachedParams];
 
             $transformer = $this;
-            /** @phpstan-ignore closure.useThis (Glide Server rebinds $this on the closure via Closure::bind) */
-            $cachePathCallable = function (string $path) use ($transformer, $cacheFilename, $context): string {
-                return $transformer->computeCachePath($path, $cacheFilename, $context);
-            };
+            // Glide Server rebinds $this on the callable via Closure::bind: capture the transformer instead
+            $cachePathCallable = fn (string $path): string => $transformer->computeCachePath($path, $cacheFilename, $context);
         }
 
         $responseFactory = new GlideResponseFactory($request);
@@ -361,16 +359,16 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         // A hit never goes through Glide, which would ask the storage whether the
         // variant exists before reading it.
         $response = $responseFactory->fromCache($this->cacheStorage, $cachePath);
-        if (null !== $response) {
+        if ($response instanceof Response) {
             return $response;
         }
 
         $lock = $this->lockFactory?->createLock(self::LOCK_PREFIX . hash('xxh128', $cachePath), $this->lockTtl);
-        if (null !== $lock && !$lock->acquire()) {
+        if ($lock instanceof LockInterface && !$lock->acquire()) {
             // Another process is rendering this variant: wait for it, then serve its render
             if ($this->acquireWithinWait($lock)) {
                 $response = $responseFactory->fromCache($this->cacheStorage, $cachePath);
-                if (null !== $response) {
+                if ($response instanceof Response) {
                     $lock->release();
 
                     return $response;
@@ -387,7 +385,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         $renderStorage = null !== $this->renderDirectory
             ? new Filesystem(new LocalFilesystemAdapter($this->renderDirectory))
             : null;
-        if (null !== $renderStorage) {
+        if ($renderStorage instanceof Filesystem) {
             $this->server->setCache($renderStorage);
         }
 
@@ -397,7 +395,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
             /** @var Response $response */
             $response = $this->server->getImageResponse($path, $params);
 
-            if (null !== $renderStorage && null !== $this->deferredCacheWriter) {
+            if ($renderStorage instanceof Filesystem && $this->deferredCacheWriter instanceof DeferredCacheWriter) {
                 // The variant reaches the cache storage after the response is sent:
                 // the lock must keep the waiting requests away until then.
                 $this->deferredCacheWriter->defer($renderStorage, $this->cacheStorage, $cachePath, $lock);
@@ -463,7 +461,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
      */
     private function sourceFailure(Throwable $e): ImageNotFoundException|ImageSourceUnavailableException|null
     {
-        for ($cause = $e->getPrevious(); null !== $cause; $cause = $cause->getPrevious()) {
+        for ($cause = $e->getPrevious(); $cause instanceof Throwable; $cause = $cause->getPrevious()) {
             if ($cause instanceof ImageNotFoundException || $cause instanceof ImageSourceUnavailableException) {
                 return $cause;
             }
@@ -668,13 +666,13 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         return $this->url(
             new Image(path: $path),
             new ImageTransformation(
-                width: self::intParam($params, 'w'),
-                height: self::intParam($params, 'h'),
-                format: self::stringParam($params, 'fm'),
-                quality: self::intParam($params, 'q'),
-                fit: self::stringParam($params, 'fit'),
-                blur: self::intParam($params, 'blur'),
-                dpr: self::intParam($params, 'dpr'),
+                width: $this->intParam($params, 'w'),
+                height: $this->intParam($params, 'h'),
+                format: $this->stringParam($params, 'fm'),
+                quality: $this->intParam($params, 'q'),
+                fit: $this->stringParam($params, 'fit'),
+                blur: $this->intParam($params, 'blur'),
+                dpr: $this->intParam($params, 'dpr'),
             ),
             $context,
         );
@@ -683,7 +681,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
     /**
      * @param array<string, mixed> $params
      */
-    private static function intParam(array $params, string $key): ?int
+    private function intParam(array $params, string $key): ?int
     {
         return isset($params[$key]) && is_scalar($params[$key]) ? (int) $params[$key] : null;
     }
@@ -691,7 +689,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
     /**
      * @param array<string, mixed> $params
      */
-    private static function stringParam(array $params, string $key): ?string
+    private function stringParam(array $params, string $key): ?string
     {
         return isset($params[$key]) && is_scalar($params[$key]) ? (string) $params[$key] : null;
     }

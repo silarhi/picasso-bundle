@@ -220,9 +220,9 @@ class ImageHelperTest extends TestCase
         $helper = $this->createHelper();
         $data = $helper->imageData(
             src: 'photo.jpg',
+            sizes: '100vw',
             sourceWidth: 800,
             sourceHeight: 600,
-            sizes: '100vw',
         );
 
         self::assertSame(800, $data->width);
@@ -302,7 +302,7 @@ class ImageHelperTest extends TestCase
         $this->configureSrcsetGenerator();
 
         $helper = $this->createHelper(defaultPlaceholder: 'blur');
-        $data = $helper->imageData(src: 'photo.jpg', placeholder: false, sizes: '100vw');
+        $data = $helper->imageData(src: 'photo.jpg', sizes: '100vw', placeholder: false);
 
         self::assertNull($data->placeholderUri);
     }
@@ -342,7 +342,7 @@ class ImageHelperTest extends TestCase
         $loaderLocator->method('has')->willReturn(false);
         $loaderRegistry = new LoaderRegistry($loaderLocator, ['filesystem' => 'blur'], [], ['filesystem' => true]);
 
-        $helper = $this->createHelper(defaultPlaceholder: null, loaderRegistry: $loaderRegistry);
+        $helper = $this->createHelper(loaderRegistry: $loaderRegistry);
         $data = $helper->imageData(src: 'photo.jpg', sizes: '100vw');
 
         self::assertSame('data:image/png;base64,placeholder', $data->placeholderUri);
@@ -376,7 +376,7 @@ class ImageHelperTest extends TestCase
         $imgixTransformer = $this->createMock(ImageTransformerInterface::class);
         $transformerLocator = $this->createMock(ContainerInterface::class);
         $transformerLocator->method('has')->willReturnCallback(static fn (string $name): bool => in_array($name, ['glide', 'imgix'], true));
-        $transformerLocator->method('get')->willReturnCallback(fn (string $name) => match ($name) {
+        $transformerLocator->method('get')->willReturnCallback(fn (string $name): ImageTransformerInterface => match ($name) {
             'imgix' => $imgixTransformer,
             default => $this->glideTransformer,
         });
@@ -458,7 +458,7 @@ class ImageHelperTest extends TestCase
             defaultFit: 'contain',
         );
 
-        $data = $helper->imageData(src: 'photo.jpg', transformer: 'glide', sizes: '100vw');
+        $data = $helper->imageData(src: 'photo.jpg', sizes: '100vw', transformer: 'glide');
 
         self::assertNotNull($data->fallbackSrc);
         self::assertSame('glide', $data->transformer);
@@ -506,9 +506,9 @@ class ImageHelperTest extends TestCase
         $helper = $this->createHelper();
         $data = $helper->imageData(
             src: '/images/logo.svg',
-            unoptimized: true,
             width: 200,
             height: 50,
+            unoptimized: true,
         );
 
         self::assertSame('/images/logo.svg', $data->fallbackSrc);
@@ -551,7 +551,7 @@ class ImageHelperTest extends TestCase
         $this->configureSrcsetGenerator();
 
         $helper = $this->createHelper(defaultPlaceholder: 'blur');
-        $data = $helper->imageData(src: 'photo.jpg', placeholder: false, sizes: '100vw');
+        $data = $helper->imageData(src: 'photo.jpg', sizes: '100vw', placeholder: false);
 
         self::assertNull($data->placeholder);
     }
@@ -570,7 +570,7 @@ class ImageHelperTest extends TestCase
             ->willReturn('/picasso/glide/filesystem/photo.jpg?blur=50');
 
         $helper = $this->createHelper(defaultPlaceholder: 'blur');
-        $data = $helper->imageData(src: 'photo.jpg', placeholder: true, sizes: '100vw');
+        $data = $helper->imageData(src: 'photo.jpg', sizes: '100vw', placeholder: true);
 
         self::assertNotNull($data->placeholderUri);
     }
@@ -590,7 +590,7 @@ class ImageHelperTest extends TestCase
             ->willReturn('/picasso/blur-url');
 
         $helper = $this->createHelper();
-        $data = $helper->imageData(src: 'photo.jpg', placeholder: 'blur', sizes: '100vw');
+        $data = $helper->imageData(src: 'photo.jpg', sizes: '100vw', placeholder: 'blur');
 
         self::assertSame('/picasso/blur-url', $data->placeholderUri);
     }
@@ -610,8 +610,8 @@ class ImageHelperTest extends TestCase
         $helper = $this->createHelper(defaultPlaceholder: 'blur');
         $data = $helper->imageData(
             src: 'photo.jpg',
-            placeholderData: 'data:image/png;base64,iVBORw0KGgo=',
             sizes: '100vw',
+            placeholderData: 'data:image/png;base64,iVBORw0KGgo=',
         );
 
         self::assertSame('data:image/png;base64,iVBORw0KGgo=', $data->placeholderUri);
@@ -681,7 +681,7 @@ class ImageHelperTest extends TestCase
         $this->configureSrcsetGenerator();
 
         $helper = $this->createHelper(defaultPlaceholder: 'blur');
-        $data = $helper->imageData(src: 'photo.jpg', priority: true, sizes: '100vw');
+        $data = $helper->imageData(src: 'photo.jpg', sizes: '100vw', priority: true);
 
         self::assertNull($data->placeholderUri);
         self::assertSame('eager', $data->loading);
@@ -697,9 +697,9 @@ class ImageHelperTest extends TestCase
         $helper = $this->createHelper();
         $data = $helper->imageData(
             src: 'photo.jpg',
+            sizes: '100vw',
             priority: true,
             loading: 'lazy',
-            sizes: '100vw',
         );
 
         self::assertSame('lazy', $data->loading);
@@ -844,9 +844,9 @@ class ImageHelperTest extends TestCase
             src: 'photo.jpg',
             width: 800,
             height: 600,
+            sizes: '100vw',
             sourceWidth: 640,
             sourceHeight: 480,
-            sizes: '100vw',
         );
 
         self::assertSame(640, $data->width);
@@ -926,7 +926,7 @@ class ImageHelperTest extends TestCase
         $this->configureSrcsetGenerator();
 
         $helper = $this->createHelper();
-        $data = $helper->imageData(src: 'photo.jpg', resolveMetadata: false, sizes: '100vw');
+        $data = $helper->imageData(src: 'photo.jpg', sizes: '100vw', resolveMetadata: false);
 
         self::assertNull($data->width);
         self::assertNull($data->height);
@@ -948,7 +948,7 @@ class ImageHelperTest extends TestCase
         $loaderRegistry = new LoaderRegistry($loaderLocator);
 
         $helper = $this->createHelper(loaderRegistry: $loaderRegistry);
-        $data = $helper->imageData(src: 'photo.jpg', resolveMetadata: true, sizes: '100vw');
+        $data = $helper->imageData(src: 'photo.jpg', sizes: '100vw', resolveMetadata: true);
 
         self::assertSame(1024, $data->width);
         self::assertSame(768, $data->height);
@@ -1002,7 +1002,7 @@ class ImageHelperTest extends TestCase
         $this->configureSrcsetGenerator();
 
         $helper = $this->createHelper();
-        $data = $helper->imageData(src: 'photo.jpg', resolveMetadata: false, sizes: '100vw');
+        $data = $helper->imageData(src: 'photo.jpg', sizes: '100vw', resolveMetadata: false);
 
         self::assertNull($data->width);
         self::assertNull($data->height);

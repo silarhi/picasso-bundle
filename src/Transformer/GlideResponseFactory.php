@@ -125,7 +125,7 @@ final readonly class GlideResponseFactory implements ResponseFactoryInterface
             fpassthru($stream);
             fclose($stream);
         });
-        $response->headers->set('Content-Type', self::sniffMimeType($head) ?? self::storedMimeType($cache, $path));
+        $response->headers->set('Content-Type', $this->sniffMimeType($head) ?? $this->storedMimeType($cache, $path));
         $response->headers->set('Content-Length', (string) ($size ?? $cache->fileSize($path)));
 
         return $this->withCacheHeaders($response, $lastModified);
@@ -149,7 +149,7 @@ final readonly class GlideResponseFactory implements ResponseFactoryInterface
      * A storage unable to tell (e.g. an extension-less path on local disk) must
      * not fail the request: the variant is there.
      */
-    private static function storedMimeType(FilesystemOperator $cache, string $path): string
+    private function storedMimeType(FilesystemOperator $cache, string $path): string
     {
         try {
             return $cache->mimeType($path);
@@ -162,7 +162,7 @@ final readonly class GlideResponseFactory implements ResponseFactoryInterface
      * The mime type of the formats Glide encodes, from their magic bytes. Null for
      * anything else, which is then asked to the storage.
      */
-    private static function sniffMimeType(string $head): ?string
+    private function sniffMimeType(string $head): ?string
     {
         return match (true) {
             str_starts_with($head, "\xFF\xD8\xFF") => 'image/jpeg',
