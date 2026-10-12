@@ -96,7 +96,7 @@ composer normalize --dry-run
 # composer.json normalization fix
 composer normalize
 
-# Stress benchmarks (Markdown tables; see README "Performance")
+# Stress benchmarks (Markdown tables; see docs/src/content/docs/concepts/performance.md)
 XDEBUG_MODE=off php -d opcache.enable_cli=1 benchmarks/run.php [render|hit|notfound|miss|crawl|herd|memory]
 docker build -f benchmarks/Dockerfile -t picasso-bench . && docker run --rm picasso-bench [scenario ...]
 ```
@@ -238,7 +238,7 @@ The project uses PHPStan custom type aliases to avoid duplicating complex type a
 
 When making API changes, update the following:
 
-1. **`README.md`** — Update usage examples, configuration reference, and feature descriptions to reflect the new or changed API.
+1. **`docs/`** — The documentation site (picasso-bundle.silarhi.dev): update the guides, the configuration and component references. Keep `README.md` short: touch its features list or quick start only when they change.
 2. **`CLAUDE.md`** — Update the relevant sections:
     - **Repository Structure** — Add new files/directories or update descriptions.
     - **Architecture Notes** — Document new or changed services, interfaces, and their roles.
@@ -246,12 +246,12 @@ When making API changes, update the following:
     - **PHPStan Custom Types** tables — Add entries for new type aliases.
     - **Common Patterns** — Update or add patterns for new extension points.
 3. **PHPDoc blocks** — Ensure all public and protected methods on interfaces and services have accurate `@param`, `@return`, and `@throws` annotations.
-4. **Bundle configuration** — When adding or changing config options in `PicassoBundle::configure()`, document the new options in both `README.md` and the Architecture Notes.
+4. **Bundle configuration** — When adding or changing config options in `PicassoBundle::configure()`, document the new options in both `docs/src/content/docs/reference/configuration.md` and the Architecture Notes.
 5. **`CHANGELOG.md`** — Add an entry to the top section, titled with the next release, never a bare `[Unreleased]` section: the next minor (e.g. `[2.1.0] - Unreleased`), or the next major when the change is a BC break. Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) sections (Added, Changed, Deprecated, Removed, Fixed, Security). When tagging the release, replace `Unreleased` with the release date and `HEAD` in its compare link with the tag. Prefix breaking changes with **BC break:** and say what consumers must change. Skip dependency bumps, CI and tooling changes.
 
 **Checklist for API changes:**
 
-- [ ] `README.md` reflects the current public API and configuration
+- [ ] `docs/` reflects the current public API and configuration
 - [ ] `CHANGELOG.md` has an entry in the next release section for every user-facing change
 - [ ] `CLAUDE.md` sections are up to date (structure, architecture, exceptions, types, patterns)
 - [ ] PHPDoc annotations are accurate on all affected interfaces and classes

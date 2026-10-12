@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Rendering is about 30% faster: a responsive image (42 URLs) takes 113 µs instead of 170 µs, a Twig page with 30 of them 4.2 ms instead of 5.5 ms ([Performance](README.md#performance), Linux; about 40% on macOS). Glide asks the router once per image and set of query keys, with placeholder values, then fills in the width, format and signature of the next URLs; a value the router would encode, a change of request context (worker mode) or a public-cache URL still go through the router. `image.html.twig` escapes the generated `src` and `srcset` with the `@internal` `picasso_escape_urls` filter, which gives what Twig's escaper gives for URLs at a fraction of its cost; templates overriding `image.html.twig` keep working, without that part of the gain.
+- Rendering is about 30% faster: a responsive image (42 URLs) takes 113 µs instead of 170 µs, a Twig page with 30 of them 4.2 ms instead of 5.5 ms ([Performance](https://picasso-bundle.silarhi.dev/concepts/performance/), Linux; about 40% on macOS). Glide asks the router once per image and set of query keys, with placeholder values, then fills in the width, format and signature of the next URLs; a value the router would encode, a change of request context (worker mode) or a public-cache URL still go through the router. `image.html.twig` escapes the generated `src` and `srcset` with the `@internal` `picasso_escape_urls` filter, which gives what Twig's escaper gives for URLs at a fraction of its cost; templates overriding `image.html.twig` keep working, without that part of the gain.
 
 ### Fixed
 
@@ -30,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - An object store failing during a Glide miss (outage, `5xx`) answered a `500` (`League\Glide\Filesystem\FilesystemException: Could not read the image`), logged as `critical`, or a `404` that `error_max_age` let CDNs keep after the outage when the existence check failed. It is now the `503` above. Requires Glide 3 or later: Glide 2 drops the source's exception, so such a read stays a `500` there.
 - A source read finding nothing after the existence check passed (e.g. S3 answering `403` to the check, which the AWS SDK reads as "exists", then `404` to the read) answered a `500`; it is now a `404`.
-- A [chain](README.md#chain-loader) member whose storage is unavailable no longer fails the rendering: it counts as not holding the image.
+- A [chain](https://picasso-bundle.silarhi.dev/sources/chain/) member whose storage is unavailable no longer fails the rendering: it counts as not holding the image.
 
 ## [2.3.0] - 2026-10-08
 

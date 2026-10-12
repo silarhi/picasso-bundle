@@ -19,3 +19,4 @@
 /rector.php export-ignore
 /renovate.json export-ignore
 /yarn.lock export-ignore
+/CONTRIBUTING.md export-ignore

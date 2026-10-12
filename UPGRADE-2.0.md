@@ -21,7 +21,7 @@ support.
 ### One directory per filesystem loader
 
 The `paths` list is removed: a filesystem loader reads the single directory set with `path`. Declare one loader per
-directory, and keep the former name as a [chain loader](README.md#chain-loader) so templates keep working:
+directory, and keep the former name as a [chain loader](https://picasso-bundle.silarhi.dev/sources/chain/) so templates keep working:
 
 ```diff
  picasso:
@@ -93,7 +93,7 @@ calls and stop reading `$image->metadata`.
 ### New `UrlAliases` constructor argument
 
 `GlideTransformer` and `ImageController` require a `Silarhi\PicassoBundle\Service\UrlAliases`.
-Without configured [URL aliases](README.md#url-aliases), pass `new UrlAliases([], [])`:
+Without configured [URL aliases](https://picasso-bundle.silarhi.dev/reference/routes/#url-aliases), pass `new UrlAliases([], [])`:
 
 ```diff
  new GlideTransformer(
@@ -130,7 +130,7 @@ Nothing to configure, but worth knowing before deploying:
 - **1.x URLs carrying `_metadata`** (images from multi-directory or multi-mapping loaders) answer
   `301 Moved Permanently` to the same image and transformation under the loader now reading their source, whatever its
   name has become. Each redirect triggers a deprecation, so your logs tell when they stop being requested; support ends
-  in 3.0. A source no loader reads any more answers `404`: declare a loader for it. See [1.x URLs](README.md#1x-urls).
+  in 3.0. A source no loader reads any more answers `404`: declare a loader for it. See [1.x URLs](https://picasso-bundle.silarhi.dev/upgrade/from-1x/#1x-urls).
 - **1.x URLs without `_metadata`** keep working as long as their loader name still exists (kept as a chain, or as a
   loader).
 - New Glide URLs are stable across renders (no more random `_metadata`), so browsers and CDNs cache them.
@@ -156,7 +156,7 @@ picasso:
 ```
 
 `cache_control.immutable: false` drops `immutable` only. If you replace source files behind unchanged paths, purge the
-variants after each change (see [Cache Purge](README.md#cache-purge)).
+variants after each change (see [Cache Purge](https://picasso-bundle.silarhi.dev/guides/cache-purge/)).
 
 ### `_untransformed` public-cache segment
 
