@@ -94,11 +94,11 @@ abstract class AbstractPicassoKernel extends Kernel
 
     public function getCacheDir(): string
     {
-        return sys_get_temp_dir() . '/picasso_test/cache/' . $this->environment;
+        return dirname(__DIR__, 2) . '/var/test/cache/' . $this->environment;
     }
 
     public function getLogDir(): string
     {
-        return sys_get_temp_dir() . '/picasso_test/log';
+        return dirname(__DIR__, 2) . '/var/test/log';
     }
 }

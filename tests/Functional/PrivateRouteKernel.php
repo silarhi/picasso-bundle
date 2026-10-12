@@ -76,6 +76,6 @@ class PrivateRouteKernel extends AbstractPicassoKernel
 
     public function getCacheDir(): string
     {
-        return sys_get_temp_dir() . '/picasso_test/cache/private_route';
+        return dirname(__DIR__, 2) . '/var/test/cache/private_route';
     }
 }
