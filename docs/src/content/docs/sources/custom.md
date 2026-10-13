@@ -23,6 +23,20 @@ class S3Loader implements ImageLoaderInterface
 }
 ```
 
+`#[AsImageLoader]` also takes the per-loader options a loader declared under `picasso.loaders` takes in YAML:
+
+| Argument             | Config equivalent     | Description                                                                                                     |
+| -------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `defaultPlaceholder` | `default_placeholder` | Placeholder for this loader's images, instead of the global `default_placeholder`                              |
+| `defaultTransformer` | `default_transformer` | Transformer for this loader's images, instead of the global `default_transformer`                              |
+| `resolveMetadata`    | `resolve_metadata`    | Whether `load()` is asked for metadata (`$withMetadata`, the image dimensions); `null` inherits the global value |
+| `urlAlias`           | `url_alias`           | Public name of the loader in image URLs (see [Routes](/reference/routes/))                                      |
+| `private`            | `private`             | Only your own routes serve its images (see [Private images](/guides/private-images/))                           |
+
+```php
+#[AsImageLoader('s3', defaultPlaceholder: 'blurhash', defaultTransformer: 'imgix', resolveMetadata: true)]
+```
+
 A loader that hands images over to other loaders, as a chain does, returns them with `Image::$loader` set to the name of the loader that loaded them: generated URLs then name that loader, which serves them.
 
 If local transformers (like Glide) should serve your loader's images, implement `ServableLoaderInterface` instead. Its `getSource()` method returns the `ImageSourceInterface` all its originals are read from when a transformed image is requested: the loader name in the image URL is all that is needed to find the original again, so a servable loader reads from a single source. Two implementations ship with the bundle:

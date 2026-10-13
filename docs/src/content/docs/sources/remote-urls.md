@@ -5,11 +5,13 @@ sidebar:
     order: 4
 ---
 
-Loads and transforms remote images by URL. Requires a PSR-18 HTTP client.
+Loads and transforms remote images by URL. Requires a PSR-18 HTTP client and a PSR-17 request factory.
 
 ```bash
-composer require symfony/http-client
+composer require symfony/http-client psr/http-client nyholm/psr7
 ```
+
+By default the loader uses Symfony's `psr18.http_client` service for both. FrameworkBundle only registers it when `psr/http-client` is installed, and it needs a PSR-17 implementation such as `nyholm/psr7` (or `php-http/discovery` with one). To use another client, set `http_client` and `request_factory` to your own service IDs.
 
 ```yaml
 picasso:

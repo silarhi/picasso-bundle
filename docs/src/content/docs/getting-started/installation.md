@@ -10,7 +10,7 @@ sidebar:
 | Dependency                                                                                    | Version         |
 | --------------------------------------------------------------------------------------------- | --------------- |
 | PHP                                                                                           | 8.2+            |
-| Symfony                                                                                       | 6.4 / 7.0 / 8.0 |
+| Symfony                                                                                       | 6.4, 7.x or 8.x |
 | [Symfony UX Twig Component](https://symfony.com/bundles/ux-twig-component/current/index.html) | 2.13+           |
 
 ## Optional Dependencies
@@ -23,7 +23,7 @@ sidebar:
 | `kornrunner/blurhash` + `imagine/imagine` | BlurHash placeholder                                                         |
 | `league/flysystem-bundle`                 | Flysystem loader                                                             |
 | `vich/uploader-bundle`                    | VichUploader loader                                                          |
-| `symfony/http-client`                     | URL loader                                                                   |
+| `symfony/http-client` + `psr/http-client` + `nyholm/psr7` | URL loader, Imgix cache purge ([PSR-18 client](/sources/remote-urls/))   |
 
 ## Installation
 

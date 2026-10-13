@@ -40,7 +40,7 @@ A configuration still using `paths` fails at container build with this suggestio
 
 ### One VichUploader mapping per vich loader
 
-A vich loader serves a single mapping: the loader name when it is a mapping, else the `mapping` option, else the only
+A vich loader serves a single mapping: its `mapping` option, else the loader name when it is a mapping, else the only
 mapping. With several mappings, declare one loader per mapping and chain them under the former name:
 
 ```diff
@@ -184,7 +184,7 @@ server rules building these paths by hand need updating.
 
 ## 1.x URLs
 
-Image URLs published by 1.x (in CDN caches, emails, search engines, saved pages) keep working. A 1.x loader reading several directories or VichUploader mappings put the source of each image in an encrypted `_metadata` query param. Since 2.0, that source names the loader reading it, so such a URL is answered with a `301 Moved Permanently` to the same image and transformation under that loader, whatever its loader name has become (a [chain](#chain-loader), another loader, or none). Nothing needs configuring:
+Image URLs published by 1.x (in CDN caches, emails, search engines, saved pages) keep working. A 1.x loader reading several directories or VichUploader mappings put the source of each image in an encrypted `_metadata` query param. Since 2.0, that source names the loader reading it, so such a URL is answered with a `301 Moved Permanently` to the same image and transformation under that loader, whatever its loader name has become (a [chain](/sources/chain/), another loader, or none). Nothing needs configuring:
 
 - The source is matched against the `path` of filesystem loaders and the upload destination of vich loaders, also when the project moved to another directory since (deployments into a new release directory).
 - When no loader reads a 1.x source any more, its URLs answer `404`: declare a loader for it.
