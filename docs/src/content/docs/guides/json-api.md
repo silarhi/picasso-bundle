@@ -68,7 +68,7 @@ The JSON response contains everything a frontend needs to render a responsive `<
         { "type": "image/avif", "srcset": "..." },
         { "type": "image/webp", "srcset": "..." }
     ],
-    "placeholderUri": "data:image/jpeg;base64,...",
+    "placeholderUri": "/image/glide/filesystem/hero.jpg?w=10&h=7&fm=jpg&q=30&fit=crop&blur=5&s=...",
     "width": 1200,
     "height": 800,
     "loading": "lazy",

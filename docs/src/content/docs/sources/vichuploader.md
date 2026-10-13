@@ -45,7 +45,7 @@ Pass the entity as `context`. The upload field is found from the loader's mappin
 />
 ```
 
-Only when an entity has several fields using the same mapping do you need to name one with `field` (e.g. `:context="{ entity: gallery, field: 'coverFile' }"`).
+Only when an entity has several fields using the same mapping do you need to name one with `field` (e.g. `context="{{ { entity: gallery, field: 'coverFile' } }}"`).
 
 Mistakes are reported with the fix:
 

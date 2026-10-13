@@ -71,7 +71,7 @@ picasso:
         #     type: blurhash
         #     components_x: 4    # horizontal components (1–9)
         #     components_y: 3    # vertical components (1–9)
-        #     size: 32           # decoded placeholder image size in px
+        #     size: 10           # decoded placeholder image size in px
         #     driver: gd         # gd | imagick
 
         # my_placeholder:
@@ -148,6 +148,8 @@ picasso:
 
 ## Options explained
 
+### `device_sizes` and `image_sizes`
+
 These arrays define which widths are generated in the srcset attribute:
 
 - **`device_sizes`** — Breakpoint widths for responsive (fluid) images.
@@ -181,7 +183,7 @@ Controls how images are resized within the target dimensions:
 | Fit       | Description                                                                     |
 | --------- | ------------------------------------------------------------------------------- |
 | `contain` | Fits inside the box, keeping the aspect ratio: one side may be shorter (default) |
-| `cover`   | Fills the box, keeping the aspect ratio, cropping the excess (same as `crop`)     |
+| `cover`   | Same as `crop` (Glide 3+ and Imgix; Glide 2 renders it as `contain`)              |
 | `crop`    | Fills the box, keeping the aspect ratio, cropping the excess                      |
 | `fill`    | Fits inside the box, then pads it to the exact box size                           |
 
@@ -205,6 +207,22 @@ Configures PSR-6 caching for metadata detection (image dimensions) and BlurHash 
 - `true` (default) — uses the `cache.app` service
 - `false` — disables caching
 - `'my_cache_pool'` — uses a custom PSR-6 cache pool service ID
+
+### `collector`
+
+Adds a Picasso panel to the Symfony web profiler (requires `symfony/web-profiler-bundle`). It lists, for each request:
+
+- **Picture renders** — every `<twig:Picasso:Image>`, `picasso_image()` and `imageData()` call, with its source, loader, transformer, placeholder, dimensions, number of `<source>` elements, priority and duration;
+- **URL generations** — every `picasso_image_url()` and `imageUrl()` call, with its transformation and the generated URL;
+- **Metadata guesses** — every dimension detection, with its cache key, result and duration.
+
+It decorates the image helper and the metadata guesser, so it adds a little overhead to every render: enable it in `dev` only.
+
+```yaml
+# config/packages/dev/picasso.yaml
+picasso:
+    collector: true
+```
 
 :::tip
 The `type` option for loaders, transformers, and placeholders is automatically inferred from the key name

@@ -37,6 +37,10 @@ When an image gets both a `width` and a `height`, `fit` decides how a source of 
 | `cover` / `crop`      | no, the excess is cut | yes                                  | Cards, avatars, grids of thumbnails of the same size      |
 | `fill`                | yes                   | yes, padded with bands               | Fixed-size slots where cropping is not an option (logos…) |
 
+:::caution[Glide 2]
+Glide 2 does not know `cover`: it renders it as `contain`. Use `crop` if you still run Glide 2. Glide 3 and later, and Imgix, render `cover` like `crop`.
+:::
+
 ## Choosing
 
 - **A grid of cards** whose images must line up: `crop`, and give every image the same `width` and `height`.

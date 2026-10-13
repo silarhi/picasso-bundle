@@ -37,7 +37,7 @@ A configuration still using `paths` fails at container build with this suggestio
 
 ### One VichUploader mapping per vich loader
 
-A vich loader serves a single mapping: the loader name when it is a mapping, else the `mapping` option, else the only
+A vich loader serves a single mapping: its `mapping` option, else the loader name when it is a mapping, else the only
 mapping. With several mappings, declare one loader per mapping and chain them under the former name:
 
 ```diff
