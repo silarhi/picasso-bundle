@@ -7,7 +7,7 @@
 
     This template is used by both:
       - the <Picasso:Image> Twig component (via components/Image.html.twig)
-      - the picasso_image() Twig function (for consumers without symfony/ux-twig-component)
+      - the picasso_image() Twig function (the same rendering as a function call)
 #}
 {% set userStyle = attributes.style|default('') %}
 {% set blurStyle = data.placeholderUri ? 'background-size:cover;background-position:center;background-repeat:no-repeat;background-image:url(' ~ data.placeholderUri ~ ');' : '' %}

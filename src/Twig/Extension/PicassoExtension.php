@@ -68,7 +68,7 @@ final class PicassoExtension extends AbstractExtension
     /**
      * Render a responsive <picture> element (same output as the <Picasso:Image> Twig component).
      *
-     * Intended for consumers that do not install symfony/ux-twig-component.
+     * The function-call counterpart of the component, for templates that cannot use the component syntax.
      *
      * @param array<string, mixed>       $context         Extra context passed to the loader (e.g. entity, field for Vich).
      * @param array<string, scalar|null> $attributes      extra HTML attributes forwarded to the inner <img> tag (alt, class, id, data-*, …)

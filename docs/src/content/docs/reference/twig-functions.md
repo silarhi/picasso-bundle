@@ -1,6 +1,6 @@
 ---
 title: 'Twig functions'
-description: 'picasso_image() and picasso_image_url(): the component without symfony/ux-twig-component, and single image URLs.'
+description: 'picasso_image() and picasso_image_url(): the component as a function call, and single image URLs.'
 sidebar:
     order: 2
 ---
@@ -8,8 +8,9 @@ sidebar:
 Two Twig functions are available:
 
 - **`picasso_image()`** — renders a full responsive `<picture>` element (same
-  output as the `<twig:Picasso:Image>` component) for consumers who don't want to
-  install `symfony/ux-twig-component`.
+  output as the `<twig:Picasso:Image>` component) as a function call, for
+  places where the component syntax is awkward: macros, `{{ }}` expressions,
+  variables built in Twig, or a string returned by a filter.
 - **`picasso_image_url()`** — generates a single transformed image URL.
 
 ## `picasso_image()`
@@ -47,13 +48,13 @@ Useful for backgrounds, meta tags, Open Graph images, or anywhere you need a pla
 
 ```twig
 {# Simple thumbnail #}
-<img src="{{ picasso_image_url('photo.jpg', width: 300, format: 'webp') }}" alt="Thumbnail">
+<img src="{{ picasso_image_url('photo.jpg', width=300, format='webp') }}" alt="Thumbnail">
 
 {# Open Graph meta tag #}
-<meta property="og:image" content="{{ picasso_image_url('hero.jpg', width: 1200, height: 630, format: 'jpg', fit: 'cover') }}">
+<meta property="og:image" content="{{ picasso_image_url('hero.jpg', width=1200, height=630, format='jpg', fit='crop') }}">
 
 {# CSS background image #}
-<div style="background-image: url('{{ picasso_image_url('bg.jpg', width: 1920, format: 'webp', quality: 80) }}')">
+<div style="background-image: url('{{ picasso_image_url('bg.jpg', width=1920, format='webp', quality=80) }}')">
 ```
 
 All available parameters:
@@ -61,16 +62,16 @@ All available parameters:
 ```twig
 {{ picasso_image_url(
     'photo.jpg',
-    width: 800,
-    height: 600,
-    format: 'webp',
-    quality: 85,
-    fit: 'cover',
-    blur: 10,
-    dpr: 2,
-    loader: 'product_image',
-    transformer: 'imgix',
-    context: { entity: product }
+    width=800,
+    height=600,
+    format='webp',
+    quality=85,
+    fit='crop',
+    blur=10,
+    dpr=2,
+    loader='product_image',
+    transformer='imgix',
+    context={ entity: product }
 ) }}
 ```
 

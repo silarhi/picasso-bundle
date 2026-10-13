@@ -21,7 +21,7 @@ use Symfony\UX\TwigComponent\Attribute\PostMount;
 #[AsTwigComponent('Picasso:Image', template: '@Picasso/components/Image.html.twig')]
 class ImageComponent
 {
-    /** The image source path (null renders nothing). */
+    /** The image path for the loader; null when the loader finds the image from the context (e.g. a VichUploader entity). */
     public ?string $src = null;
 
     /** @var array<string, mixed> Extra context passed to the loader (e.g. entity, field for Vich). */
