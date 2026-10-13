@@ -15,7 +15,13 @@ Glide cache is purged automatically — no extra configuration needed. In standa
 
 ## Imgix
 
-Imgix purge requires an API key and a PSR-18 HTTP client:
+Imgix purge requires an API key and a PSR-18 HTTP client with PSR-17 factories:
+
+```bash
+composer require symfony/http-client psr/http-client nyholm/psr7
+```
+
+The default `psr18.http_client` service is only registered when `psr/http-client` is installed, and it needs a PSR-17 implementation such as `nyholm/psr7`.
 
 ```yaml
 picasso:
