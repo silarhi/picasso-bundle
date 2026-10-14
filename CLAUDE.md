@@ -101,6 +101,8 @@ XDEBUG_MODE=off php -d opcache.enable_cli=1 benchmarks/run.php [render|hit|notfo
 docker build -f benchmarks/Dockerfile -t picasso-bench . && docker run --rm picasso-bench [scenario ...]
 ```
 
+The JS tooling (husky + lint-staged at the root, the Starlight site in `docs/`) uses pnpm: its version is pinned by `packageManager` in each `package.json`, and a `pnpm-workspace.yaml` `allowBuilds` list would name the dependencies allowed to run install scripts (none needs one today).
+
 ## CI/CD
 
 - Uses **Laminas CI Matrix Action** (`.github/workflows/continuous-integration.yml`)

@@ -7,7 +7,7 @@ Contributions are welcome! Bug reports and feature requests go to the
 
 ```bash
 composer install
-yarn install # Git hooks: lint-staged formats the staged files on commit
+pnpm install # Git hooks: lint-staged formats the staged files on commit
 ```
 
 ## Quality checks
@@ -57,8 +57,8 @@ The documentation site, [picasso-bundle.silarhi.dev](https://picasso-bundle.sila
 
 ```bash
 cd docs
-yarn install
-yarn dev # http://localhost:4321
+pnpm install
+pnpm dev # http://localhost:4321
 ```
 
 The example images and HTML are rendered by the bundle itself: run `php docs/scripts/render-examples.php` and

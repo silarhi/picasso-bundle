@@ -18,5 +18,5 @@
 /phpunit.xml.dist export-ignore
 /rector.php export-ignore
 /renovate.json export-ignore
-/yarn.lock export-ignore
+/pnpm-lock.yaml export-ignore
 /CONTRIBUTING.md export-ignore
