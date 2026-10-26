@@ -2,10 +2,10 @@
 title: 'Chain'
 description: 'One loader name for images spread over several directories, storages or mappings.'
 sidebar:
-    order: 5
+    order: 6
 ---
 
-Groups several filesystem, flysystem or vich loaders under one name, for images spread over several directories, storages or VichUploader mappings. Each image is rendered with the first loader of the chain holding it:
+Groups several filesystem, flysystem, vich or asset_mapper loaders under one name, for images spread over several directories, storages, VichUploader mappings or asset paths. Each image is rendered with the first loader of the chain holding it:
 
 - an image path goes to the first loader whose directory or storage has it (or to the first loader when none does: its URL then 404s, as with any loader); a storage that is unavailable counts as not having it, so pages still render during its outage;
 - an entity goes to the first vich loader whose mapping one of its fields uses.

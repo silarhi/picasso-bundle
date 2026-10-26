@@ -106,6 +106,10 @@ picasso:
         #     allowed_hosts: []    # hosts Glide may fetch images from ("*.example.com" for subdomains); empty: any host
         #     resolve_metadata: ~  # inherits from global (false)
 
+        # asset_mapper:
+        #     type: asset_mapper   # inferred from key name; reads images by AssetMapper logical path
+        #     resolve_metadata: ~  # auto-set to true for asset_mapper loaders
+
         # images:
         #     type: chain
         #     loaders: [filesystem, my_flysystem]  # tried in order: each image uses the first loader holding it

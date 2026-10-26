@@ -32,6 +32,7 @@ use Silarhi\PicassoBundle\DataCollector\CollectingMetadataGuesser;
 use Silarhi\PicassoBundle\DataCollector\PicassoDataCollector;
 use Silarhi\PicassoBundle\DependencyInjection\UrlAliasPass;
 use Silarhi\PicassoBundle\DependencyInjection\VichLoaderPass;
+use Silarhi\PicassoBundle\Loader\AssetMapperLoader;
 use Silarhi\PicassoBundle\Loader\ChainLoader;
 use Silarhi\PicassoBundle\Loader\FilesystemLoader;
 use Silarhi\PicassoBundle\Loader\FlysystemLoader;
@@ -64,6 +65,7 @@ use Silarhi\PicassoBundle\Twig\Extension\PicassoExtension;
 
 use function sprintf;
 
+use Symfony\Component\AssetMapper\AssetMapperInterface;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
@@ -323,7 +325,7 @@ final class PicassoBundle extends AbstractBundle
                         ->children()
                             ->booleanNode('enabled')->defaultTrue()->end()
                             ->enumNode('type')
-                                ->values(['filesystem', 'flysystem', 'vich', 'url', 'chain'])
+                                ->values(['filesystem', 'flysystem', 'vich', 'url', 'asset_mapper', 'chain'])
                                 ->defaultNull()
                                 ->info('Loader type. Inferred from name when it matches a known type.')
                             ->end()
@@ -377,7 +379,7 @@ final class PicassoBundle extends AbstractBundle
                             ->end()
                             ->scalarNode('resolve_metadata')
                                 ->defaultNull()
-                                ->info('Whether to resolve image metadata for this loader. Null inherits from global. Filesystem loaders default to true.')
+                                ->info('Whether to resolve image metadata for this loader. Null inherits from global. Filesystem and asset_mapper loaders default to true.')
                                 ->validate()
                                     ->ifTrue(static fn (mixed $v): bool => null !== $v && !is_bool($v))
                                     ->thenInvalid('The "resolve_metadata" option must be null or a boolean.')
@@ -516,7 +518,7 @@ final class PicassoBundle extends AbstractBundle
 
         // --- Loaders ---
 
-        $knownTypes = ['filesystem', 'flysystem', 'vich', 'url'];
+        $knownTypes = ['filesystem', 'flysystem', 'vich', 'url', 'asset_mapper'];
         $vichHelperRegistered = false;
         /** @var array<string, string> $loaderPlaceholders */
         $loaderPlaceholders = [];
@@ -569,8 +571,8 @@ final class PicassoBundle extends AbstractBundle
                 $loaderTransformers[$name] = $loaderConfig['default_transformer'];
             }
 
-            // Auto-set resolve_metadata to true for filesystem loaders when not explicitly configured
-            $resolveMetadata = $loaderConfig['resolve_metadata'] ?? ('filesystem' === $type ? true : null);
+            // Auto-set resolve_metadata to true for local loaders when not explicitly configured
+            $resolveMetadata = $loaderConfig['resolve_metadata'] ?? (in_array($type, ['filesystem', 'asset_mapper'], true) ? true : null);
             if (null !== $resolveMetadata) {
                 $tag['resolve_metadata'] = $resolveMetadata;
                 $loaderResolveMetadata[$name] = $resolveMetadata;
@@ -612,6 +614,16 @@ final class PicassoBundle extends AbstractBundle
                         ])
                         ->tag('picasso.loader', $tag)
                         ->tag('kernel.reset', ['method' => 'reset']);
+                    break;
+
+                case 'asset_mapper':
+                    if (!interface_exists(AssetMapperInterface::class)) {
+                        throw new Exception\InvalidConfigurationException(sprintf('Loader "%s": an asset_mapper loader requires symfony/asset-mapper. Run "composer require symfony/asset-mapper".', $name));
+                    }
+
+                    $services->set('picasso.loader.' . $name, AssetMapperLoader::class)
+                        ->args([service('asset_mapper')])
+                        ->tag('picasso.loader', $tag);
                     break;
 
                 case 'vich':
@@ -1017,8 +1029,8 @@ final class PicassoBundle extends AbstractBundle
                 ? $loaders[$loader]['type'] ?? (in_array($loader, $knownTypes, true) ? $loader : null)
                 : null;
 
-            if (!in_array($type, ['filesystem', 'flysystem', 'vich'], true)) {
-                throw new Exception\InvalidConfigurationException(sprintf('Loader "%s": chain member "%s" must be a filesystem, flysystem or vich loader declared under "picasso.loaders".', $name, $loader));
+            if (!in_array($type, ['filesystem', 'flysystem', 'vich', 'asset_mapper'], true)) {
+                throw new Exception\InvalidConfigurationException(sprintf('Loader "%s": chain member "%s" must be a filesystem, flysystem, vich or asset_mapper loader declared under "picasso.loaders".', $name, $loader));
             }
         }
     }
