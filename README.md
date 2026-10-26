@@ -92,15 +92,15 @@ tedious and error-prone.
 PicassoBundle solves this the same way Next.js Image did for React:
 **a single component that handles everything**.
 
-|                         | Without PicassoBundle                 | With PicassoBundle                       |
-| ----------------------- | ------------------------------------- | ---------------------------------------- |
-| **Format negotiation**  | Manual AVIF/WebP/JPEG `<source>` tags | Automatic from config                    |
-| **Responsive srcset**   | Hand-crafted per breakpoint           | Generated from `sizes` prop              |
-| **Blur placeholders**   | DIY or skip it                        | Built-in (LQIP, BlurHash, or custom)     |
-| **Dimension detection** | Hardcoded or forgotten                | Auto-detected from image stream          |
-| **LCP optimization**    | Manually set loading/fetchpriority    | One `priority` prop                      |
-| **Image sources**       | Filesystem only                       | Filesystem, S3, Flysystem, Vich, URL     |
-| **CDN support**         | Build your own integration            | Imgix out of the box, or plug in any CDN |
+|                         | Without PicassoBundle                 | With PicassoBundle                                |
+| ----------------------- | ------------------------------------- | ------------------------------------------------- |
+| **Format negotiation**  | Manual AVIF/WebP/JPEG `<source>` tags | Automatic from config                             |
+| **Responsive srcset**   | Hand-crafted per breakpoint           | Generated from `sizes` prop                       |
+| **Blur placeholders**   | DIY or skip it                        | Built-in (LQIP, BlurHash, or custom)              |
+| **Dimension detection** | Hardcoded or forgotten                | Auto-detected from image stream                   |
+| **LCP optimization**    | Manually set loading/fetchpriority    | One `priority` prop                               |
+| **Image sources**       | Filesystem only                       | Filesystem, S3, Flysystem, Vich, URL, AssetMapper |
+| **CDN support**         | Build your own integration            | Imgix out of the box, or plug in any CDN          |
 
 ---
 
@@ -112,7 +112,7 @@ PicassoBundle solves this the same way Next.js Image did for React:
 - **Smart dimension detection** — reads image dimensions from the stream automatically, preserves aspect ratio
 - **Priority images** — one prop for `loading="eager"` + `fetchpriority="high"` (LCP optimization)
 - **Multiple image sources** — Local filesystem, [Flysystem](https://flysystem.thephpleague.com/) (S3, GCS, Azure),
-  [VichUploaderBundle](https://github.com/dustin10/VichUploaderBundle), remote URLs
+  [VichUploaderBundle](https://github.com/dustin10/VichUploaderBundle), remote URLs, AssetMapper assets
 - **Local or CDN transforms** —
   [Glide](https://glide.thephpleague.com/) for self-hosted,
   [Imgix](https://imgix.com/) for CDN, or bring your own
@@ -129,7 +129,7 @@ PicassoBundle solves this the same way Next.js Image did for React:
 - Symfony 6.4, 7.x or 8.x
 - [Symfony UX Twig Component](https://symfony.com/bundles/ux-twig-component/current/index.html) 2.13+
 
-Glide, BlurHash, Flysystem, VichUploaderBundle and remote URLs each need an optional package: see
+Glide, BlurHash, Flysystem, VichUploaderBundle, AssetMapper and remote URLs each need an optional package: see
 [Installation](https://picasso-bundle.silarhi.dev/getting-started/installation/).
 
 ## Installation
@@ -190,7 +190,7 @@ placeholder — all automatically. Placeholders are opt-in: without the
 Everything else is on **[picasso-bundle.silarhi.dev](https://picasso-bundle.silarhi.dev)**:
 
 - **Guides**: [responsive images](https://picasso-bundle.silarhi.dev/guides/responsive-images/), [fit modes](https://picasso-bundle.silarhi.dev/guides/fit-modes/), [placeholders](https://picasso-bundle.silarhi.dev/guides/placeholders/), [priority images](https://picasso-bundle.silarhi.dev/guides/priority-images/), [private images](https://picasso-bundle.silarhi.dev/guides/private-images/), [cache purge](https://picasso-bundle.silarhi.dev/guides/cache-purge/), [JSON API](https://picasso-bundle.silarhi.dev/guides/json-api/)
-- **Image sources**: [filesystem](https://picasso-bundle.silarhi.dev/sources/filesystem/), [Flysystem](https://picasso-bundle.silarhi.dev/sources/flysystem/), [VichUploaderBundle](https://picasso-bundle.silarhi.dev/sources/vichuploader/), [remote URLs](https://picasso-bundle.silarhi.dev/sources/remote-urls/), [chain](https://picasso-bundle.silarhi.dev/sources/chain/), [custom](https://picasso-bundle.silarhi.dev/sources/custom/)
+- **Image sources**: [filesystem](https://picasso-bundle.silarhi.dev/sources/filesystem/), [Flysystem](https://picasso-bundle.silarhi.dev/sources/flysystem/), [VichUploaderBundle](https://picasso-bundle.silarhi.dev/sources/vichuploader/), [AssetMapper](https://picasso-bundle.silarhi.dev/sources/asset-mapper/), [remote URLs](https://picasso-bundle.silarhi.dev/sources/remote-urls/), [chain](https://picasso-bundle.silarhi.dev/sources/chain/), [custom](https://picasso-bundle.silarhi.dev/sources/custom/)
 - **Transformers**: [Glide](https://picasso-bundle.silarhi.dev/transformers/glide/), [Imgix](https://picasso-bundle.silarhi.dev/transformers/imgix/), [serving from a CDN](https://picasso-bundle.silarhi.dev/transformers/cdn/), [custom](https://picasso-bundle.silarhi.dev/transformers/custom/)
 - **Reference**: [configuration](https://picasso-bundle.silarhi.dev/reference/configuration/), [component](https://picasso-bundle.silarhi.dev/reference/component/), [Twig functions](https://picasso-bundle.silarhi.dev/reference/twig-functions/), [routes](https://picasso-bundle.silarhi.dev/reference/routes/)
 - **Concepts**: [how it works](https://picasso-bundle.silarhi.dev/concepts/how-it-works/), [performance](https://picasso-bundle.silarhi.dev/concepts/performance/)

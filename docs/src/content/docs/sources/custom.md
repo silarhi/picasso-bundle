@@ -2,7 +2,7 @@
 title: 'Custom loader'
 description: 'Write your own loader, and let Glide serve its images.'
 sidebar:
-    order: 6
+    order: 7
 ---
 
 Create a custom loader by implementing `ImageLoaderInterface` and tagging it with `#[AsImageLoader]`:

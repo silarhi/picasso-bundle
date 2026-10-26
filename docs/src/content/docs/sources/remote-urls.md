@@ -2,7 +2,7 @@
 title: 'Remote URLs'
 description: 'Transform images hosted on other servers, safely.'
 sidebar:
-    order: 4
+    order: 5
 ---
 
 Loads and transforms remote images by URL. Requires a PSR-18 HTTP client and a PSR-17 request factory.
