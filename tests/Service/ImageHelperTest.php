@@ -20,6 +20,7 @@ use function in_array;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
+use Psr\Link\LinkInterface;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Dto\ImageSource;
@@ -28,12 +29,16 @@ use Silarhi\PicassoBundle\Dto\SrcsetEntry;
 use Silarhi\PicassoBundle\Placeholder\PlaceholderInterface;
 use Silarhi\PicassoBundle\Service\ImageHelper;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
+use Silarhi\PicassoBundle\Service\ImagePreloader;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
 use Silarhi\PicassoBundle\Service\PlaceholderRegistry;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\WebLink\GenericLinkProvider;
 
 class ImageHelperTest extends TestCase
 {
@@ -719,6 +724,40 @@ class ImageHelperTest extends TestCase
         self::assertNull($data->fetchPriority);
     }
 
+    public function testPreloadsPriorityImagesOnly(): void
+    {
+        $this->pipeline->method('load')
+            ->willReturn(new Image(path: 'photo.jpg'));
+        $this->configureSrcsetGenerator();
+        $request = new Request();
+        $requestStack = new RequestStack();
+        $requestStack->push($request);
+
+        $helper = new ImageHelper(
+            pipeline: $this->pipeline,
+            srcsetGenerator: $this->srcsetGenerator,
+            transformerRegistry: $this->transformerRegistry,
+            metadataGuesser: $this->metadataGuesser,
+            placeholderRegistry: $this->placeholderRegistry,
+            loaderRegistry: $this->loaderRegistry,
+            formats: ['avif', 'webp', 'jpg'],
+            defaultQuality: 75,
+            defaultFit: 'contain',
+            preloader: new ImagePreloader($requestStack),
+        );
+
+        $helper->imageData(src: 'photo.jpg', sizes: '100vw', fetchPriority: 'high');
+        self::assertFalse($request->attributes->has('_links'));
+
+        $data = $helper->imageData(src: 'photo.jpg', sizes: '100vw', priority: true);
+        $preloads = self::preloads($request);
+        self::assertCount(1, $preloads);
+        self::assertSame($data->sources[0]->srcset, $preloads[0]->getAttributes()['imagesrcset'] ?? null);
+
+        $helper->imageData(src: '/logo.svg', priority: true, unoptimized: true);
+        self::assertCount(2, self::preloads($request));
+    }
+
     public function testGetMimeTypeForEachSourceFormat(): void
     {
         $this->pipeline->method('load')
@@ -1015,5 +1054,21 @@ class ImageHelperTest extends TestCase
         ]);
         $this->srcsetGenerator->method('buildSrcsetString')->willReturn('/img/photo.jpg?w=640 640w');
         $this->srcsetGenerator->method('getFallbackUrl')->willReturn('/img/photo.jpg');
+    }
+
+    /**
+     * @return list<LinkInterface>
+     */
+    private static function preloads(Request $request): array
+    {
+        $links = $request->attributes->get('_links');
+        self::assertInstanceOf(GenericLinkProvider::class, $links);
+        $preloads = [];
+        foreach ($links->getLinks() as $link) {
+            self::assertInstanceOf(LinkInterface::class, $link);
+            $preloads[] = $link;
+        }
+
+        return $preloads;
     }
 }

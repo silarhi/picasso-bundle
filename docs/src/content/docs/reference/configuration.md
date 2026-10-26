@@ -53,6 +53,9 @@ picasso:
         immutable: true # served images never change meaning, so caches need not revalidate them
         error_max_age: ~ # seconds a 404 may be cached by clients and CDNs (null: not cacheable)
 
+    # --- Preload of priority images (needs symfony/web-link) ---
+    preload: true # adds a Link: rel=preload header for every priority image
+
     # --- Web profiler data collector (dev only) ---
     collector: false # set to true to record image renders / URL generations in the Symfony toolbar
 
@@ -211,6 +214,13 @@ Configures PSR-6 caching for metadata detection (image dimensions) and BlurHash 
 - `true` (default) — uses the `cache.app` service
 - `false` — disables caching
 - `'my_cache_pool'` — uses a custom PSR-6 cache pool service ID
+
+### `preload`
+
+Preloads every [priority image](/guides/priority-images/#preloading) through a `Link: rel=preload` response header, added with `symfony/web-link`.
+
+- `true` (default) — preloads priority images when `symfony/web-link` is installed; does nothing without it
+- `false` — never preloads
 
 ### `collector`
 
