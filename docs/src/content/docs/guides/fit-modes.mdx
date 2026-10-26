@@ -48,8 +48,25 @@ Glide 2 does not know `cover`: it renders it as `contain`. Use `crop` if you sti
 - **A photo in an article**: keep `contain`, and give only a `width` (the height follows the source ratio), so the browser reserves the right space.
 - **A logo in a fixed slot**: `fill` keeps it whole. Prefer a transparent PNG or WebP there: the bands are then transparent rather than white.
 
+## Choosing what to keep
+
+`crop` keeps the center of the image. When the subject is elsewhere, say which part to keep in the fit value itself, so no extra prop is needed:
+
+```twig
+{# The face sits at 30% of the width and 20% of the height of the photo #}
+<twig:Picasso:Image src="team.jpg" width="400" height="400" fit="crop-30-20" alt="Our team" />
+```
+
+| Fit                                                                | Keeps                                                                       |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------- |
+| `crop-<x>-<y>`                                                     | The focal point at `x`% of the width and `y`% of the height, as centered as the box allows |
+| `crop-<x>-<y>-<zoom>`                                              | The same, zoomed in (`crop-30-20-2` doubles the size of the subject)        |
+| `crop-top-left`, `crop-top`, `crop-top-right`, `crop-left`, `crop-right`, `crop-bottom-left`, `crop-bottom`, `crop-bottom-right` | That side or corner                         |
+
+The focal point is in percent, not in pixels: it stays right whatever the resolution of the source, so it can be stored once next to the image (an entity field, for example) and passed to every render: `fit="crop-{{ photo.focalX }}-{{ photo.focalY }}"`. Every candidate of the `srcset` is cut around the same point.
+
 Set the default for every image with [`default_fit`](/reference/configuration/#default_fit), and override it per image with the `fit` prop or the `fit` argument of [`picasso_image_url()`](/reference/twig-functions/).
 
 :::note[With Imgix]
-[Imgix](/transformers/imgix/) maps the same values to its own modes: `contain` to `clip`, `cover` and `crop` to `crop`, `fill` to `fill`, which pads like Glide does. Any other value is passed to Imgix unchanged.
+[Imgix](/transformers/imgix/) maps the same values to its own modes: `contain` to `clip`, `cover` and `crop` to `crop`, `fill` to `fill`, which pads like Glide does. A focal point becomes `crop=focalpoint` with `fp-x`, `fp-y` (and `fp-z` for the zoom), a side or corner `crop=top,left` and the like. Any other value is passed to Imgix unchanged.
 :::

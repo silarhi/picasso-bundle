@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Tests\Transformer;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
@@ -75,6 +76,34 @@ class ImgixTransformerTest extends TestCase
         $url = $transformer->url($image, $transformation);
 
         self::assertStringContainsString('fit=crop', $url);
+    }
+
+    /**
+     * @param array<string, string> $expected
+     */
+    #[DataProvider('cropFits')]
+    public function testUrlMapsGlideCropPositionsAndFocalPoints(string $fit, array $expected): void
+    {
+        $transformer = new ImgixTransformer('https://example.imgix.net');
+
+        $url = $transformer->url(new Image(path: 'photo.jpg'), new ImageTransformation(width: 300, height: 300, fit: $fit));
+
+        parse_str((string) parse_url($url, \PHP_URL_QUERY), $query);
+        self::assertSame(['w' => '300', 'h' => '300', ...$expected], $query);
+    }
+
+    /**
+     * @return iterable<string, array{string, array<string, string>}>
+     */
+    public static function cropFits(): iterable
+    {
+        yield 'focal point' => ['crop-25-75', ['fit' => 'crop', 'crop' => 'focalpoint', 'fp-x' => '0.25', 'fp-y' => '0.75']];
+        yield 'focal point on the edges' => ['crop-0-100', ['fit' => 'crop', 'crop' => 'focalpoint', 'fp-x' => '0', 'fp-y' => '1']];
+        yield 'focal point with zoom' => ['crop-50-30-1.5', ['fit' => 'crop', 'crop' => 'focalpoint', 'fp-x' => '0.5', 'fp-y' => '0.3', 'fp-z' => '1.5']];
+        yield 'corner' => ['crop-top-left', ['fit' => 'crop', 'crop' => 'top,left']];
+        yield 'edge' => ['cover-bottom', ['fit' => 'crop', 'crop' => 'bottom']];
+        yield 'center' => ['crop-center', ['fit' => 'crop']];
+        yield 'unknown value' => ['crop-somewhere', ['fit' => 'crop-somewhere']];
     }
 
     public function testUrlMapsAllParams(): void

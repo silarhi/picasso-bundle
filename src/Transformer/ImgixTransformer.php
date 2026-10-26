@@ -123,7 +123,7 @@ final readonly class ImgixTransformer implements PurgableTransformerInterface
             $imgix['q'] = $transformation->quality;
         }
         if (null !== $transformation->fit) {
-            $imgix['fit'] = $this->mapFit($transformation->fit);
+            $imgix = [...$imgix, ...$this->mapFit($transformation->fit)];
         }
 
         if (null !== $transformation->blur) {
@@ -137,16 +137,40 @@ final readonly class ImgixTransformer implements PurgableTransformerInterface
     }
 
     /**
+     * Map a fit mode to Imgix params. Glide's crop positions ("crop-top-left") and focal points ("crop-25-75", in
+     * percent of the width and height, with an optional zoom: "crop-25-75-2") become Imgix crop modes, so a template
+     * keeps one fit value whatever the transformer.
+     *
      * @see https://docs.imgix.com/apis/rendering/size/resize-fit-mode
+     * @see https://docs.imgix.com/apis/rendering/size/crop
+     *
+     * @return array<string, string>
      */
-    private function mapFit(string $fit): string
+    private function mapFit(string $fit): array
     {
-        return match ($fit) {
+        if (1 === preg_match('/^crop-(\d{1,3})-(\d{1,3})(?:-(\d{1,3}(?:\.\d+)?))?$/', $fit, $focalPoint)) {
+            return [
+                'fit' => 'crop',
+                'crop' => 'focalpoint',
+                'fp-x' => (string) ((int) $focalPoint[1] / 100),
+                'fp-y' => (string) ((int) $focalPoint[2] / 100),
+                ...(isset($focalPoint[3]) ? ['fp-z' => $focalPoint[3]] : []),
+            ];
+        }
+
+        if (1 === preg_match('/^(?:crop|cover)-(top-left|top|top-right|left|center|right|bottom-left|bottom|bottom-right)$/', $fit, $position)) {
+            // Imgix centers by default and takes the edges to keep: "top,left"
+            return 'center' === $position[1]
+                ? ['fit' => 'crop']
+                : ['fit' => 'crop', 'crop' => str_replace('-', ',', $position[1])];
+        }
+
+        return ['fit' => match ($fit) {
             'contain' => 'clip',
             'cover', 'crop' => 'crop',
             'fill' => 'fill',
             default => $fit,
-        };
+        }];
     }
 
     /**

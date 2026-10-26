@@ -72,6 +72,27 @@ class EndToEndImageServingTest extends KernelTestCase
         self::assertStringContainsString('image/', (string) $response->headers->get('Content-Type'));
     }
 
+    public function testRenderAndServeAFocalPointCrop(): void
+    {
+        $rendered = $this->renderTwigComponent('Picasso:Image', [
+            'src' => 'photo.jpg',
+            'width' => 40,
+            'height' => 40,
+            'fit' => 'crop-25-75',
+        ]);
+
+        $srcUrl = $this->parseSrcFromImg($rendered->toString());
+        self::assertStringContainsString('fit=crop-25-75', $srcUrl);
+
+        $response = $this->handleRequest($srcUrl);
+        self::assertSame(200, $response->getStatusCode(), 'Focal point crop serving failed: ' . $response->getContent());
+        ob_start();
+        $response->sendContent();
+        $size = getimagesizefromstring((string) ob_get_clean());
+        self::assertNotFalse($size);
+        self::assertSame([40, 40], [$size[0], $size[1]]);
+    }
+
     public function testRenderAndServeSrcsetEntries(): void
     {
         $rendered = $this->renderTwigComponent('Picasso:Image', [
