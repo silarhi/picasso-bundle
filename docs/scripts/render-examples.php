@@ -18,8 +18,8 @@ use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Placeholder\BlurHashPlaceholder;
 
 // Renders the example images of the documentation with the bundle's own transformations, so the pages show what
-// Picasso really outputs: fit modes, placeholders and srcset variants of docs/src/assets/source/meeting.jpg, and focal
-// points on docs/src/assets/source/kittens.jpg (by The Lucky Neko on Unsplash, https://unsplash.com/photos/uePn9YCTCY0).
+// Picasso really outputs: fit modes, focal points, placeholders and srcset variants of docs/src/assets/source/kittens.jpg
+// (by The Lucky Neko on Unsplash, https://unsplash.com/photos/uePn9YCTCY0).
 //
 //     php docs/scripts/render-examples.php
 //
@@ -31,7 +31,7 @@ $docs = \dirname(__DIR__);
 $sourceDir = $docs . '/src/assets/source';
 $outputDir = $docs . '/src/assets/examples';
 $cacheDir = sys_get_temp_dir() . '/picasso-docs-' . bin2hex(random_bytes(4));
-$source = 'meeting.jpg';
+$source = 'kittens.jpg';
 
 $server = ServerFactory::create(['source' => $sourceDir, 'cache' => $cacheDir, 'driver' => 'gd']);
 
@@ -42,8 +42,8 @@ $server = ServerFactory::create(['source' => $sourceDir, 'cache' => $cacheDir, '
  *
  * @return array{file: string, bytes: int, width: int, height: int}
  */
-$render = static function (string $name, array $params, ?string $from = null) use ($server, $source, $cacheDir, $outputDir): array {
-    $cached = $server->makeImage($from ?? $source, $params);
+$render = static function (string $name, array $params) use ($server, $source, $cacheDir, $outputDir): array {
+    $cached = $server->makeImage($source, $params);
     $target = $outputDir . '/' . $name;
     copy($cacheDir . '/' . $cached, $target);
     [$width, $height] = getimagesize($target) ?: [0, 0];
@@ -61,7 +61,7 @@ foreach (['contain', 'cover', 'crop', 'fill'] as $fit) {
 
 // Focal points: a narrow box over three kittens side by side, where `crop` keeps the middle one
 foreach (['crop', 'crop-28-55', 'crop-73-55', 'crop-50-45-2'] as $fit) {
-    $data['focal'][$fit] = $render("focal-{$fit}.jpg", ['w' => 240, 'h' => 480, 'fit' => $fit, 'fm' => 'jpg', 'q' => 75], 'kittens.jpg');
+    $data['focal'][$fit] = $render("focal-{$fit}.jpg", ['w' => 240, 'h' => 480, 'fit' => $fit, 'fm' => 'jpg', 'q' => 75]);
 }
 
 // Formats: one 800 wide variant per default format, to compare their weight

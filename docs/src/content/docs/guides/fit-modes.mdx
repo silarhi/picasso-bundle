@@ -18,10 +18,10 @@ import examples from '../../../data/examples.json'
 
 export const size = (fit) => `${examples.fit[fit].width} × ${examples.fit[fit].height}`
 
-When an image gets both a `width` and a `height`, `fit` decides how a source of another aspect ratio goes into that box. The same 3:2 photo, asked for as a 480 × 480 square:
+When an image gets both a `width` and a `height`, `fit` decides how a source of another aspect ratio goes into that box. The same photo of three kittens, wider than tall, asked for as a 480 × 480 square:
 
 ```twig
-<twig:Picasso:Image src="meeting.jpg" width="480" height="480" fit="contain" alt="…" />
+<twig:Picasso:Image src="kittens.jpg" width="480" height="480" fit="contain" alt="…" />
 ```
 
 <Gallery
@@ -32,7 +32,7 @@ When an image gets both a `width` and a `height`, `fit` decides how a source of 
         { src: crop, alt: 'crop: the box filled, the sides cropped', label: 'crop', note: size('crop') },
         { src: fill, alt: 'fill: the whole photo, padded with white bands', label: 'fill', note: `${size('fill')}, padded` },
     ]}
-    caption="Rendered by Glide, the checkerboard marks the 480 × 480 box. contain returns a smaller image, fill pads it to the box."
+    caption="Rendered by Glide from a photo by The Lucky Neko on Unsplash, the checkerboard marks the 480 × 480 box. contain returns a smaller image, fill pads it to the box."
 />
 
 | Fit                   | Keeps the whole image | Output is exactly `width` × `height` | Use it for                                                |
@@ -69,7 +69,7 @@ Glide 2 does not know `cover`: it renders it as `contain`. Use `crop` if you sti
         { src: focalRight, alt: 'crop-73-55: the right kitten', label: 'crop-73-55', note: 'the right kitten' },
         { src: focalZoom, alt: 'crop-50-45-2: the face of the middle kitten, twice as large', label: 'crop-50-45-2', note: 'zoomed in twice' },
     ]}
-    caption="Rendered by Glide from the same photo (by The Lucky Neko on Unsplash)."
+    caption="Rendered by Glide from the same photo."
 />
 
 | Fit                                                                | Keeps                                                                       |
