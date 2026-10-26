@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - Unreleased
+
+### Added
+
+- `asset_mapper` loader: renders and serves the images [AssetMapper](https://symfony.com/doc/current/frontend/asset_mapper.html) maps, by the logical path given to `asset()` (`src="images/hero.jpg"`), without repeating asset directories in the Picasso configuration. It reads dimensions by default, like the filesystem loader, and can be a chain member. Requires `symfony/asset-mapper` ([AssetMapper](https://picasso-bundle.silarhi.dev/sources/asset-mapper/)).
+
 ## [2.5.0] - 2026-10-12
 
 ### Changed

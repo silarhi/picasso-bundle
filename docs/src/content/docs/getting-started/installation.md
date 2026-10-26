@@ -23,6 +23,7 @@ sidebar:
 | `kornrunner/blurhash` + `imagine/imagine` | BlurHash placeholder                                                         |
 | `league/flysystem-bundle`                 | Flysystem loader                                                             |
 | `vich/uploader-bundle`                    | VichUploader loader                                                          |
+| `symfony/asset-mapper`                    | [AssetMapper loader](/sources/asset-mapper/)                                 |
 | `symfony/http-client` + `psr/http-client` + `nyholm/psr7` | URL loader, Imgix cache purge ([PSR-18 client](/sources/remote-urls/))   |
 
 ## Installation
