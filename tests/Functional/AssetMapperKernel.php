@@ -25,6 +25,8 @@ class AssetMapperKernel extends AbstractPicassoKernel
     protected function configureContainer(ContainerBuilder $container): void
     {
         $container->loadFromExtension('framework', [
+            // FrameworkBundle 6.4.0 wires the importmap resolver of AssetMapper on http_client without enabling it
+            'http_client' => ['enabled' => true],
             'asset_mapper' => [
                 'paths' => [__DIR__ . '/../Fixtures' => 'images'],
             ],
