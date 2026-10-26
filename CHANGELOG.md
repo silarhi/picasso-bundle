@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - Unreleased
+
+### Added
+
+- Focal-point cropping without a new prop: `fit="crop-30-20"` keeps the point at 30% of the width and 20% of the height (`crop-30-20-2` zooms in), and `fit="crop-top-left"` and the other sides and corners keep that part of the image. Glide already read these values; the Imgix transformer now maps them to `crop=focalpoint` with `fp-x`/`fp-y`/`fp-z`, and to `crop=top,left` and the like, instead of passing them through unchanged ([Fit modes](https://picasso-bundle.silarhi.dev/guides/fit-modes/#choosing-what-to-keep)).
+
 ## [2.5.0] - 2026-10-12
 
 ### Changed

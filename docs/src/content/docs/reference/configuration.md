@@ -187,7 +187,7 @@ Controls how images are resized within the target dimensions:
 | `crop`    | Fills the box, keeping the aspect ratio, cropping the excess                      |
 | `fill`    | Fits inside the box, then pads it to the exact box size                           |
 
-See them rendered side by side in [Fit modes](/guides/fit-modes/).
+See them rendered side by side in [Fit modes](/guides/fit-modes/), which also covers keeping a [focal point](/guides/fit-modes/#choosing-what-to-keep) (`crop-30-20`).
 
 ### `resolve_metadata`
 

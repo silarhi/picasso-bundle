@@ -30,7 +30,7 @@ The `<twig:Picasso:Image>` component renders a responsive `<picture>` element wi
 | `loader`          | `string`       | —       | Override default loader                                              |
 | `transformer`     | `string`       | —       | Override default transformer                                         |
 | `quality`         | `int`          | 75      | Override quality (1–100)                                             |
-| `fit`             | `string`       | contain | Fit mode: `contain`, `cover`, `crop`, `fill`                         |
+| `fit`             | `string`       | contain | Fit mode: `contain`, `cover`, `crop`, `fill`, or a [focal point](/guides/fit-modes/#choosing-what-to-keep) (`crop-30-20`) |
 | `placeholder`     | `string\|bool` | —       | `true`/`false` to enable/disable, or a placeholder name              |
 | `placeholderData` | `string`       | —       | Literal data URI, bypasses placeholder services                      |
 | `priority`        | `bool`         | false   | Eager loading, `fetchpriority="high"`, no placeholder                |
