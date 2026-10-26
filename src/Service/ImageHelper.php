@@ -44,6 +44,7 @@ final readonly class ImageHelper implements ImageHelperInterface
         private ?string $defaultPlaceholder = null,
         private bool $defaultResolveMetadata = false,
         private ?Stopwatch $stopwatch = null,
+        private ?ImagePreloader $preloader = null,
     ) {
     }
 
@@ -119,7 +120,7 @@ final readonly class ImageHelper implements ImageHelperInterface
         $fetchPriority ??= $priority ? 'high' : null;
 
         if ($unoptimized) {
-            return new ImageRenderData(
+            return $this->preload($priority, new ImageRenderData(
                 fallbackSrc: $src,
                 fallbackSrcset: null,
                 sources: [],
@@ -131,7 +132,7 @@ final readonly class ImageHelper implements ImageHelperInterface
                 sizes: $sizes,
                 unoptimized: true,
                 attributes: $attributes,
-            );
+            ));
         }
 
         $loaderName = $this->pipeline->resolveLoaderName($loader);
@@ -171,7 +172,7 @@ final readonly class ImageHelper implements ImageHelperInterface
             $resolvedSourceWidth, $resolvedSourceHeight, $width, $height, $sizes, $quality, $fit,
         );
 
-        return new ImageRenderData(
+        return $this->preload($priority, new ImageRenderData(
             fallbackSrc: $fallbackSrc,
             fallbackSrcset: $fallbackSrcset,
             sources: $sources,
@@ -186,7 +187,16 @@ final readonly class ImageHelper implements ImageHelperInterface
             loader: $servingLoader,
             transformer: $transformerName,
             placeholder: $placeholderName,
-        );
+        ));
+    }
+
+    private function preload(bool $priority, ImageRenderData $data): ImageRenderData
+    {
+        if ($priority) {
+            $this->preloader?->preload($data);
+        }
+
+        return $data;
     }
 
     /**

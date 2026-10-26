@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - Unreleased
+
+### Added
+
+- Priority images are preloaded: with `symfony/web-link` installed, rendering an image with `priority` adds a `Link: <…>; rel="preload"; as="image"; fetchpriority="high"` header to the response, with the `type`, `imagesrcset` and `imagesizes` of the `<picture>`'s first `<source>`, so the browser fetches the image before it parses the `<picture>` (and the header can go out as 103 Early Hints). Turn it off with the new `preload` option ([Priority images](https://picasso-bundle.silarhi.dev/guides/priority-images/#preloading)).
+
 ## [2.5.0] - 2026-10-12
 
 ### Changed

@@ -42,7 +42,8 @@ src/
 │                       #   LegacyMetadataResolver (@internal: 1.x "_metadata" tokens → loader),
 │                       #   UrlAliases (loader/transformer names ↔ their URL segments),
 │                       #   ImageServer (serves images from the application's own routes),
-│                       #   TransformerContextFactory (@internal: transformer context, route checks)
+│                       #   TransformerContextFactory (@internal: transformer context, route checks),
+│                       #   ImagePreloader (@internal: Link preload of priority images, symfony/web-link)
 ├── Transformer/        # GlideTransformer, ImgixTransformer + interfaces
 │                       #   (ImageTransformerInterface, LocalTransformerInterface, PurgableTransformerInterface),
 │                       #   DeferredCacheWriter (@internal: kernel.terminate upload of Glide misses),
@@ -152,6 +153,7 @@ The JS tooling (husky + lint-staged at the root, the Starlight site in `docs/`) 
 - **ImagePipeline** orchestrates loader + transformer for the Twig function. Also provides a `purge()` convenience method that resolves loader/transformer names and delegates to `PurgableTransformerInterface::purge()`.
     - `resolveTransformerName(?transformer, ?loaderName)` is the **only** transformer resolution: the given transformer, else the loader's `default_transformer`, else the global `default_transformer`. `url()`, `purge()`, `ImageHelper::imageData()`, `ImageServer::serve()` and `CollectingImageHelper` all call it with the resolved name of the _requested_ loader (never a chain's delegate). Do not reimplement it: Glide URLs are signed with the transformer's key, so a URL generated with one resolution and served with another 404s. A null `loaderName` skips loader defaults.
 - **ImageHelper** provides a convenience API for generating single image URLs with named parameters. Supports `resolveMetadata` parameter to control metadata resolution at runtime.
+    - **Preload** (`preload` option, default `true`, optional `symfony/web-link`): `ImageHelper::imageData()` hands every `priority` render to the `@internal` `ImagePreloader` (its last, nullable constructor argument, only wired when the option is on and `GenericLinkProvider` exists), which adds a `rel=preload; as=image; fetchpriority=high` link to the **main** request's `_links` attribute, like web-link's `preload()` Twig function; FrameworkBundle's `AddLinkHeaderListener` turns it into a `Link` header. It preloads the first `<source>` (with `type`, `imagesrcset`, and the srcset's first URL as href) or, without sources, the `<img>` (`fallbackSrc`, `fallbackSrcset`). It is a collaborator, not an `ImageHelperInterface` decorator: decorating `picasso.image_helper` would hand a different class to services autowiring the concrete `ImageHelper`.
 - **ImageComponent** is the main Twig component (`<twig:Picasso:Image>`) that generates `<picture>` with `<source>` elements. Supports `resolveMetadata` prop.
 - **PicassoExtension** registers two Twig functions:
     - `picasso_image_url(path, …)` — returns a single transformed image URL.
