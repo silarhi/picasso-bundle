@@ -148,19 +148,19 @@ class BundleWiringTest extends TestCase
         ];
         yield 'unknown member' => [
             ['all' => ['type' => 'chain', 'loaders' => ['nope']]],
-            'Loader "all": chain member "nope" must be a filesystem, flysystem or vich loader declared under "picasso.loaders".',
+            'Loader "all": chain member "nope" must be a filesystem, flysystem, vich or asset_mapper loader declared under "picasso.loaders".',
         ];
         yield 'disabled member' => [
             ['uploads' => ['type' => 'filesystem', 'path' => '/uploads', 'enabled' => false], 'all' => ['type' => 'chain', 'loaders' => ['uploads']]],
-            'Loader "all": chain member "uploads" must be a filesystem, flysystem or vich loader declared under "picasso.loaders".',
+            'Loader "all": chain member "uploads" must be a filesystem, flysystem, vich or asset_mapper loader declared under "picasso.loaders".',
         ];
         yield 'member that would fetch remote images to tell whether it holds one' => [
             ['url' => [], 'all' => ['type' => 'chain', 'loaders' => ['url']]],
-            'Loader "all": chain member "url" must be a filesystem, flysystem or vich loader declared under "picasso.loaders".',
+            'Loader "all": chain member "url" must be a filesystem, flysystem, vich or asset_mapper loader declared under "picasso.loaders".',
         ];
         yield 'nested chain' => [
             ['inner' => ['type' => 'chain', 'loaders' => ['all']], 'all' => ['type' => 'chain', 'loaders' => ['inner']]],
-            'Loader "inner": chain member "all" must be a filesystem, flysystem or vich loader declared under "picasso.loaders".',
+            'Loader "inner": chain member "all" must be a filesystem, flysystem, vich or asset_mapper loader declared under "picasso.loaders".',
         ];
         yield 'loaders on another type' => [
             ['uploads' => ['type' => 'filesystem', 'path' => '/uploads', 'loaders' => ['assets']]],

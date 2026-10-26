@@ -42,6 +42,7 @@
         "psr/http-client": "^1.0.3",
         "psr/http-factory": "^1.1",
         "rector/rector": "^2.7.0",
+        "symfony/asset-mapper": "^6.4 || ^7.0 || ^8.0",
         "symfony/http-client": "^6.4 || ^7.0 || ^8.0",
         "symfony/lock": "^6.4 || ^7.0 || ^8.0",
         "symfony/twig-bundle": "^6.4 || ^7.0 || ^8.0",
@@ -56,6 +57,7 @@
         "league/glide": "Required for the Glide transformer (local image transformation)",
         "psr/http-client": "Required for the URL loader (PSR-18 HTTP client interface)",
         "psr/http-factory": "Required for the URL loader (PSR-17 HTTP factory interface)",
+        "symfony/asset-mapper": "Required for the AssetMapper loader",
         "symfony/http-client": "Provides a PSR-18 HTTP client implementation for the URL loader",
         "symfony/lock": "Required for the Glide lock option (render each missing variant once)",
         "vich/uploader-bundle": "Required for the VichUploader loader"
