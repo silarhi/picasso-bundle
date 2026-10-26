@@ -43,9 +43,9 @@ final class DocsKernel extends AbstractPicassoKernel
 }
 
 $examples = [
-    'quick-start' => '<twig:Picasso:Image src="meeting.jpg" width="800" height="600" sizes="(max-width: 768px) 100vw, 800px" alt="A meeting" />',
-    'fixed-size' => '<twig:Picasso:Image src="meeting.jpg" width="320" height="240" placeholder="{{ false }}" alt="A meeting" />',
-    'priority' => '<twig:Picasso:Image src="meeting.jpg" width="1920" height="1080" sizes="100vw" priority="{{ true }}" alt="A meeting" />',
+    'quick-start' => '<twig:Picasso:Image src="kittens.jpg" width="800" height="600" sizes="(max-width: 768px) 100vw, 800px" alt="Three tabby kittens" />',
+    'fixed-size' => '<twig:Picasso:Image src="kittens.jpg" width="320" height="240" placeholder="{{ false }}" alt="Three tabby kittens" />',
+    'priority' => '<twig:Picasso:Image src="kittens.jpg" width="1920" height="1080" sizes="100vw" priority="{{ true }}" alt="Three tabby kittens" />',
 ];
 
 (new Filesystem())->remove(sys_get_temp_dir() . '/picasso_docs');

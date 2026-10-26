@@ -18,7 +18,8 @@ use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Placeholder\BlurHashPlaceholder;
 
 // Renders the example images of the documentation with the bundle's own transformations, so the pages show what
-// Picasso really outputs: fit modes, placeholders and srcset variants of docs/src/assets/source/meeting.jpg.
+// Picasso really outputs: fit modes, focal points, placeholders and srcset variants of docs/src/assets/source/kittens.jpg
+// (by The Lucky Neko on Unsplash, https://unsplash.com/photos/uePn9YCTCY0).
 //
 //     php docs/scripts/render-examples.php
 //
@@ -30,7 +31,7 @@ $docs = \dirname(__DIR__);
 $sourceDir = $docs . '/src/assets/source';
 $outputDir = $docs . '/src/assets/examples';
 $cacheDir = sys_get_temp_dir() . '/picasso-docs-' . bin2hex(random_bytes(4));
-$source = 'meeting.jpg';
+$source = 'kittens.jpg';
 
 $server = ServerFactory::create(['source' => $sourceDir, 'cache' => $cacheDir, 'driver' => 'gd']);
 
@@ -56,6 +57,11 @@ $data = ['source' => ['width' => 0, 'height' => 0, 'bytes' => filesize($sourceDi
 // Fit modes: the same 480×480 box for each value of the `fit` prop
 foreach (['contain', 'cover', 'crop', 'fill'] as $fit) {
     $data['fit'][$fit] = $render("fit-{$fit}.jpg", ['w' => 480, 'h' => 480, 'fit' => $fit, 'fm' => 'jpg', 'q' => 75]);
+}
+
+// Focal points: a narrow box over three kittens side by side, where `crop` keeps the middle one
+foreach (['crop', 'crop-28-55', 'crop-73-55', 'crop-50-45-2'] as $fit) {
+    $data['focal'][$fit] = $render("focal-{$fit}.jpg", ['w' => 240, 'h' => 480, 'fit' => $fit, 'fm' => 'jpg', 'q' => 75]);
 }
 
 // Formats: one 800 wide variant per default format, to compare their weight

@@ -48,7 +48,7 @@ composer require silarhi/picasso-bundle
 
 ## One source, every variant
 
-The same photo, 800 px wide, in the three default formats. The browser downloads the first one it supports.
+The same photo, 800 px wide, in the three default formats. The browser downloads the first one it supports, in the order of your [`formats`](/reference/configuration/#formats) setting.
 
 <Gallery
     minWidth="12rem"
@@ -57,12 +57,12 @@ The same photo, 800 px wide, in the three default formats. The browser downloads
         { src: webp, alt: 'WebP variant', label: 'WebP', note: kb(examples.formats.webp.bytes) },
         { src: jpg, alt: 'JPEG variant', label: 'JPEG', note: `${kb(examples.formats.jpg.bytes)}, the fallback` },
     ]}
-    caption="Rendered by Glide (GD) at the default quality, 75."
+    caption="Rendered by Glide (GD) at the default quality, 75. What each format saves depends on the image: on this furry photo AVIF weighs as much as JPEG, on smoother ones it is often far lighter. Measure on your own images before choosing the order."
 />
 
 <CardGrid>
     <Card title="Every format" icon="seti:image">
-        AVIF, WebP and JPEG `<source>` tags from your config: browsers pick the lightest they support.
+        AVIF, WebP and JPEG `<source>` tags in the order of your config: browsers take the first one they support.
     </Card>
     <Card title="Responsive srcset" icon="laptop">
         Widths for every breakpoint, generated from the `sizes` prop. [How it works](/guides/responsive-images/)

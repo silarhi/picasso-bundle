@@ -10,14 +10,18 @@ import contain from '../../../assets/examples/fit-contain.jpg'
 import cover from '../../../assets/examples/fit-cover.jpg'
 import crop from '../../../assets/examples/fit-crop.jpg'
 import fill from '../../../assets/examples/fit-fill.jpg'
+import focalCenter from '../../../assets/examples/focal-crop.jpg'
+import focalLeft from '../../../assets/examples/focal-crop-28-55.jpg'
+import focalRight from '../../../assets/examples/focal-crop-73-55.jpg'
+import focalZoom from '../../../assets/examples/focal-crop-50-45-2.jpg'
 import examples from '../../../data/examples.json'
 
 export const size = (fit) => `${examples.fit[fit].width} × ${examples.fit[fit].height}`
 
-When an image gets both a `width` and a `height`, `fit` decides how a source of another aspect ratio goes into that box. The same 3:2 photo, asked for as a 480 × 480 square:
+When an image gets both a `width` and a `height`, `fit` decides how a source of another aspect ratio goes into that box. The same photo of three kittens, wider than tall, asked for as a 480 × 480 square:
 
 ```twig
-<twig:Picasso:Image src="meeting.jpg" width="480" height="480" fit="contain" alt="…" />
+<twig:Picasso:Image src="kittens.jpg" width="480" height="480" fit="contain" alt="…" />
 ```
 
 <Gallery
@@ -28,7 +32,7 @@ When an image gets both a `width` and a `height`, `fit` decides how a source of 
         { src: crop, alt: 'crop: the box filled, the sides cropped', label: 'crop', note: size('crop') },
         { src: fill, alt: 'fill: the whole photo, padded with white bands', label: 'fill', note: `${size('fill')}, padded` },
     ]}
-    caption="Rendered by Glide, the checkerboard marks the 480 × 480 box. contain returns a smaller image, fill pads it to the box."
+    caption="Rendered by Glide from a photo by The Lucky Neko on Unsplash, the checkerboard marks the 480 × 480 box. contain returns a smaller image, fill pads it to the box."
 />
 
 | Fit                   | Keeps the whole image | Output is exactly `width` × `height` | Use it for                                                |
@@ -50,12 +54,23 @@ Glide 2 does not know `cover`: it renders it as `contain`. Use `crop` if you sti
 
 ## Choosing what to keep
 
-`crop` keeps the center of the image. When the subject is elsewhere, say which part to keep in the fit value itself, so no extra prop is needed:
+`crop` keeps the center of the image. When the subject is elsewhere, say which part to keep in the fit value itself, so no extra prop is needed. Three kittens in a narrow 240 × 480 box: `crop` keeps the middle one, a focal point picks another:
 
 ```twig
-{# The face sits at 30% of the width and 20% of the height of the photo #}
-<twig:Picasso:Image src="team.jpg" width="400" height="400" fit="crop-30-20" alt="Our team" />
+{# The left kitten sits at 28% of the width and 55% of the height of the photo #}
+<twig:Picasso:Image src="kittens.jpg" width="240" height="480" fit="crop-28-55" alt="A tabby kitten" />
 ```
+
+<Gallery
+    minWidth="7rem"
+    items={[
+        { src: focalCenter, alt: 'crop: the middle kitten, the two others cut at the edges', label: 'crop', note: 'the center' },
+        { src: focalLeft, alt: 'crop-28-55: the left kitten', label: 'crop-28-55', note: 'the left kitten' },
+        { src: focalRight, alt: 'crop-73-55: the right kitten', label: 'crop-73-55', note: 'the right kitten' },
+        { src: focalZoom, alt: 'crop-50-45-2: the face of the middle kitten, twice as large', label: 'crop-50-45-2', note: 'zoomed in twice' },
+    ]}
+    caption="Rendered by Glide from the same photo."
+/>
 
 | Fit                                                                | Keeps                                                                       |
 | ------------------------------------------------------------------ | --------------------------------------------------------------------------- |
