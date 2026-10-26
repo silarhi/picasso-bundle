@@ -20,6 +20,7 @@ sidebar:
 | `league/glide`                            | Glide transformer (local image processing)                                   |
 | `intervention/image-driver-vips`          | Glide `vips` driver ([libvips](/transformers/glide/#choosing-a-driver))                          |
 | `symfony/lock`                            | Glide `lock` option ([one render per variant](/transformers/glide/#rendering-each-variant-once)) |
+| `symfony/web-link`                        | [Preloading priority images](/guides/priority-images/#preloading)          |
 | `kornrunner/blurhash` + `imagine/imagine` | BlurHash placeholder                                                         |
 | `league/flysystem-bundle`                 | Flysystem loader                                                             |
 | `vich/uploader-bundle`                    | VichUploader loader                                                          |

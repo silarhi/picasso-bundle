@@ -16,7 +16,11 @@ namespace Silarhi\PicassoBundle\Tests\Functional;
 use function assert;
 
 use Psr\Container\ContainerInterface;
+use Psr\Link\LinkInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\WebLink\GenericLinkProvider;
 use Twig\Environment;
 
 /**
@@ -68,6 +72,27 @@ class PicassoImageFunctionTest extends KernelTestCase
         self::assertStringNotContainsString('background-image:url(', $html);
     }
 
+    public function testPriorityPreloadsTheImage(): void
+    {
+        $request = Request::create('/');
+        self::bootKernel();
+        $requestStack = self::getContainer()->get('request_stack');
+        assert($requestStack instanceof RequestStack);
+        $requestStack->push($request);
+        $twig = self::getContainer()->get('twig');
+        assert($twig instanceof Environment);
+
+        $html = $twig->createTemplate("{{ picasso_image(src='photo.jpg', sizes='100vw', priority=true) }}")->render();
+
+        $preloads = self::preloads($request);
+        self::assertCount(1, $preloads);
+        self::assertSame(['preload'], $preloads[0]->getRels());
+        self::assertStringStartsWith('/image/local_glide/main/photo.jpg', $preloads[0]->getHref());
+        self::assertSame('image/webp', $preloads[0]->getAttributes()['type'] ?? null);
+        self::assertSame('100vw', $preloads[0]->getAttributes()['imagesizes'] ?? null);
+        self::assertStringContainsString('fetchpriority="high"', $html);
+    }
+
     public function testUnoptimizedRendersPlainImg(): void
     {
         $html = $this->renderInline("{{ picasso_image(src='/logo.svg', unoptimized=true) }}");
@@ -96,5 +121,21 @@ class PicassoImageFunctionTest extends KernelTestCase
         assert($twig instanceof Environment);
 
         return $twig->createTemplate($template)->render();
+    }
+
+    /**
+     * @return list<LinkInterface>
+     */
+    private static function preloads(Request $request): array
+    {
+        $links = $request->attributes->get('_links');
+        self::assertInstanceOf(GenericLinkProvider::class, $links);
+        $preloads = [];
+        foreach ($links->getLinks() as $link) {
+            self::assertInstanceOf(LinkInterface::class, $link);
+            $preloads[] = $link;
+        }
+
+        return $preloads;
     }
 }

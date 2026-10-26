@@ -46,6 +46,7 @@
         "symfony/http-client": "^6.4 || ^7.0 || ^8.0",
         "symfony/lock": "^6.4 || ^7.0 || ^8.0",
         "symfony/twig-bundle": "^6.4 || ^7.0 || ^8.0",
+        "symfony/web-link": "^6.4 || ^7.0 || ^8.0",
         "vich/uploader-bundle": "^2.9 || ^3.0",
         "vincentlanglet/twig-cs-fixer": "^4.1.1"
     },
@@ -60,6 +61,7 @@
         "symfony/asset-mapper": "Required for the AssetMapper loader",
         "symfony/http-client": "Provides a PSR-18 HTTP client implementation for the URL loader",
         "symfony/lock": "Required for the Glide lock option (render each missing variant once)",
+        "symfony/web-link": "Required to preload priority images (Link header)",
         "vich/uploader-bundle": "Required for the VichUploader loader"
     },
     "autoload": {

@@ -22,6 +22,24 @@ Images are lazy-loaded by default: the browser only fetches them when they come 
 
 Use it on **one** image per page, two at most: if everything is a priority, nothing is.
 
+## Preloading
+
+With [`symfony/web-link`](https://symfony.com/doc/current/web_link.html) installed, a priority image is also preloaded: the bundle adds a `Link` header to the response, so the browser starts fetching the image before it has parsed the HTML down to the `<picture>`.
+
+```bash
+composer require symfony/web-link
+```
+
+```http
+Link: </image/glide/filesystem/hero-banner.jpg?w=640&fm=avif&q=75&s=…>; rel="preload"; type="image/avif"; imagesrcset="/image/glide/filesystem/hero-banner.jpg?w=640&fm=avif&q=75&s=… 640w, …"; as="image"; fetchpriority="high"; imagesizes="100vw"
+```
+
+- The link preloads the first `<source>` of the `<picture>`, the format browsers pick first (AVIF by default), with its `srcset` and `sizes`: the browser preloads the very file the `<picture>` will use. Its `type` lets browsers that cannot decode that format skip the preload. An image with a single format, or `unoptimized`, preloads the `<img>` itself.
+- The header can be sent before the page as [103 Early Hints](https://symfony.com/doc/current/web_link.html#early-hints), when your server supports them.
+- The link is added to the main request, so a priority image rendered in a fragment (`render()`, ESI) or cached HTML is not preloaded: preload it yourself there, with the `preload()` Twig function of `symfony/web-link`.
+
+Turn it off with the [`preload`](/reference/configuration/#preload) option.
+
 To fine-tune instead, set `loading` and `fetchPriority` yourself:
 
 ```twig

@@ -47,6 +47,7 @@ use Silarhi\PicassoBundle\Placeholder\TransformerPlaceholder;
 use Silarhi\PicassoBundle\Service\ImageHelper;
 use Silarhi\PicassoBundle\Service\ImageHelperInterface;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
+use Silarhi\PicassoBundle\Service\ImagePreloader;
 use Silarhi\PicassoBundle\Service\ImageServer;
 use Silarhi\PicassoBundle\Service\LegacyMetadataResolver;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
@@ -79,6 +80,7 @@ use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_lo
 
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\WebLink\GenericLinkProvider;
 use Vich\UploaderBundle\Storage\StorageInterface as VichStorageInterface;
 
 final class PicassoBundle extends AbstractBundle
@@ -256,6 +258,10 @@ final class PicassoBundle extends AbstractBundle
                 ->booleanNode('resolve_metadata')
                     ->defaultFalse()
                     ->info('Whether to resolve image metadata (dimensions) from the source by default. Filesystem loaders default to true.')
+                ->end()
+                ->booleanNode('preload')
+                    ->defaultTrue()
+                    ->info('Preload priority images through a Link header (and 103 Early Hints when sent). Needs symfony/web-link, does nothing without it.')
                 ->end()
                 ->booleanNode('collector')
                     ->defaultFalse()
@@ -479,6 +485,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_transformer: string|null,
          *     default_placeholder: string|null,
          *     resolve_metadata: bool,
+         *     preload: bool,
          *     collector: bool,
          *     cache: bool|string,
          *     cache_control: CacheControlConfig,
@@ -936,6 +943,12 @@ final class PicassoBundle extends AbstractBundle
 
         // --- Image Helper ---
 
+        $preload = $config['preload'] && class_exists(GenericLinkProvider::class);
+        if ($preload) {
+            $services->set('.picasso.image_preloader', ImagePreloader::class)
+                ->args([service('request_stack')]);
+        }
+
         $services->set('picasso.image_helper', ImageHelper::class)
             ->args([
                 service('picasso.pipeline'),
@@ -950,6 +963,7 @@ final class PicassoBundle extends AbstractBundle
                 $defaultPlaceholder,
                 $config['resolve_metadata'],
                 service('debug.stopwatch')->nullOnInvalid(),
+                $preload ? service('.picasso.image_preloader') : null,
             ]);
         $services->alias(ImageHelper::class, 'picasso.image_helper');
         $services->alias(ImageHelperInterface::class, 'picasso.image_helper');
