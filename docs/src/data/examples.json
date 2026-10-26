@@ -30,6 +30,32 @@
             "height": 480
         }
     },
+    "focal": {
+        "crop": {
+            "file": "focal-crop.jpg",
+            "bytes": 14335,
+            "width": 240,
+            "height": 480
+        },
+        "crop-28-55": {
+            "file": "focal-crop-28-55.jpg",
+            "bytes": 12449,
+            "width": 240,
+            "height": 480
+        },
+        "crop-73-55": {
+            "file": "focal-crop-73-55.jpg",
+            "bytes": 13099,
+            "width": 240,
+            "height": 480
+        },
+        "crop-50-45-2": {
+            "file": "focal-crop-50-45-2.jpg",
+            "bytes": 16154,
+            "width": 240,
+            "height": 480
+        }
+    },
     "formats": {
         "avif": {
             "file": "format-800.avif",
