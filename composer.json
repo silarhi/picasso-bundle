@@ -1,6 +1,6 @@
 {
     "name": "silarhi/picasso-bundle",
-    "description": "Responsive image component for Symfony, inspired by next/image",
+    "description": "Responsive images for Symfony: one Twig component for AVIF/WebP srcset, blur placeholders, Glide/Imgix, inspired by next/image",
     "license": "MIT",
     "type": "symfony-bundle",
     "keywords": [
@@ -21,6 +21,12 @@
         "placeholder",
         "next-image"
     ],
+    "homepage": "https://picasso-bundle.silarhi.dev",
+    "support": {
+        "issues": "https://github.com/silarhi/picasso-bundle/issues",
+        "source": "https://github.com/silarhi/picasso-bundle",
+        "docs": "https://picasso-bundle.silarhi.dev"
+    },
     "require": {
         "php": ">=8.2",
         "symfony/deprecation-contracts": "^2.5 || ^3.0",
