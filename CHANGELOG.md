@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Signing key rotation: the Glide `sign_key` takes a list of keys, like Symfony's secrets, e.g. `['%env(PICASSO_SIGN_KEY)%', '%env(PICASSO_PREVIOUS_SIGN_KEY)%']` (or `'%env(csv:PICASSO_SIGN_KEYS)%'` from one variable). The first one signs, every one verifies, so a new key can be put in front of the current one without breaking the URLs already published, 1.x URLs included; the old key is removed once they are gone ([Rotating the key](https://picasso-bundle.silarhi.dev/transformers/glide/#rotating-the-key)). A plain string keeps working unchanged.
 
+### Changed
+
+- Twig is optional: `symfony/ux-twig-component` is no longer required, and an application without Twig still generates and serves images (`ImageHelperInterface`, the image route). The `<twig:Picasso:Image>` component is registered when `TwigComponentBundle` is, and the `picasso_image()` and `picasso_image_url()` functions when `TwigBundle` is. An application rendering `<twig:Picasso:Image>` without requiring `symfony/ux-twig-component` itself now has to: `composer require symfony/ux-twig-component`.
+
 ### Deprecated
 
 - URLs signed with the MD5 signature of 2.6 and earlier: 2.x keeps validating them, for every listed key, so the URLs in pages, HTTP caches and CDNs keep working; 3.0 will only accept HMAC signatures.

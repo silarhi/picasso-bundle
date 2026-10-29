@@ -135,6 +135,11 @@ class PicassoBundleTest extends TestCase
         self::assertInstanceOf(PicassoExtension::class, $container->get('.picasso.twig_extension'));
     }
 
+    public function testImageComponentIsNotRegisteredWithoutTwigComponentBundle(): void
+    {
+        self::assertFalse($this->getTestContainer()->has('.picasso.image_component'));
+    }
+
     public function testPipelineGeneratesUrl(): void
     {
         $container = $this->getTestContainer();

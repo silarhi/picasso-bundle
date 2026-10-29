@@ -993,24 +993,31 @@ final class PicassoBundle extends AbstractBundle
         $services->alias(ImageHelper::class, 'picasso.image_helper');
         $services->alias(ImageHelperInterface::class, 'picasso.image_helper');
 
-        // --- Twig Extension ---
+        // --- Twig Extension and Image Component ---
+        // Twig is optional: without it, the bundle still generates and serves images (ImageHelperInterface, routes).
+        // Extensions load in a temporary container, so check the registered bundles rather than hasExtension().
 
-        $services->set('.picasso.twig_extension', PicassoExtension::class)
-            ->args([
-                service('picasso.image_helper'),
-            ])
-            ->tag('twig.extension');
+        /** @var array<string, class-string> $bundles */
+        $bundles = $builder->getParameter('kernel.bundles');
 
-        // --- Image Component ---
+        if (isset($bundles['TwigBundle'])) {
+            $services->set('.picasso.twig_extension', PicassoExtension::class)
+                ->args([
+                    service('picasso.image_helper'),
+                ])
+                ->tag('twig.extension');
+        }
 
-        $services->set('.picasso.image_component', ImageComponent::class)
-            ->args([
-                service('picasso.image_helper'),
-            ])
-            ->tag('twig.component', [
-                'key' => 'Picasso:Image',
-                'template' => '@Picasso/components/Image.html.twig',
-            ]);
+        if (isset($bundles['TwigComponentBundle'])) {
+            $services->set('.picasso.image_component', ImageComponent::class)
+                ->args([
+                    service('picasso.image_helper'),
+                ])
+                ->tag('twig.component', [
+                    'key' => 'Picasso:Image',
+                    'template' => '@Picasso/components/Image.html.twig',
+                ]);
+        }
 
         // --- Data Collector (web profiler) ---
 

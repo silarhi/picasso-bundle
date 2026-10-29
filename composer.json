@@ -30,8 +30,7 @@
     "require": {
         "php": ">=8.2",
         "symfony/deprecation-contracts": "^2.5 || ^3.0",
-        "symfony/framework-bundle": "^6.4 || ^7.0 || ^8.0",
-        "symfony/ux-twig-component": "^2.13 || ^3.0"
+        "symfony/framework-bundle": "^6.4 || ^7.0 || ^8.0"
     },
     "require-dev": {
         "ergebnis/composer-normalize": "^2.54.0",
@@ -52,9 +51,13 @@
         "symfony/http-client": "^6.4 || ^7.0 || ^8.0",
         "symfony/lock": "^6.4 || ^7.0 || ^8.0",
         "symfony/twig-bundle": "^6.4 || ^7.0 || ^8.0",
+        "symfony/ux-twig-component": "^2.13 || ^3.0",
         "symfony/web-link": "^6.4 || ^7.0 || ^8.0",
         "vich/uploader-bundle": "^2.9 || ^3.0",
         "vincentlanglet/twig-cs-fixer": "^4.1.1"
+    },
+    "conflict": {
+        "symfony/ux-twig-component": "<2.13"
     },
     "suggest": {
         "imagine/imagine": "Required for the BlurHash placeholder (supports GD and Imagick)",
@@ -67,6 +70,8 @@
         "symfony/asset-mapper": "Required for the AssetMapper loader",
         "symfony/http-client": "Provides a PSR-18 HTTP client implementation for the URL loader",
         "symfony/lock": "Required for the Glide lock option (render each missing variant once)",
+        "symfony/twig-bundle": "Required for the picasso_image() and picasso_image_url() Twig functions",
+        "symfony/ux-twig-component": "Required for the <twig:Picasso:Image> component",
         "symfony/web-link": "Required to preload priority images (Link header)",
         "vich/uploader-bundle": "Required for the VichUploader loader"
     },

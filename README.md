@@ -127,7 +127,8 @@ PicassoBundle solves this the same way Next.js Image did for React:
 
 - PHP 8.2+
 - Symfony 6.4, 7.x or 8.x
-- [Symfony UX Twig Component](https://symfony.com/bundles/ux-twig-component/current/index.html) 2.13+
+- [Symfony UX Twig Component](https://symfony.com/bundles/ux-twig-component/current/index.html) 2.13+ for the
+  `<twig:Picasso:Image>` component
 
 Glide, BlurHash, Flysystem, VichUploaderBundle, AssetMapper and remote URLs each need an optional package: see
 [Installation](https://picasso-bundle.silarhi.dev/getting-started/installation/).
@@ -136,6 +137,9 @@ Glide, BlurHash, Flysystem, VichUploaderBundle, AssetMapper and remote URLs each
 
 ```bash
 composer require silarhi/picasso-bundle
+
+# the <twig:Picasso:Image> component
+composer require symfony/ux-twig-component
 
 # and a transformer: Glide renders the images locally (Imgix needs no extra package)
 composer require league/glide

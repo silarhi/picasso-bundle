@@ -48,11 +48,17 @@ abstract class AbstractPicassoKernel extends Kernel
                 'http_method_override' => false,
                 'handle_all_throwables' => true,
                 'php_errors' => ['log' => true],
+                // symfony/ux-twig-component needs the property_accessor service; FrameworkBundle only enables it by
+                // default for non-dev packages, and here symfony/property-access only comes with require-dev.
+                'property_access' => true,
             ]);
 
-            $container->loadFromExtension('twig', [
-                'default_path' => '%kernel.project_dir%/templates',
-            ]);
+            // NoTwigKernel omits TwigBundle.
+            if ($container->hasExtension('twig')) {
+                $container->loadFromExtension('twig', [
+                    'default_path' => '%kernel.project_dir%/templates',
+                ]);
+            }
 
             // symfony/ux-twig-component v3 requires "defaults" and "anonymous_template_directory"
             // to be configured explicitly. v2 accepts the same keys with no change in behaviour
