@@ -16,13 +16,13 @@ namespace Silarhi\PicassoBundle\Tests\Transformer;
 use function dirname;
 use function is_string;
 
-use League\Glide\Signatures\SignatureFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Exception\InvalidRouteException;
 use Silarhi\PicassoBundle\Service\UrlAliases;
+use Silarhi\PicassoBundle\Transformer\GlideSignature;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 
 use function sprintf;
@@ -37,7 +37,7 @@ use Symfony\Component\Routing\RouteCollection;
  */
 class GlideTransformerRouteTest extends TestCase
 {
-    private const SIGN_KEY = 'route-secret-key';
+    private const SIGN_KEY = 'route-secret-key_0123456789abcdef0123456789abcdef';
 
     public function testUrlPointsAtTheRouteWithTheTransformationInTheQuery(): void
     {
@@ -66,9 +66,9 @@ class GlideTransformerRouteTest extends TestCase
         $query = $this->query($url);
         self::assertSame('1', $query['download']);
 
-        SignatureFactory::create(self::SIGN_KEY)->validateRequest('contracts/42.jpg', $query);
+        (new GlideSignature(self::SIGN_KEY))->validateRequest('contracts/42.jpg', $query);
         $this->expectExceptionMessage('Signature is not valid.');
-        SignatureFactory::create(self::SIGN_KEY)->validateRequest('contracts/43.jpg', $query);
+        (new GlideSignature(self::SIGN_KEY))->validateRequest('contracts/43.jpg', $query);
     }
 
     public function testBaseUrlIsNotPrependedToRoutedUrls(): void
@@ -90,7 +90,7 @@ class GlideTransformerRouteTest extends TestCase
             $this->context(['tenant' => 'acme', 'id' => 1]),
         );
 
-        self::assertMatchesRegularExpression('#^/portal/acme/documents/1/image\?s=[0-9a-f]{32}$#', $url);
+        self::assertMatchesRegularExpression('#^/portal/acme/documents/1/image\?s=[0-9a-f]{64}$#', $url);
     }
 
     public function testPublicCacheCannotServeRoutes(): void

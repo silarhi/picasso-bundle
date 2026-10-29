@@ -43,7 +43,7 @@ class CollectorKernel extends AbstractPicassoKernel
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'integration-test-key',
+                    'sign_key' => 'integration-test-key_0123456789abcdef0123456789abcdef',
                     'cache' => '%kernel.cache_dir%/glide',
                 ],
             ],

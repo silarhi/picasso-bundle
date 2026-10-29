@@ -35,7 +35,7 @@ class UrlAliasKernel extends AbstractPicassoKernel
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'url-alias-key',
+                    'sign_key' => 'url-alias-key_0123456789abcdef0123456789abcdef',
                     'cache' => '%kernel.cache_dir%/bucket',
                     'url_alias' => 'g',
                     'public_cache' => [

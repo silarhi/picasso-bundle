@@ -20,7 +20,6 @@ use League\Flysystem\FilesystemOperator;
 use League\Flysystem\Local\LocalFilesystemAdapter;
 use League\Flysystem\UnableToDeleteDirectory;
 use League\Glide\Server;
-use League\Glide\Signatures\SignatureFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
@@ -33,6 +32,7 @@ use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
 use Silarhi\PicassoBundle\Service\UrlAliases;
 use Silarhi\PicassoBundle\Source\LocalImageSource;
 use Silarhi\PicassoBundle\Transformer\DeferredCacheWriter;
+use Silarhi\PicassoBundle\Transformer\GlideSignature;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\Filesystem\Filesystem as SymfonyFilesystem;
@@ -41,7 +41,7 @@ use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
 class GlideTransformerPurgeTest extends TestCase
 {
-    private const SIGN_KEY = 'test-secret-key';
+    private const SIGN_KEY = 'test-secret-key_0123456789abcdef0123456789abcdef';
 
     private string $tempDir;
 
@@ -292,7 +292,7 @@ class GlideTransformerPurgeTest extends TestCase
         $response = $transformer->serve(
             $loader,
             $path,
-            new Request(SignatureFactory::create(self::SIGN_KEY)->addSignature($path, $params)),
+            new Request((new GlideSignature(self::SIGN_KEY))->addSignature($path, $params)),
             ['transformer' => 'glide', 'loader' => 'filesystem'],
         );
 

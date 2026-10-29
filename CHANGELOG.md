@@ -5,6 +5,24 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] - Unreleased
+
+### Security
+
+- Glide URLs are signed with an HMAC-SHA256 of the image path and its query string, compared in constant time, instead of Glide's own signature: an MD5 hash prefixed with the key (open to length extension), compared with `!==` (which leaks timing). The new `GlideSignature` class implements Glide's `SignatureInterface`. URLs signed before keep being served, see the new `accept_legacy_signatures` option ([Signing key](https://picasso-bundle.silarhi.dev/transformers/glide/#signing-key)).
+- A Glide transformer without a `sign_key`, or with an empty one, is rejected: an empty `PICASSO_SIGN_KEY=` let anyone compute valid signatures. A key written in the configuration fails the container build; one read from an environment variable fails the first use of the transformer. Generate one with `php -r 'echo bin2hex(random_bytes(32)), PHP_EOL;'`. Imgix tokens are unchanged.
+- With `public_cache`, a variant is always stored under an image extension: the one of `fm`, else of the source name when Glide writes that format (`jpg`, `jpeg`, `png`, `gif`, `webp`, `avif`, `tif`, `tiff`, `heic`, `jxl`), else `jpg`. It used to come from the source name, so an upload named `page.html` or `shell.php` was stored in the web-served cache as `page.html/_untransformed.html`, then served as HTML (or run) by the web server. Such URLs now redirect to the image extension; delete the files already stored under another extension from the public cache, which the web server still serves ([Glide](https://picasso-bundle.silarhi.dev/transformers/glide/#storing-the-glide-cache-on-flysystem)).
+
+### Added
+
+- Signing key rotation: the Glide `sign_key` takes a list of keys, e.g. `'%env(csv:PICASSO_SIGN_KEYS)%'`. The first one signs, every one validates, so a new key can be put in front of the current one without breaking the URLs already published, 1.x URLs included; the old key is removed once they are gone ([Rotating the key](https://picasso-bundle.silarhi.dev/transformers/glide/#rotating-the-key)). A plain string keeps working unchanged.
+- `accept_legacy_signatures` Glide option (default `true`): whether URLs signed with the MD5 signature of 2.6 and earlier are still served, so the URLs in pages, HTTP caches and CDNs keep working while only HMAC signatures are generated. Set it to `false` once they are gone.
+
+### Deprecated
+
+- URLs signed with the MD5 signature: 3.0 removes `accept_legacy_signatures` and only accepts HMAC signatures.
+- Glide sign keys shorter than 32 characters: they still work, with a deprecation, and 3.0 will reject them. Put a new key in front of the short one to replace it without breaking published URLs ([Rotating the key](https://picasso-bundle.silarhi.dev/transformers/glide/#rotating-the-key)).
+
 ## [2.6.0] - 2026-10-26
 
 ### Added
@@ -229,6 +247,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release.
 
+[2.7.0]: https://github.com/silarhi/picasso-bundle/compare/v2.6.0...HEAD
 [2.6.0]: https://github.com/silarhi/picasso-bundle/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/silarhi/picasso-bundle/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/silarhi/picasso-bundle/compare/v2.3.0...v2.4.0

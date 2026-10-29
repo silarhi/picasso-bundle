@@ -31,7 +31,7 @@ picasso:
 
 With Imgix, the CDN fetches the remote image itself. With Glide, your server downloads it on the first request of each variant, then serves the cached variant. So any URL your server can reach could be fetched:
 
-- set a `sign_key` on the Glide transformer: without it, anyone can forge valid image URLs;
+- keep the Glide [`sign_key`](/transformers/glide/#signing-key) secret: whoever knows it can sign URLs to any image;
 - list the hosts your images come from in `allowed_hosts`: Glide 404s on images from any other host, without requesting them. `*.example.com` allows its subdomains, not `example.com` itself.
 
 ```yaml

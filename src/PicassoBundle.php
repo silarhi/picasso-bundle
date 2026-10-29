@@ -13,10 +13,12 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle;
 
+use function array_is_list;
 use function assert;
 use function count;
 use function dirname;
 use function in_array;
+use function is_array;
 use function is_bool;
 use function is_int;
 use function is_string;
@@ -58,6 +60,7 @@ use Silarhi\PicassoBundle\Service\SrcsetGenerator;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
 use Silarhi\PicassoBundle\Service\UrlAliases;
 use Silarhi\PicassoBundle\Transformer\DeferredCacheWriter;
+use Silarhi\PicassoBundle\Transformer\GlideSignature;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 use Silarhi\PicassoBundle\Transformer\ImgixTransformer;
@@ -417,7 +420,20 @@ final class PicassoBundle extends AbstractBundle
                                 ->defaultNull()
                                 ->info('Transformer type. Inferred from name when it matches a known type.')
                             ->end()
-                            ->scalarNode('sign_key')->defaultNull()->end()
+                            // A variable node: a list may come from one environment variable ("%env(csv:PICASSO_SIGN_KEYS)%"),
+                            // a placeholder a scalar node would reject as an array
+                            ->variableNode('sign_key')
+                                ->defaultNull()
+                                ->info(sprintf('Glide: secret signing image URLs, required, at least %d characters (e.g. bin2hex(random_bytes(32))); or a list of them to rotate keys: the first one signs, all of them validate. Imgix: optional signing token.', GlideSignature::MIN_KEY_LENGTH))
+                                ->validate()
+                                    ->ifTrue(static fn (mixed $v): bool => !self::isSignKey($v))
+                                    ->thenInvalid('The "sign_key" option must be a string or a list of strings (the first one signs, all of them validate).')
+                                ->end()
+                            ->end()
+                            ->booleanNode('accept_legacy_signatures')
+                                ->defaultTrue()
+                                ->info('Glide: still serve URLs signed before 2.7 (MD5). New URLs are always signed with HMAC-SHA256. Set to false once the old URLs are out of your pages and caches; 3.0 removes them.')
+                            ->end()
                             ->scalarNode('cache')->defaultNull()->info('Glide cache target. Either a local path or a Flysystem storage name (resolved via FlysystemRegistry).')->end()
                             ->scalarNode('driver')
                                 ->defaultValue('gd')
@@ -496,7 +512,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_fit: string,
          *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int|null, quality: int|null, fit: string|null, format: string|null, components_x: int, components_y: int, driver: string, service: string|null}>,
          *     loaders: array<string, array{enabled: bool, type: string|null, path: string|null, paths: mixed, loaders: list<string>, mapping: string|null, storage: string|null, http_client: string|null, request_factory: string|null, allowed_hosts: list<string>, default_placeholder: string|null, default_transformer: string|null, url_alias: string|null, private: bool, resolve_metadata: bool|null}>,
-         *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, api_key: string|null, http_client: string|null, request_factory: string|null, stream_factory: string|null, service: string|null, url_alias: string|null, defer_cache_write: bool, lock: array{enabled: bool, factory: string, ttl: float|int, wait: float|int}, public_cache: array{enabled: bool, prefix: string}}>
+         *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|list<string>|null, accept_legacy_signatures: bool, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, api_key: string|null, http_client: string|null, request_factory: string|null, stream_factory: string|null, service: string|null, url_alias: string|null, defer_cache_write: bool, lock: array{enabled: bool, factory: string, ttl: float|int, wait: float|int}, public_cache: array{enabled: bool, prefix: string}}>
          * } $config
          */
         $services = $container->services();
@@ -732,11 +748,19 @@ final class PicassoBundle extends AbstractBundle
                         throw new Exception\InvalidConfigurationException(sprintf('The "lock" option of transformer "%s" requires symfony/lock: run "composer require symfony/lock", then configure "framework.lock" (or point "lock.factory" to your own LockFactory service).', $name));
                     }
 
+                    $signKey = $transformerConfig['sign_key'];
+                    // Keys read from environment variables are only known at runtime, where GlideSignature
+                    // checks them again (and deprecates short ones): here, they are non-empty placeholders
+                    $signKeys = is_array($signKey) ? $signKey : [$signKey];
+                    if ([] === $signKeys || in_array(null, $signKeys, true) || in_array('', $signKeys, true)) {
+                        throw new Exception\InvalidConfigurationException(sprintf('Transformer "%s" needs a "sign_key": Glide image URLs are signed with it, and anyone could forge them without one. Generate one with "php -r \'echo bin2hex(random_bytes(32)), PHP_EOL;\'", store it in an environment variable and set "sign_key: \'%%env(PICASSO_SIGN_KEY)%%\'".', $name));
+                    }
+
                     $services->set('picasso.transformer.' . $name, GlideTransformer::class)
                         ->args([
                             service('router'),
                             service(UrlAliasPass::SERVICE),
-                            $transformerConfig['sign_key'],
+                            $signKey,
                             $transformerConfig['cache'] ?? '%kernel.project_dir%/var/glide-cache',
                             $transformerConfig['driver'],
                             $transformerConfig['max_image_size'],
@@ -748,10 +772,11 @@ final class PicassoBundle extends AbstractBundle
                             $transformerConfig['lock']['enabled'] ? service($transformerConfig['lock']['factory']) : null,
                             (float) $transformerConfig['lock']['ttl'],
                             (float) $transformerConfig['lock']['wait'],
+                            $transformerConfig['accept_legacy_signatures'],
                         ])
                         ->tag('picasso.transformer', $tag);
                     $glideTransformers[$name] = service('picasso.transformer.' . $name);
-                    $glideSignKey ??= (string) $transformerConfig['sign_key'];
+                    $glideSignKey ??= $signKey;
 
                     if ($transformerConfig['defer_cache_write'] && !$deferredCacheWriterRegistered) {
                         $services->set('picasso.deferred_cache_writer', DeferredCacheWriter::class)
@@ -765,6 +790,10 @@ final class PicassoBundle extends AbstractBundle
                     break;
 
                 case 'imgix':
+                    if (is_array($transformerConfig['sign_key'])) {
+                        throw new Exception\InvalidConfigurationException(sprintf('The "sign_key" of Imgix transformer "%s" must be a single signing token, not a list.', $name));
+                    }
+
                     $imgixArgs = [
                         $transformerConfig['base_url'],
                         $transformerConfig['sign_key'],
@@ -1066,6 +1095,31 @@ final class PicassoBundle extends AbstractBundle
         }
 
         return array_map(strtolower(...), $hosts);
+    }
+
+    /**
+     * Whether a "sign_key" value has the shape the option accepts: nothing, a
+     * key, or a list of keys. Emptiness is checked by loadExtension(), which
+     * tells keys from environment placeholders: this also validates those, as
+     * empty fixtures ("" or []).
+     */
+    private static function isSignKey(mixed $value): bool
+    {
+        if (null === $value || is_string($value)) {
+            return true;
+        }
+
+        if (!is_array($value) || !array_is_list($value)) {
+            return false;
+        }
+
+        foreach ($value as $key) {
+            if (!is_string($key)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

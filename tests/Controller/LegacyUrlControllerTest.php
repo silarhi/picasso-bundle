@@ -17,7 +17,6 @@ use function assert;
 use function dirname;
 use function is_string;
 
-use League\Glide\Signatures\SignatureFactory;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Controller\ImageController;
 use Silarhi\PicassoBundle\Controller\LegacyUrlController;
@@ -28,6 +27,7 @@ use Silarhi\PicassoBundle\Service\TransformerRegistry;
 use Silarhi\PicassoBundle\Service\UrlAliases;
 use Silarhi\PicassoBundle\Tests\Fixtures\CollectsDeprecationsTrait;
 use Silarhi\PicassoBundle\Tests\Fixtures\LegacyMetadataToken;
+use Silarhi\PicassoBundle\Transformer\GlideSignature;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 use Silarhi\PicassoBundle\Transformer\LocalTransformerInterface;
 
@@ -43,7 +43,7 @@ class LegacyUrlControllerTest extends TestCase
 {
     use CollectsDeprecationsTrait;
 
-    private const SIGN_KEY = 'test-sign-key';
+    private const SIGN_KEY = 'test-sign-key_0123456789abcdef0123456789abcdef';
     private const FIXTURES = __DIR__ . '/../Fixtures';
     private const CACHE_CONTROL = ['max_age' => null, 'immutable' => false, 'error_max_age' => null];
 
@@ -65,7 +65,7 @@ class LegacyUrlControllerTest extends TestCase
     public function testRedirects1xUrlsToTheLoaderReadingTheirRoot(): void
     {
         $token = LegacyMetadataToken::mint(self::SIGN_KEY, ['path' => self::FIXTURES]);
-        $request = new Request(SignatureFactory::create(self::SIGN_KEY)->addSignature('photo.jpg', ['w' => '10', '_metadata' => $token]));
+        $request = new Request((new GlideSignature(self::SIGN_KEY))->addSignature('photo.jpg', ['w' => '10', '_metadata' => $token]));
 
         [$response, $deprecations] = self::collectDeprecations(fn (): Response => $this->createController()('glide', 'legacy', 'photo.jpg', $request));
 
@@ -79,7 +79,7 @@ class LegacyUrlControllerTest extends TestCase
         foreach ([
             'invalid token' => new Request(['w' => '10', '_metadata' => 'not-a-token', 's' => 'signature']),
             'forged signature' => new Request(['w' => '10', '_metadata' => LegacyMetadataToken::mint(self::SIGN_KEY, ['path' => self::FIXTURES]), 's' => 'forged']),
-            'root no loader reads' => new Request(SignatureFactory::create(self::SIGN_KEY)->addSignature('photo.jpg', ['_metadata' => LegacyMetadataToken::mint(self::SIGN_KEY, ['path' => '/srv/old'])])),
+            'root no loader reads' => new Request((new GlideSignature(self::SIGN_KEY))->addSignature('photo.jpg', ['_metadata' => LegacyMetadataToken::mint(self::SIGN_KEY, ['path' => '/srv/old'])])),
         ] as $case => $request) {
             try {
                 $this->createController(errorMaxAge: 60)('glide', 'legacy', 'photo.jpg', $request);

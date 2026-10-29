@@ -43,18 +43,29 @@ final readonly class LegacyMetadataResolver
     private const IV_LENGTH = 12;
     private const TAG_LENGTH = 16;
 
-    private string $derivedKey;
+    /**
+     * @var list<string>
+     */
+    private array $derivedKeys;
 
     /**
-     * @param string                $key           Sign key of the Glide transformer that minted 1.x URLs
+     * @param string|array<mixed>   $key           Sign key of the Glide transformer that minted 1.x URLs, or its keys:
+     *                                             tokens minted with any of them decrypt, so rotating keys keeps 1.x URLs
      * @param array<string, string> $loadersByRoot Root (directory or Flysystem storage name) → loader name
      */
     public function __construct(
-        string $key,
+        string|array $key,
         private array $loadersByRoot,
         private string $projectDir,
     ) {
-        $this->derivedKey = hash('sha256', $key, true);
+        $derivedKeys = [];
+        foreach (is_string($key) ? [$key] : $key as $signKey) {
+            if (is_string($signKey)) {
+                $derivedKeys[] = hash('sha256', $signKey, true);
+            }
+        }
+
+        $this->derivedKeys = $derivedKeys;
     }
 
     /**
@@ -83,14 +94,22 @@ final readonly class LegacyMetadataResolver
             throw new ImageNotFoundException('Invalid metadata parameter.');
         }
 
-        $plaintext = openssl_decrypt(
-            substr($data, self::IV_LENGTH + self::TAG_LENGTH),
-            self::CIPHER,
-            $this->derivedKey,
-            \OPENSSL_RAW_DATA,
-            substr($data, 0, self::IV_LENGTH),
-            substr($data, self::IV_LENGTH, self::TAG_LENGTH),
-        );
+        $plaintext = false;
+        // GCM authenticates the token: a key that did not mint it fails instead of decrypting garbage
+        foreach ($this->derivedKeys as $derivedKey) {
+            $plaintext = openssl_decrypt(
+                substr($data, self::IV_LENGTH + self::TAG_LENGTH),
+                self::CIPHER,
+                $derivedKey,
+                \OPENSSL_RAW_DATA,
+                substr($data, 0, self::IV_LENGTH),
+                substr($data, self::IV_LENGTH, self::TAG_LENGTH),
+            );
+
+            if (false !== $plaintext) {
+                break;
+            }
+        }
 
         try {
             $metadata = false !== $plaintext ? json_decode($plaintext, true, flags: \JSON_THROW_ON_ERROR) : null;

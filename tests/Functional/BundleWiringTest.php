@@ -26,10 +26,13 @@ use Silarhi\PicassoBundle\Controller\LegacyUrlController;
 use Silarhi\PicassoBundle\DataCollector\CollectingImageHelper;
 use Silarhi\PicassoBundle\DataCollector\CollectingMetadataGuesser;
 use Silarhi\PicassoBundle\DataCollector\PicassoDataCollector;
+use Silarhi\PicassoBundle\Dto\Image;
+use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
 use Silarhi\PicassoBundle\Loader\ChainLoader;
 use Silarhi\PicassoBundle\Loader\FlysystemLoader;
 use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
+use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
 use Silarhi\PicassoBundle\Loader\VichUploaderLoader;
 use Silarhi\PicassoBundle\PicassoBundle;
 use Silarhi\PicassoBundle\Placeholder\BlurHashPlaceholder;
@@ -50,6 +53,8 @@ use Silarhi\PicassoBundle\Tests\Functional\Stub\StubConfiguredAttributeLoader;
 use Silarhi\PicassoBundle\Tests\Functional\Stub\StubServicePlaceholder;
 use Silarhi\PicassoBundle\Tests\Functional\Stub\StubServiceTransformer;
 use Silarhi\PicassoBundle\Transformer\DeferredCacheWriter;
+use Silarhi\PicassoBundle\Transformer\GlideSignature;
+use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 use Silarhi\PicassoBundle\Transformer\ImgixTransformer;
 
@@ -63,11 +68,14 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
 use Symfony\Component\DependencyInjection\Reference;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Kernel;
 use Vich\UploaderBundle\VichUploaderBundle;
 
 class BundleWiringTest extends TestCase
 {
+    private const SIGN_KEY = 'bundle-wiring-sign-key-0123456789abcdef';
+
     /** @var Kernel[] */
     private array $kernels = [];
 
@@ -92,7 +100,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
         ]);
@@ -247,8 +255,8 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'imgix' => ['base_url' => 'https://example.imgix.net'],
-                'glide' => ['sign_key' => 'first-glide-key'],
-                'other_glide' => ['type' => 'glide', 'sign_key' => 'other-key'],
+                'glide' => ['sign_key' => 'first-glide-key_0123456789abcdef0123456789abcdef'],
+                'other_glide' => ['type' => 'glide', 'sign_key' => 'other-key_0123456789abcdef0123456789abcdef'],
             ],
         ]);
 
@@ -259,7 +267,7 @@ class BundleWiringTest extends TestCase
 
         // 1.x encrypted "_metadata" with the first Glide sign key; the first loader reading a root serves it
         $resolver = $container->getDefinition(LegacyMetadataResolver::SERVICE);
-        self::assertSame('first-glide-key', $resolver->getArgument(0));
+        self::assertSame('first-glide-key_0123456789abcdef0123456789abcdef', $resolver->getArgument(0));
         self::assertSame(['/uploads' => 'uploads', '/assets' => 'assets'], $resolver->getArgument(1));
     }
 
@@ -298,7 +306,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
         ]);
@@ -316,7 +324,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
         ]);
@@ -339,7 +347,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
         ]);
@@ -357,7 +365,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
                 'imgix' => [
                     'base_url' => 'https://example.imgix.net',
@@ -383,7 +391,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
         ]);
@@ -400,7 +408,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
         ], withPsrHttpClient: true);
@@ -414,7 +422,7 @@ class BundleWiringTest extends TestCase
             'cache_control' => ['max_age' => 600, 'immutable' => false, 'error_max_age' => 60],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'secret',
+                    'sign_key' => 'secret-0123456789abcdef0123456789abcdef',
                     'base_url' => 'https://cdn.example.com',
                     'defer_cache_write' => true,
                     'public_cache' => ['enabled' => true, 'prefix' => 'image'],
@@ -442,7 +450,7 @@ class BundleWiringTest extends TestCase
     {
         $container = $this->loadExtension([
             'transformers' => [
-                'glide' => ['sign_key' => 'secret'],
+                'glide' => ['sign_key' => 'secret-0123456789abcdef0123456789abcdef'],
             ],
         ]);
 
@@ -463,12 +471,12 @@ class BundleWiringTest extends TestCase
         $container = $this->loadExtension([
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'secret',
+                    'sign_key' => 'secret-0123456789abcdef0123456789abcdef',
                     'lock' => ['enabled' => true, 'factory' => 'app.lock_factory', 'ttl' => 10, 'wait' => 5],
                 ],
                 'defaults' => [
                     'type' => 'glide',
-                    'sign_key' => 'secret',
+                    'sign_key' => 'secret-0123456789abcdef0123456789abcdef',
                     'lock' => true,
                 ],
             ],
@@ -485,6 +493,151 @@ class BundleWiringTest extends TestCase
         self::assertSame(10.0, $defaults->getArgument(13));
     }
 
+    /**
+     * @return iterable<string, array{array<string, mixed>}>
+     */
+    public static function missingGlideSignKeyProvider(): iterable
+    {
+        yield 'no sign_key' => [[]];
+        yield 'empty sign_key' => [['sign_key' => '']];
+        yield 'empty list' => [['sign_key' => []]];
+        yield 'empty key in a list' => [['sign_key' => [self::SIGN_KEY, '']]];
+    }
+
+    /**
+     * @param array<string, mixed> $glideConfig
+     */
+    #[DataProvider('missingGlideSignKeyProvider')]
+    public function testGlideRequiresASignKey(array $glideConfig): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('Transformer "glide" needs a "sign_key": Glide image URLs are signed with it');
+
+        $this->loadExtension(['transformers' => ['glide' => $glideConfig]]);
+    }
+
+    public function testGlideSignKeyMustBeAStringOrAListOfStrings(): void
+    {
+        $this->expectException(\Symfony\Component\Config\Definition\Exception\InvalidConfigurationException::class);
+        $this->expectExceptionMessage('The "sign_key" option must be a string or a list of strings');
+
+        $this->loadExtension(['transformers' => ['glide' => ['sign_key' => ['current' => self::SIGN_KEY]]]]);
+    }
+
+    public function testGlideSignKeysAreWiredInOrder(): void
+    {
+        $container = $this->loadExtension([
+            'loaders' => ['uploads' => ['type' => 'filesystem', 'path' => '/uploads']],
+            'transformers' => [
+                'glide' => ['sign_key' => ['new-' . self::SIGN_KEY, self::SIGN_KEY, 'short']],
+            ],
+        ]);
+
+        $keys = ['new-' . self::SIGN_KEY, self::SIGN_KEY, 'short'];
+        self::assertSame($keys, $container->getDefinition('picasso.transformer.glide')->getArgument(2));
+        // 1.x tokens minted with any of them keep decrypting
+        self::assertSame($keys, $container->getDefinition(LegacyMetadataResolver::SERVICE)->getArgument(0));
+    }
+
+    public function testImgixSignKeyStaysOptional(): void
+    {
+        $container = $this->loadExtension(['transformers' => ['imgix' => ['base_url' => 'https://example.imgix.net', 'sign_key' => 'short']]]);
+
+        self::assertSame('short', $container->getDefinition('picasso.transformer.imgix')->getArgument(1));
+    }
+
+    public function testImgixSignKeyCannotBeAList(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('The "sign_key" of Imgix transformer "imgix" must be a single signing token, not a list.');
+
+        $this->loadExtension(['transformers' => ['imgix' => ['base_url' => 'https://example.imgix.net', 'sign_key' => ['a', 'b']]]]);
+    }
+
+    public function testGlideSignKeyFromTheEnvironmentIsCheckedAtRuntime(): void
+    {
+        $config = [
+            'loaders' => ['filesystem' => ['path' => __DIR__ . '/../Fixtures']],
+            'transformers' => ['glide' => ['sign_key' => '%env(PICASSO_WIRING_SIGN_KEY)%']],
+        ];
+
+        $_ENV['PICASSO_WIRING_SIGN_KEY'] = self::SIGN_KEY;
+
+        try {
+            // A key the environment provides is only known at runtime: the container builds with any value
+            self::assertInstanceOf(GlideTransformer::class, $this->transformerRegistry($config)->get('glide'));
+
+            $_ENV['PICASSO_WIRING_SIGN_KEY'] = '';
+            $registry = $this->transformerRegistry($config);
+
+            $this->expectException(InvalidConfigurationException::class);
+            $this->expectExceptionMessage('A Glide "sign_key" is empty');
+
+            $registry->get('glide');
+        } finally {
+            unset($_ENV['PICASSO_WIRING_SIGN_KEY']);
+        }
+    }
+
+    public function testGlideSignKeysFromOneCsvEnvironmentVariable(): void
+    {
+        $config = [
+            'loaders' => ['filesystem' => ['path' => __DIR__ . '/../Fixtures']],
+            'transformers' => ['glide' => ['sign_key' => '%env(csv:PICASSO_WIRING_SIGN_KEYS)%']],
+        ];
+
+        $_ENV['PICASSO_WIRING_SIGN_KEYS'] = 'new-' . self::SIGN_KEY . ',' . self::SIGN_KEY;
+
+        try {
+            $transformer = $this->transformerRegistry($config)->get('glide');
+            self::assertInstanceOf(GlideTransformer::class, $transformer);
+
+            // Signed with the first key; a URL signed with the second one is still served
+            $url = $transformer->url(new Image(path: 'photo.jpg'), new ImageTransformation(width: 10), ['loader' => 'filesystem', 'transformer' => 'glide']);
+            parse_str((string) parse_url($url, \PHP_URL_QUERY), $query);
+            self::assertSame((new GlideSignature('new-' . self::SIGN_KEY))->generateSignature('photo.jpg', ['w' => '10']), $query['s']);
+
+            $loader = $this->bootKernel($config)->get('picasso.loader.filesystem');
+            self::assertInstanceOf(ServableLoaderInterface::class, $loader);
+            $response = $transformer->serve($loader, 'photo.jpg', new Request((new GlideSignature(self::SIGN_KEY))->addSignature('photo.jpg', ['w' => '10'])), ['loader' => 'filesystem', 'transformer' => 'glide']);
+            self::assertSame(200, $response->getStatusCode());
+
+            $_ENV['PICASSO_WIRING_SIGN_KEYS'] = '';
+            $registry = $this->transformerRegistry($config);
+
+            $this->expectException(InvalidConfigurationException::class);
+            $this->expectExceptionMessage('The Glide "sign_key" list is empty');
+
+            $registry->get('glide');
+        } finally {
+            unset($_ENV['PICASSO_WIRING_SIGN_KEYS']);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    private function transformerRegistry(array $config): TransformerRegistry
+    {
+        $registry = $this->bootKernel($config)->get('picasso.transformer_registry');
+        self::assertInstanceOf(TransformerRegistry::class, $registry);
+
+        return $registry;
+    }
+
+    public function testGlideAcceptsLegacySignaturesUntilTurnedOff(): void
+    {
+        $container = $this->loadExtension([
+            'transformers' => [
+                'glide' => ['sign_key' => self::SIGN_KEY],
+                'strict' => ['type' => 'glide', 'sign_key' => self::SIGN_KEY, 'accept_legacy_signatures' => false],
+            ],
+        ]);
+
+        self::assertTrue($container->getDefinition('picasso.transformer.glide')->getArgument(14));
+        self::assertFalse($container->getDefinition('picasso.transformer.strict')->getArgument(14));
+    }
+
     public function testVipsDriverWithoutItsPackageSaysHowToInstallIt(): void
     {
         if (class_exists('Intervention\\Image\\Drivers\\Vips\\Driver')) {
@@ -496,7 +649,7 @@ class BundleWiringTest extends TestCase
 
         $this->loadExtension([
             'transformers' => [
-                'glide' => ['sign_key' => 'secret', 'driver' => 'vips'],
+                'glide' => ['sign_key' => 'secret-0123456789abcdef0123456789abcdef', 'driver' => 'vips'],
             ],
         ]);
     }
@@ -581,7 +734,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
                 'disabled_one' => [
                     'type' => 'glide',
@@ -606,7 +759,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
             'placeholders' => [
@@ -633,7 +786,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
             'placeholders' => [
@@ -660,7 +813,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
             'placeholders' => [
@@ -685,7 +838,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
             'placeholders' => [
@@ -709,7 +862,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
             'placeholders' => [
@@ -735,7 +888,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
             'placeholders' => [
@@ -757,7 +910,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
         ], withFlysystemStorage: true);
@@ -779,7 +932,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
         ]);
@@ -799,7 +952,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
         ]);
@@ -820,7 +973,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
             'placeholders' => [
@@ -850,7 +1003,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
             'placeholders' => [
@@ -875,7 +1028,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
         ]);
@@ -898,7 +1051,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
         ]);
@@ -918,7 +1071,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
         ]);
@@ -940,7 +1093,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
         ]);
@@ -961,7 +1114,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
         ]);
@@ -979,7 +1132,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
         ], withPsrHttpClient: true);
@@ -1005,7 +1158,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
         ]);
@@ -1025,7 +1178,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
         ]);
@@ -1045,7 +1198,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
             'placeholders' => [
@@ -1072,7 +1225,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
         ]);
@@ -1094,7 +1247,7 @@ class BundleWiringTest extends TestCase
                 'disabled_glide' => [
                     'type' => 'glide',
                     'enabled' => false,
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
         ]);
@@ -1114,7 +1267,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
             'placeholders' => [
@@ -1144,7 +1297,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
         ]);
@@ -1168,7 +1321,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
         ], withServices: [StubConfiguredAttributeLoader::class, StubAttributeTransformer::class, StubAttributePlaceholder::class]);
@@ -1202,7 +1355,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                     'url_alias' => 'g',
                 ],
             ],
@@ -1239,7 +1392,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
         ]);
@@ -1260,7 +1413,7 @@ class BundleWiringTest extends TestCase
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'test',
+                    'sign_key' => 'test-0123456789abcdef0123456789abcdef',
                 ],
             ],
         ]);
@@ -1602,7 +1755,7 @@ class VichWiringTestKernel extends Kernel
                 ],
                 'transformers' => [
                     'glide' => [
-                        'sign_key' => 'test-key',
+                        'sign_key' => 'test-key_0123456789abcdef0123456789abcdef',
                         'cache' => '%kernel.cache_dir%/glide',
                     ],
                 ],

@@ -15,7 +15,7 @@ namespace Silarhi\PicassoBundle\Tests\Functional;
 
 use function assert;
 
-use League\Glide\Signatures\SignatureFactory;
+use Silarhi\PicassoBundle\Transformer\GlideSignature;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -193,7 +193,7 @@ class PublicCacheEndToEndTest extends KernelTestCase
      */
     private function buildLegacyUrl(string $path, array $params): string
     {
-        $signature = SignatureFactory::create('public-cache-key')->generateSignature($path, $params);
+        $signature = (new GlideSignature('public-cache-key_0123456789abcdef0123456789abcdef'))->generateSignature($path, $params);
 
         return '/image/glide/filesystem/' . $path . '?' . http_build_query([...$params, 's' => $signature]);
     }

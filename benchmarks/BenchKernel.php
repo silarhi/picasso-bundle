@@ -89,7 +89,7 @@ final class BenchKernel extends AbstractPicassoKernel
             'loaders' => ['main' => ['type' => 'filesystem', 'path' => self::imagesDir()]],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'benchmark-sign-key',
+                    'sign_key' => 'benchmark-sign-key-0123456789abcdef0123456789abcdef',
                     'cache' => $counting ? 'bench.cache' : $this->glideCacheDir(),
                     'driver' => $this->options['driver'],
                     'defer_cache_write' => $this->options['defer'],
