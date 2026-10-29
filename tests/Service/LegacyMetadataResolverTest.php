@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Tests\Service;
 
+use JsonException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
@@ -58,6 +59,7 @@ class LegacyMetadataResolverTest extends TestCase
         yield 'too short' => ['abc'];
         yield 'another key' => [LegacyMetadataToken::mint('another-key', ['path' => '/app'])];
         yield 'no root' => [LegacyMetadataToken::mint(self::KEY, ['field' => 'imageFile'])];
+        yield 'not an object' => [LegacyMetadataToken::encrypt(self::KEY, '"/app/public/uploads"')];
     }
 
     #[DataProvider('invalidTokenProvider')]
@@ -67,6 +69,18 @@ class LegacyMetadataResolverTest extends TestCase
         $this->expectExceptionMessage('Invalid metadata parameter.');
 
         $this->resolver()->decodeRoot($token);
+    }
+
+    public function testRejectsATokenWhosePlaintextIsNotJson(): void
+    {
+        // Authenticated by the key, yet not what 1.x encrypted: the JSON error is kept as previous
+        try {
+            $this->resolver()->decodeRoot(LegacyMetadataToken::encrypt(self::KEY, 'upload_destination=avatars.storage'));
+            self::fail('An ImageNotFoundException was expected.');
+        } catch (ImageNotFoundException $e) {
+            self::assertSame('Invalid metadata parameter.', $e->getMessage());
+            self::assertInstanceOf(JsonException::class, $e->getPrevious());
+        }
     }
 
     public function testFindsTheLoaderReadingARoot(): void

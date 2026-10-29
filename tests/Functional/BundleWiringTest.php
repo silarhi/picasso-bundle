@@ -20,6 +20,7 @@ use function dirname;
 use League\FlysystemBundle\FlysystemBundle;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use Silarhi\PicassoBundle\Controller\LegacyUrlController;
@@ -47,6 +48,7 @@ use Silarhi\PicassoBundle\Service\PlaceholderRegistry;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
 use Silarhi\PicassoBundle\Service\UrlAliases;
 use Silarhi\PicassoBundle\Source\FlysystemImageSource;
+use Silarhi\PicassoBundle\Tests\Fixtures\HidesFromAutoloadingTrait;
 use Silarhi\PicassoBundle\Tests\Functional\Stub\StubAttributePlaceholder;
 use Silarhi\PicassoBundle\Tests\Functional\Stub\StubAttributeTransformer;
 use Silarhi\PicassoBundle\Tests\Functional\Stub\StubConfiguredAttributeLoader;
@@ -62,6 +64,7 @@ use function sprintf;
 
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\TwigBundle\TwigBundle;
+use Symfony\Component\AssetMapper\AssetMapperInterface;
 use Symfony\Component\Config\Loader\LoaderInterface;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -70,11 +73,14 @@ use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Kernel;
+use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\String\Slugger\AsciiSlugger;
 use Vich\UploaderBundle\VichUploaderBundle;
 
 class BundleWiringTest extends TestCase
 {
+    use HidesFromAutoloadingTrait;
+
     private const SIGN_KEY = 'bundle-wiring-sign-key-0123456789abcdef';
 
     /** @var Kernel[] */
@@ -467,6 +473,27 @@ class BundleWiringTest extends TestCase
         );
     }
 
+    #[RunInSeparateProcess]
+    public function testGlideRenderLockRequiresSymfonyLock(): void
+    {
+        self::hideFromAutoloading(LockFactory::class);
+
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('The "lock" option of transformer "glide" requires symfony/lock: run "composer require symfony/lock", then configure "framework.lock" (or point "lock.factory" to your own LockFactory service).');
+
+        $this->loadExtension(['transformers' => ['glide' => ['sign_key' => self::SIGN_KEY, 'lock' => true]]]);
+    }
+
+    #[RunInSeparateProcess]
+    public function testGlideWithoutRenderLockDoesNotNeedSymfonyLock(): void
+    {
+        self::hideFromAutoloading(LockFactory::class);
+
+        $container = $this->loadExtension(['transformers' => ['glide' => ['sign_key' => self::SIGN_KEY]]]);
+
+        self::assertNull($container->getDefinition('picasso.transformer.glide')->getArgument(11));
+    }
+
     public function testGlideRenderLockIsWired(): void
     {
         $container = $this->loadExtension([
@@ -517,12 +544,22 @@ class BundleWiringTest extends TestCase
         $this->loadExtension(['transformers' => ['glide' => $glideConfig]]);
     }
 
-    public function testGlideSignKeyMustBeAStringOrAListOfStrings(): void
+    /**
+     * @return iterable<string, array{mixed}>
+     */
+    public static function invalidGlideSignKeyProvider(): iterable
+    {
+        yield 'map of keys' => [['current' => self::SIGN_KEY]];
+        yield 'non-string key in a list' => [[self::SIGN_KEY, 42]];
+    }
+
+    #[DataProvider('invalidGlideSignKeyProvider')]
+    public function testGlideSignKeyMustBeAStringOrAListOfStrings(mixed $signKey): void
     {
         $this->expectException(\Symfony\Component\Config\Definition\Exception\InvalidConfigurationException::class);
         $this->expectExceptionMessage('The "sign_key" option must be a string or a list of strings');
 
-        $this->loadExtension(['transformers' => ['glide' => ['sign_key' => ['current' => self::SIGN_KEY]]]]);
+        $this->loadExtension(['transformers' => ['glide' => ['sign_key' => $signKey]]]);
     }
 
     public function testGlideSignKeysAreWiredInOrder(): void
@@ -1474,6 +1511,28 @@ class BundleWiringTest extends TestCase
             ['https://example.imgix.net', null],
             $container->getDefinition('picasso.transformer.imgix')->getArguments(),
         );
+    }
+
+    #[RunInSeparateProcess]
+    public function testBlurhashPlaceholderRequiresImagine(): void
+    {
+        self::hideFromAutoloading(\Imagine\Image\ImagineInterface::class);
+
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('Placeholder "hash" of type "blurhash" requires the "imagine/imagine" package. Install it with: composer require imagine/imagine');
+
+        $this->loadExtension(['placeholders' => ['hash' => ['type' => 'blurhash']]]);
+    }
+
+    #[RunInSeparateProcess]
+    public function testAssetMapperLoaderRequiresSymfonyAssetMapper(): void
+    {
+        self::hideFromAutoloading(AssetMapperInterface::class);
+
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('Loader "assets": an asset_mapper loader requires symfony/asset-mapper. Run "composer require symfony/asset-mapper".');
+
+        $this->loadExtension(['loaders' => ['assets' => ['type' => 'asset_mapper']]]);
     }
 
     public function testBlurhashPlaceholderWithImagickDriverUsesImagick(): void

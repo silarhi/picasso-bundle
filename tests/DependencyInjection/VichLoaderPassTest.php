@@ -59,6 +59,14 @@ class VichLoaderPassTest extends TestCase
         $this->process('products', 'product', self::MAPPINGS);
     }
 
+    public function testUnknownExplicitMappingWithoutAnyMappingConfigured(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('Loader "products" serves the VichUploader mapping "product_image", which does not exist. VichUploader has no mappings configured.');
+
+        $this->process('products', 'product_image', []);
+    }
+
     public function testAmbiguousLoaderAsksForAMapping(): void
     {
         $this->expectException(InvalidConfigurationException::class);
@@ -106,6 +114,21 @@ class VichLoaderPassTest extends TestCase
         (new VichLoaderPass())->process($container);
 
         self::assertSame(['%kernel.project_dir%/public/products' => 'products_fs', 'avatars.storage' => 'user_avatar'], $resolver->getArgument(1));
+    }
+
+    public function testTagEntriesWithoutAttributesAreSkipped(): void
+    {
+        $container = new ContainerBuilder();
+        $container->setParameter('vich_uploader.mappings', self::MAPPINGS);
+        $definition = (new Definition())
+            ->setArguments([null, null, '', '', null])
+            // A malformed entry next to a well-formed one: only the latter binds a mapping
+            ->setTags([VichLoaderPass::TAG => ['not-attributes', ['loader' => 'avatars', 'mapping' => 'user_avatar']]]);
+        $container->setDefinition('picasso.loader.avatars', $definition);
+
+        (new VichLoaderPass())->process($container);
+
+        self::assertSame([null, null, 'user_avatar', 'avatars.storage', null], $definition->getArguments());
     }
 
     public function testNothingToDoWithoutVichLoaders(): void
