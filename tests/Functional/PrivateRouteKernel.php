@@ -26,8 +26,8 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
  */
 class PrivateRouteKernel extends AbstractPicassoKernel
 {
-    public const SIGN_KEY = 'private-route-key';
-    public const PRIVATE_SIGN_KEY = 'private-documents-key';
+    public const SIGN_KEY = 'private-route-key_0123456789abcdef0123456789abcdef';
+    public const PRIVATE_SIGN_KEY = 'private-documents-key_0123456789abcdef0123456789abcdef';
 
     protected function configureContainer(ContainerBuilder $container): void
     {

@@ -15,10 +15,10 @@ namespace Silarhi\PicassoBundle\Tests\Functional;
 
 use function assert;
 
-use League\Glide\Signatures\SignatureFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Silarhi\PicassoBundle\Tests\Fixtures\CollectsDeprecationsTrait;
 use Silarhi\PicassoBundle\Tests\Fixtures\LegacyMetadataToken;
+use Silarhi\PicassoBundle\Transformer\GlideSignature;
 
 use function sprintf;
 
@@ -242,7 +242,7 @@ class EndToEndImageServingTest extends KernelTestCase
         $html = $rendered->toString();
 
         $srcUrl = $this->parseSrcFromImg($html);
-        $tamperedUrl = preg_replace('/s=[a-f0-9]+/', 's=tampered', $srcUrl);
+        $tamperedUrl = preg_replace('/s=[A-Za-z0-9_-]+/', 's=tampered', $srcUrl);
         self::assertNotNull($tamperedUrl);
 
         $response = $this->handleRequest($tamperedUrl);
@@ -297,7 +297,7 @@ class EndToEndImageServingTest extends KernelTestCase
     public function test1xUrlRedirectsToTheLoaderReadingItsRoot(string $loader): void
     {
         self::bootKernel();
-        $token = LegacyMetadataToken::mint('full-test-key', ['path' => __DIR__ . '/../Fixtures']);
+        $token = LegacyMetadataToken::mint('full-test-key_0123456789abcdef0123456789abcdef', ['path' => __DIR__ . '/../Fixtures']);
 
         [$response, $deprecations] = self::collectDeprecations(fn (): Response => $this->handleRequest($this->sign1xUrl($loader, 'photo.jpg', ['w' => '10', '_metadata' => $token])));
 
@@ -312,7 +312,7 @@ class EndToEndImageServingTest extends KernelTestCase
     public function test1xUrlWhoseRootNoLoaderReadsIsNotFound(): void
     {
         self::bootKernel();
-        $token = LegacyMetadataToken::mint('full-test-key', ['path' => '/srv/removed']);
+        $token = LegacyMetadataToken::mint('full-test-key_0123456789abcdef0123456789abcdef', ['path' => '/srv/removed']);
 
         self::assertSame(404, $this->handleRequest($this->sign1xUrl('main', 'photo.jpg', ['w' => '10', '_metadata' => $token]))->getStatusCode());
     }
@@ -320,7 +320,7 @@ class EndToEndImageServingTest extends KernelTestCase
     public function test1xUrlWithAForgedSignatureIsNotFound(): void
     {
         self::bootKernel();
-        $token = LegacyMetadataToken::mint('full-test-key', ['path' => __DIR__ . '/../Fixtures']);
+        $token = LegacyMetadataToken::mint('full-test-key_0123456789abcdef0123456789abcdef', ['path' => __DIR__ . '/../Fixtures']);
 
         self::assertSame(404, $this->handleRequest('/image/local_glide/main/photo.jpg?' . http_build_query(['w' => '10', '_metadata' => $token, 's' => 'forged']))->getStatusCode());
     }
@@ -330,7 +330,7 @@ class EndToEndImageServingTest extends KernelTestCase
      */
     private function sign1xUrl(string $loader, string $path, array $params): string
     {
-        $params['s'] = SignatureFactory::create('full-test-key')->generateSignature($path, $params);
+        $params['s'] = (new GlideSignature('full-test-key_0123456789abcdef0123456789abcdef'))->generateSignature($path, $params);
 
         return '/image/local_glide/' . $loader . '/' . $path . '?' . http_build_query($params);
     }

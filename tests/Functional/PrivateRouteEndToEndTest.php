@@ -16,9 +16,9 @@ namespace Silarhi\PicassoBundle\Tests\Functional;
 use function assert;
 use function count;
 
-use League\Glide\Signatures\SignatureFactory;
 use Silarhi\PicassoBundle\Exception\InvalidRouteException;
 use Silarhi\PicassoBundle\Service\ImageHelperInterface;
+use Silarhi\PicassoBundle\Transformer\GlideSignature;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\Request;
@@ -130,14 +130,14 @@ class PrivateRouteEndToEndTest extends KernelTestCase
         $signature = $query['s'] ?? null;
         unset($query['s'], $query['tenant'], $query['id']);
 
-        self::assertSame(SignatureFactory::create(PrivateRouteKernel::PRIVATE_SIGN_KEY)->generateSignature('photo.jpg', $query), $signature);
+        self::assertSame((new GlideSignature(PrivateRouteKernel::PRIVATE_SIGN_KEY))->generateSignature('photo.jpg', $query), $signature);
         self::assertSame(200, $this->get(html_entity_decode($url))->getStatusCode());
     }
 
     public function testTheBundleRouteRefusesThePrivateLoader(): void
     {
         $params = ['w' => '32'];
-        $params['s'] = SignatureFactory::create(PrivateRouteKernel::SIGN_KEY)->generateSignature('photo.jpg', $params);
+        $params['s'] = (new GlideSignature(PrivateRouteKernel::SIGN_KEY))->generateSignature('photo.jpg', $params);
 
         self::assertSame(404, $this->get('/image/glide/documents/photo.jpg?' . http_build_query($params))->getStatusCode());
         // The same signed URL is served for a loader that is not private

@@ -712,7 +712,7 @@ class ConfigurationTest extends TestCase
             'transformers' => [
                 'my_glide' => [
                     'type' => 'glide',
-                    'sign_key' => 'secret-key',
+                    'sign_key' => 'secret-key_0123456789abcdef0123456789abcdef',
                     'cache' => '/var/cache/glide',
                     'driver' => 'gd',
                 ],
@@ -720,7 +720,7 @@ class ConfigurationTest extends TestCase
         ]);
 
         self::assertSame('glide', $config['transformers']['my_glide']['type']);
-        self::assertSame('secret-key', $config['transformers']['my_glide']['sign_key']);
+        self::assertSame('secret-key_0123456789abcdef0123456789abcdef', $config['transformers']['my_glide']['sign_key']);
         self::assertSame('/var/cache/glide', $config['transformers']['my_glide']['cache']);
         self::assertSame('gd', $config['transformers']['my_glide']['driver']);
         self::assertNull($config['transformers']['my_glide']['max_image_size']);
@@ -774,7 +774,7 @@ class ConfigurationTest extends TestCase
             'transformers' => [
                 'my_glide' => [
                     'type' => 'glide',
-                    'sign_key' => 'secret-key',
+                    'sign_key' => 'secret-key_0123456789abcdef0123456789abcdef',
                     'cache' => 'thumbs.storage',
                     'driver' => 'gd',
                 ],
@@ -793,7 +793,7 @@ class ConfigurationTest extends TestCase
             'transformers' => [
                 'my_glide' => [
                     'type' => 'glide',
-                    'sign_key' => 'secret-key',
+                    'sign_key' => 'secret-key_0123456789abcdef0123456789abcdef',
                     'public_cache' => [
                         'enabled' => true,
                     ],
@@ -947,7 +947,7 @@ class ConfigurationTest extends TestCase
         $config = $this->processConfig([
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'key',
+                    'sign_key' => 'key_0123456789abcdef0123456789abcdef',
                 ],
                 'imgix' => [
                     'base_url' => 'https://example.imgix.net',
@@ -980,7 +980,7 @@ class ConfigurationTest extends TestCase
             'transformers' => [
                 'local' => [
                     'type' => 'glide',
-                    'sign_key' => 'local-key',
+                    'sign_key' => 'local-key_0123456789abcdef0123456789abcdef',
                 ],
                 'cdn' => [
                     'type' => 'imgix',
@@ -1104,7 +1104,7 @@ class ConfigurationTest extends TestCase
             'transformers' => [
                 'local' => [
                     'type' => 'glide',
-                    'sign_key' => 'my-secret',
+                    'sign_key' => 'my-secret-0123456789abcdef0123456789abcdef',
                     'cache' => '/tmp/glide',
                     'driver' => 'imagick',
                     'max_image_size' => 4194304,

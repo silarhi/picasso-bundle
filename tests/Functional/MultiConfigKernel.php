@@ -51,7 +51,7 @@ class MultiConfigKernel extends AbstractPicassoKernel
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'multi-test-key',
+                    'sign_key' => 'multi-test-key_0123456789abcdef0123456789abcdef',
                     'cache' => '%kernel.cache_dir%/glide',
                 ],
             ],

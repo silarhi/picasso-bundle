@@ -15,7 +15,7 @@ composer require league/glide
 picasso:
     transformers:
         glide:
-            sign_key: '%env(PICASSO_SIGN_KEY)%'
+            sign_key: '%env(PICASSO_SIGN_KEY)%' # required: a secret, or a list to rotate keys (see "Signing key")
             cache: '%kernel.project_dir%/var/glide-cache'
             driver: gd # gd | imagick | vips
             max_image_size: ~ # optional: max pixel count (width x height)
@@ -35,6 +35,51 @@ When using Glide, you must [import the bundle routes](/reference/routes/) so tha
 Glide URLs are stable: the same image and transformation always produce the same URL and signature. A thumbnail used several times in a page, or across pages, is fetched once and caches cleanly in browsers and CDNs.
 
 A cached variant costs two calls to the cache storage (its size, then its contents), and a conditional request (`If-Modified-Since`) one: the content type is read from the image's first bytes. That matters when the cache is an object store, where each call is an HTTP request. On such a storage, responses carry no `Last-Modified` header, which would cost one more call: signed URLs never change, and [`cache_control`](/reference/routes/#error-responses) makes them cacheable for a year anyway.
+
+## Signing key
+
+Every Glide URL carries a signature (`s`), so only your application can ask your server for a rendering. `sign_key` is the secret it is computed with, and it is required. Use a random key of at least 32 bytes, as long as the SHA-256 output, and keep it out of your repository:
+
+```bash
+php -r 'echo bin2hex(random_bytes(32)), PHP_EOL;' # 64 characters
+```
+
+```dotenv
+# .env.local, or your secret store
+PICASSO_SIGN_KEY=…
+```
+
+A missing or empty key is rejected: when the container is built for a key written in the configuration, at the first use of the transformer for a key read from an environment variable, so an empty `PICASSO_SIGN_KEY=` fails the first image request instead of signing URLs anyone could compute. Like Symfony's secrets, any other key is accepted: a short one is only as hard to guess as it is long, so replace it with a [rotation](#rotating-the-key).
+
+The signature is an HMAC-SHA256 of the image path and its sorted query string, base64url-encoded without padding (43 characters, as Symfony's `UriSigner` writes it), and compared in constant time. Before 2.7, Picasso used Glide's own signature (32 hexadecimal characters, an MD5 hash prefixed with the key): those URLs are still served in 2.x, so the ones already in your pages, HTTP caches and CDNs keep working, and only HMAC signatures are generated. 3.0 will stop accepting them.
+
+### Rotating the key
+
+Changing the key would break every URL already published. Like Symfony's own secrets (`UriSigner`), `sign_key` also takes a list of keys: the first one signs new URLs, and every one of them validates (the pre-2.7 MD5 signatures too, until 3.0). The 1.x URLs [still redirected](/upgrade/from-1x/#1x-urls) keep working too, whichever key minted them. Give each key its own environment variable:
+
+```yaml
+picasso:
+    transformers:
+        glide:
+            sign_key: ['%env(PICASSO_SIGN_KEY)%', '%env(PICASSO_PREVIOUS_SIGN_KEY)%']
+```
+
+To rotate the key, or to replace a short one with a longer, random one:
+
+1. Generate a new key (`php -r 'echo bin2hex(random_bytes(32)), PHP_EOL;'`), set it as `PICASSO_SIGN_KEY` and move the current one to `PICASSO_PREVIOUS_SIGN_KEY`, then deploy: new pages carry URLs signed with the new key, and the published URLs keep working.
+2. Wait until every URL signed with the old key is gone: your longest HTML page cache, HTTP cache and CDN lifetime (with the default [`cache_control`](/reference/routes/#error-responses), CDNs may keep an image for a year, but they only ask your server again for URLs that pages still reference).
+3. Remove the old key from the list (and `PICASSO_PREVIOUS_SIGN_KEY`), then deploy.
+
+Every listed key must be set: an empty one is rejected like an empty `sign_key`, so drop the second entry outside of a rotation. Alternatively, keep all the keys in one comma-separated environment variable, read with Symfony's `csv` processor, so that a rotation only changes the environment:
+
+```yaml
+picasso:
+    transformers:
+        glide:
+            sign_key: '%env(csv:PICASSO_SIGN_KEYS)%' # PICASSO_SIGN_KEYS=<new key>,<previous key>
+```
+
+Hexadecimal keys need no quoting there.
 
 ## Choosing a driver
 
@@ -113,6 +158,12 @@ picasso:
 
 :::note
 `public_cache: enabled: true` writes rendered files at a path your web server is expected to serve directly. Combined with a remote Flysystem cache, that only works if the underlying bucket is publicly served at the matching URL prefix (see [Serving thumbnails from a CDN](/transformers/cdn/)) — otherwise leave `public_cache` disabled and let the bundle's controller stream the cached file.
+
+Public-cache variants end with an image extension, since the web server picks their content type from it: the extension of the output format (`fm`), else of the source name when it is one Glide can write (`jpg`, `jpeg`, `png`, `gif`, `webp`, `avif`, `tif`, `tiff`, `heic`, `jxl`), else `jpg`. An upload named `page.html` is stored as `page.html/_untransformed.jpg`, never as an HTML file. Before 2.7 its extension came from the source name: such URLs are now redirected to the image extension, but the files already stored under another extension are still served by the web server: list them, then delete them (here with `cache: '%kernel.project_dir%/public/image'`):
+
+```bash
+find public/image -type f ! -iregex '.*\.\(avif\|gif\|heic\|jpe?g\|jxl\|png\|tiff?\|webp\)'
+```
 
 With a local path as `cache`, `public_cache` writes world-readable variants (`0644` files, `0755` directories): the web server serves them itself, and may run as another user than PHP (shared hosting), so Flysystem's default `0700` directories would make it answer `403`. With a local Flysystem storage as `cache`, give it the same permissions (`directory_visibility: public` in flysystem-bundle).
 :::

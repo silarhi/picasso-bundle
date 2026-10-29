@@ -47,7 +47,7 @@ class AssetMapperKernel extends AbstractPicassoKernel
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'asset-mapper-key',
+                    'sign_key' => 'asset-mapper-key_0123456789abcdef0123456789abcdef',
                     'cache' => '%kernel.cache_dir%/glide',
                 ],
             ],

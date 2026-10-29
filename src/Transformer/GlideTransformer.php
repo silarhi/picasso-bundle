@@ -32,13 +32,13 @@ use League\Glide\Filesystem\FileNotFoundException;
 use League\Glide\Filesystem\FilesystemException;
 use League\Glide\Server;
 use League\Glide\ServerFactory;
-use League\Glide\Signatures\Signature;
 use League\Glide\Signatures\SignatureException;
-use League\Glide\Signatures\SignatureFactory;
+use SensitiveParameter;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
 use Silarhi\PicassoBundle\Exception\ImageSourceUnavailableException;
+use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
 use Silarhi\PicassoBundle\Exception\InvalidRouteException;
 use Silarhi\PicassoBundle\Exception\LoaderNotFoundException;
 use Silarhi\PicassoBundle\Exception\PurgeException;
@@ -50,6 +50,7 @@ use Silarhi\PicassoBundle\Service\UrlAliases;
 use Silarhi\PicassoBundle\Source\ImageSourceFlysystemAdapter;
 
 use function sprintf;
+use function strtolower;
 
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -84,6 +85,21 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
      * image still needs a filename inside that folder: "photo.jpg/_untransformed.jpg".
      */
     private const UNTRANSFORMED_PARAMS_SEGMENT = '_untransformed';
+
+    /**
+     * File extensions a public-cache variant may be stored under: the formats
+     * Glide encodes ("pjpg" is stored as "jpg"), and their usual aliases. The web
+     * server serves the variant with the content type of its extension, so it
+     * must never come from the source name alone: "page.html" or "shell.php"
+     * would be served as HTML, or run.
+     */
+    private const IMAGE_EXTENSIONS = ['avif', 'gif', 'heic', 'jpeg', 'jpg', 'jxl', 'png', 'tif', 'tiff', 'webp'];
+
+    /**
+     * Extension of a public-cache variant whose source name has no image
+     * extension: Glide encodes a source of a format it cannot write as JPEG.
+     */
+    private const FALLBACK_EXTENSION = 'jpg';
 
     /**
      * How long clients and CDNs may cache the redirect away from a legacy URL.
@@ -122,7 +138,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
      */
     private const LOCK_POLL_INTERVAL = 100_000;
 
-    private Signature $signature;
+    private GlideSignature $signature;
     private Server $server;
     private ?string $baseUrl;
     private string $cachePrefix;
@@ -136,6 +152,8 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
     private ?string $renderDirectory;
 
     /**
+     * @param string|array<mixed>      $signKey             Secret signing image URLs, or a non-empty list of them
+     *                                                      to rotate keys: the first one signs, all of them validate
      * @param string                   $driver              "gd", "imagick", "vips" (needs intervention/image-driver-vips) or an Intervention driver class
      * @param string|null              $baseUrl             Scheme and host (e.g. a CDN) prepended to generated URLs; null keeps them host-relative
      * @param string                   $cachePrefix         Public-cache mode only: path prepended to every cache key, so keys can mirror the
@@ -147,11 +165,13 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
      * @param float                    $lockTtl             Seconds a render lock outlives a crashed renderer
      * @param float                    $lockWait            Seconds a miss waits for the render in progress of the same
      *                                                      variant before rendering it itself
+     *
+     * @throws InvalidConfigurationException When there is no sign key, or one is empty
      */
     public function __construct(
         private UrlGeneratorInterface $router,
         private UrlAliases $urlAliases,
-        string $signKey,
+        #[SensitiveParameter] string|array $signKey,
         string $cache,
         string $driver,
         ?int $maxImageSize,
@@ -164,7 +184,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         private float $lockTtl = 30.0,
         private float $lockWait = 10.0,
     ) {
-        $this->signature = SignatureFactory::create($signKey);
+        $this->signature = new GlideSignature($signKey);
         $this->urlTemplates = new UrlTemplates($router);
         $this->baseUrl = null !== $baseUrl && '' !== $baseUrl ? rtrim($baseUrl, '/') : null;
         $this->cachePrefix = trim($cachePrefix, '/');
@@ -229,8 +249,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
             if ('' === $paramsSegment) {
                 $paramsSegment = self::UNTRANSFORMED_PARAMS_SEGMENT;
             }
-            $format = isset($glideParams['fm']) ? (string) $glideParams['fm'] : pathinfo($path, \PATHINFO_EXTENSION);
-            $path = $path . '/' . $paramsSegment . '.' . $format;
+            $path = $path . '/' . $paramsSegment . '.' . $this->publicCacheExtension($path, $glideParams);
             $glideParams = [];
         }
 
@@ -334,8 +353,16 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
             $cacheFilename = substr($path, $lastSlash + 1);
             $path = substr($path, 0, $lastSlash);
 
-            ['params' => $cachedParams] = self::parseParamsFilename($cacheFilename);
+            ['params' => $cachedParams, 'format' => $extension] = self::parseParamsFilename($cacheFilename);
             $params = [...$params, ...$cachedParams];
+
+            if (!$this->isImageExtension($extension)) {
+                // A URL minted before extensions were restricted to images (e.g.
+                // "page.html/_untransformed.html"): the web server would serve the
+                // variant stored under it with that extension's content type, so
+                // point clients at the image extension instead of storing it.
+                return $this->permanentRedirect($this->buildCanonicalUrl($path, $params, $context));
+            }
 
             $transformer = $this;
             // Glide Server rebinds $this on the callable via Closure::bind: capture the transformer instead
@@ -692,6 +719,30 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
     private function stringParam(array $params, string $key): ?string
     {
         return isset($params[$key]) && is_scalar($params[$key]) ? (string) $params[$key] : null;
+    }
+
+    /**
+     * The extension of a public-cache variant: the format Glide encodes it to.
+     * That is "fm" when set, else the source format, read from the source name
+     * (url() never reads the source) and only trusted when it is an image
+     * extension. Its case is kept, so published URLs do not move.
+     *
+     * @param TransformerParams $glideParams
+     */
+    private function publicCacheExtension(string $path, array $glideParams): string
+    {
+        $extension = isset($glideParams['fm']) ? (string) $glideParams['fm'] : pathinfo($path, \PATHINFO_EXTENSION);
+        // Glide encodes "pjpg" as a progressive JPEG
+        if ('pjpg' === strtolower($extension)) {
+            return 'jpg';
+        }
+
+        return $this->isImageExtension($extension) ? $extension : self::FALLBACK_EXTENSION;
+    }
+
+    private function isImageExtension(string $extension): bool
+    {
+        return in_array(strtolower($extension), self::IMAGE_EXTENSIONS, true);
     }
 
     /**

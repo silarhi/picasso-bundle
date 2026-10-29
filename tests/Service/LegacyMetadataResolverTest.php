@@ -21,13 +21,25 @@ use Silarhi\PicassoBundle\Tests\Fixtures\LegacyMetadataToken;
 
 class LegacyMetadataResolverTest extends TestCase
 {
-    private const KEY = 'sign-key';
+    private const KEY = 'sign-key_0123456789abcdef0123456789abcdef';
 
     public function testDecodesTheRootOfAVichToken(): void
     {
         $token = LegacyMetadataToken::mint(self::KEY, ['upload_destination' => 'avatars.storage']);
 
         self::assertSame('avatars.storage', $this->resolver()->decodeRoot($token));
+    }
+
+    public function testDecodesTokensMintedWithAnyOfTheRotatedKeys(): void
+    {
+        // Rotating the sign key must not break the 1.x URLs minted with the previous one
+        $resolver = new LegacyMetadataResolver(['new-sign-key-0123456789abcdef0123456789', self::KEY], [], '/app');
+
+        self::assertSame('/app/old', $resolver->decodeRoot(LegacyMetadataToken::mint(self::KEY, ['path' => '/app/old'])));
+        self::assertSame('/app/new', $resolver->decodeRoot(LegacyMetadataToken::mint('new-sign-key-0123456789abcdef0123456789', ['path' => '/app/new'])));
+
+        $this->expectException(ImageNotFoundException::class);
+        $resolver->decodeRoot(LegacyMetadataToken::mint('removed-sign-key-0123456789abcdef01234', ['path' => '/app']));
     }
 
     public function testDecodesTheRootOfAFilesystemToken(): void

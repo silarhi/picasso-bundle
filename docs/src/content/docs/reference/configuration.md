@@ -122,7 +122,7 @@ picasso:
         glide:
             enabled: true # false skips this transformer without removing it
             type: glide # inferred from key name
-            sign_key: ~ # signing key for secure URLs
+            sign_key: ~ # required: a secret (32+ random bytes recommended), or a list to rotate keys like Symfony's secrets (the first signs, all verify), e.g. ['%env(PICASSO_SIGN_KEY)%', '%env(PICASSO_PREVIOUS_SIGN_KEY)%']
             cache: '%kernel.project_dir%/var/glide-cache' # local path OR a Flysystem storage name (e.g. 'thumbs.storage')
             driver: gd # gd | imagick | vips
             max_image_size: ~ # optional max pixel count
@@ -142,7 +142,7 @@ picasso:
         # imgix:
         #     type: imgix
         #     base_url: ~      # e.g. https://my-source.imgix.net
-        #     sign_key: ~      # optional signing key
+        #     sign_key: ~      # optional signing token (any length)
         #     api_key: ~       # optional API key for cache purge
         #     http_client: ~   # PSR-18 HTTP client service ID for purge
         #     request_factory: ~ # PSR-17 request factory service ID for purge

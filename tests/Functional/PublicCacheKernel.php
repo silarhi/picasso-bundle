@@ -29,7 +29,7 @@ class PublicCacheKernel extends AbstractPicassoKernel
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'public-cache-key',
+                    'sign_key' => 'public-cache-key_0123456789abcdef0123456789abcdef',
                     'cache' => '%kernel.cache_dir%/glide',
                     'public_cache' => [
                         'enabled' => true,

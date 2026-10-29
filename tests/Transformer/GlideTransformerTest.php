@@ -17,20 +17,28 @@ use function assert;
 use function in_array;
 use function is_string;
 
-use League\Glide\Signatures\SignatureFactory;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
+use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
 use Silarhi\PicassoBundle\Service\UrlAliases;
+use Silarhi\PicassoBundle\Transformer\GlideSignature;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
+
+use function strlen;
+
+use Symfony\Component\Routing\Generator\UrlGenerator;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use Symfony\Component\Routing\RequestContext;
+use Symfony\Component\Routing\Route;
+use Symfony\Component\Routing\RouteCollection;
 
 class GlideTransformerTest extends TestCase
 {
-    private const SIGN_KEY = 'test-secret-key';
+    private const SIGN_KEY = 'test-secret-key_0123456789abcdef0123456789abcdef';
 
     private GlideTransformer $transformer;
     private Stub&UrlGeneratorInterface $router;
@@ -267,7 +275,13 @@ class GlideTransformerTest extends TestCase
     public static function untransformedImagePathProvider(): iterable
     {
         yield 'filename with extension' => ['uploads/photo.jpg', 'uploads/photo.jpg/_untransformed.jpg'];
-        yield 'filename without extension' => ['uploads/photo', 'uploads/photo/_untransformed.'];
+        yield 'filename without extension' => ['uploads/photo', 'uploads/photo/_untransformed.jpg'];
+        yield 'uppercase image extension' => ['uploads/PHOTO.JPG', 'uploads/PHOTO.JPG/_untransformed.JPG'];
+        yield 'png source' => ['uploads/logo.png', 'uploads/logo.png/_untransformed.png'];
+        // The web server would serve these as HTML, or run them
+        yield 'html source' => ['uploads/page.html', 'uploads/page.html/_untransformed.jpg'];
+        yield 'php source' => ['uploads/shell.php', 'uploads/shell.php/_untransformed.jpg'];
+        yield 'svg source' => ['uploads/icon.svg', 'uploads/icon.svg/_untransformed.jpg'];
     }
 
     #[DataProvider('untransformedImagePathProvider')]
@@ -285,8 +299,30 @@ class GlideTransformerTest extends TestCase
 
         $url = $transformer->url(new Image(path: $path), new ImageTransformation(), ['loader' => 'filesystem', 'transformer' => 'glide']);
 
-        $signature = SignatureFactory::create(self::SIGN_KEY)->generateSignature($expectedPath, []);
+        $signature = (new GlideSignature(self::SIGN_KEY))->generateSignature($expectedPath, []);
         self::assertSame('/picasso/glide/filesystem/' . $expectedPath . '?s=' . $signature, $url);
+    }
+
+    /**
+     * @return iterable<string, array{string, ImageTransformation, string}>
+     */
+    public static function publicCacheExtensionProvider(): iterable
+    {
+        yield 'format of fm' => ['uploads/page.html', new ImageTransformation(width: 300, format: 'webp'), 'uploads/page.html/fm_webp%2Cw_300.webp'];
+        yield 'progressive jpeg is a jpeg' => ['uploads/photo.png', new ImageTransformation(width: 300, format: 'pjpg'), 'uploads/photo.png/fm_pjpg%2Cw_300.jpg'];
+        yield 'no fm keeps the source format' => ['uploads/photo.webp', new ImageTransformation(width: 300), 'uploads/photo.webp/w_300.webp'];
+        yield 'no fm on a non-image name' => ['uploads/page.html', new ImageTransformation(width: 300), 'uploads/page.html/w_300.jpg'];
+        yield 'fm that is not an image format' => ['uploads/photo.jpg', new ImageTransformation(width: 300, format: 'php'), 'uploads/photo.jpg/fm_php%2Cw_300.jpg'];
+    }
+
+    #[DataProvider('publicCacheExtensionProvider')]
+    public function testPublicCacheUrlEndsWithAnImageExtension(string $path, ImageTransformation $transformation, string $expectedPath): void
+    {
+        $transformer = new GlideTransformer($this->router, new UrlAliases([], []), self::SIGN_KEY, '/tmp/cache', 'gd', null, true);
+
+        $url = $transformer->url(new Image(path: $path), $transformation, ['loader' => 'filesystem', 'transformer' => 'glide']);
+
+        self::assertSame('/picasso/glide/filesystem/' . $expectedPath, parse_url($url, \PHP_URL_PATH));
     }
 
     public function testPublicCacheUrlPassesMetadataAsQueryParam(): void
@@ -495,8 +531,64 @@ class GlideTransformerTest extends TestCase
         // The signature is computed against the cached path with no extra params
         // (all transformation params are embedded in the path itself)
         $cachedPath = 'photos/hero.jpg/' . $parsed['paramsSegment'] . '.avif';
-        $expectedSignature = SignatureFactory::create(self::SIGN_KEY)
-            ->generateSignature($cachedPath, []);
+        $expectedSignature = (new GlideSignature(self::SIGN_KEY))->generateSignature($cachedPath, []);
         self::assertSame($expectedSignature, $query['s']);
+    }
+
+    /**
+     * The URL templates fill in the signature without the router: a base64url
+     * signature ("-", "_") must come out exactly as the router writes it, and
+     * validate once parsed back from the URL, in both URL schemes.
+     */
+    public function testBase64UrlSignaturesSurviveTheRouterAndTheUrlTemplates(): void
+    {
+        $routes = new RouteCollection();
+        $routes->add('picasso_image', new Route('/image/{transformer}/{loader}/{path}', requirements: ['path' => '.+']));
+        $router = new UrlGenerator($routes, new RequestContext());
+        $signature = new GlideSignature(self::SIGN_KEY);
+        $context = ['loader' => 'filesystem', 'transformer' => 'glide'];
+        $urlSafeCharacters = '';
+
+        foreach ([false, true] as $publicCache) {
+            $transformer = new GlideTransformer($router, new UrlAliases([], []), self::SIGN_KEY, '/tmp/cache', 'gd', null, $publicCache);
+
+            for ($width = 16; $width <= 4096; $width += 16) {
+                $url = $transformer->url(new Image(path: 'uploads/photo.jpg'), new ImageTransformation(width: $width, format: 'webp'), $context);
+                parse_str((string) parse_url($url, \PHP_URL_QUERY), $query);
+                self::assertIsString($query['s']);
+                self::assertMatchesRegularExpression('/^[A-Za-z0-9_-]{43}$/', $query['s']);
+                self::assertStringEndsWith('s=' . $query['s'], $url, 'The signature must reach the URL unencoded.');
+
+                $path = rawurldecode(substr((string) parse_url($url, \PHP_URL_PATH), strlen('/image/glide/filesystem/')));
+                $signature->validateRequest($path, $query);
+
+                if (!$publicCache) {
+                    // What the router itself writes, which the templates must reproduce
+                    self::assertSame($router->generate('picasso_image', ['transformer' => 'glide', 'loader' => 'filesystem', 'path' => 'uploads/photo.jpg', 'w' => $width, 'fm' => 'webp', 's' => $query['s']]), $url);
+                }
+
+                $urlSafeCharacters .= preg_replace('/[A-Za-z0-9]/', '', $query['s']);
+            }
+        }
+
+        self::assertStringContainsString('-', $urlSafeCharacters);
+        self::assertStringContainsString('_', $urlSafeCharacters);
+    }
+
+    public function testSignKeysStayOutOfStackTraces(): void
+    {
+        $ignoreArgs = ini_set('zend.exception_ignore_args', '0');
+
+        try {
+            new GlideTransformer($this->router, new UrlAliases([], []), [self::SIGN_KEY, ''], '/tmp/cache', 'gd', null, false);
+            self::fail('An empty key must be rejected.');
+        } catch (InvalidConfigurationException $e) {
+            $trace = $e->getTraceAsString();
+            self::assertStringContainsString('GlideTransformer->__construct(', $trace);
+            self::assertStringContainsString('SensitiveParameterValue', $trace);
+            self::assertStringNotContainsString(substr(self::SIGN_KEY, 0, 10), $trace);
+        } finally {
+            ini_set('zend.exception_ignore_args', false !== $ignoreArgs ? $ignoreArgs : '');
+        }
     }
 }

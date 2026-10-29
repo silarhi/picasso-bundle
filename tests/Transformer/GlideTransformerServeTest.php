@@ -27,7 +27,7 @@ use League\Flysystem\UnableToCheckFileExistence;
 use League\Flysystem\UnableToReadFile;
 use League\Glide\Api\Encoder;
 use League\Glide\Filesystem\FilesystemException;
-use League\Glide\Signatures\SignatureFactory;
+use League\Glide\Signatures\Signature;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Client\ClientExceptionInterface;
@@ -55,6 +55,7 @@ use Silarhi\PicassoBundle\Tests\Source\Stub\ObjectStoreFailures;
 use Silarhi\PicassoBundle\Tests\Transformer\Stub\CountingFilesystem;
 use Silarhi\PicassoBundle\Tests\Transformer\Stub\RacyCacheAdapter;
 use Silarhi\PicassoBundle\Transformer\DeferredCacheWriter;
+use Silarhi\PicassoBundle\Transformer\GlideSignature;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 
 use function sprintf;
@@ -73,7 +74,7 @@ class GlideTransformerServeTest extends TestCase
 {
     use ObjectStoreFailures;
 
-    private const SIGN_KEY = 'test-secret-key';
+    private const SIGN_KEY = 'test-secret-key_0123456789abcdef0123456789abcdef';
 
     private string $tempDir;
 
@@ -443,6 +444,33 @@ class GlideTransformerServeTest extends TestCase
         self::assertSame(['s'], array_keys($query), 'Only the signature stays in the query string');
     }
 
+    public function testServeAcceptsALegacyMd5Signature(): void
+    {
+        $response = $this->createTransformer($this->tempDir . '/cache')->serve(
+            $this->createLoader(__DIR__ . '/../Fixtures'),
+            'photo.jpg',
+            new Request((new Signature(self::SIGN_KEY))->addSignature('photo.jpg', ['w' => '10'])),
+            ['transformer' => 'glide', 'loader' => 'filesystem'],
+        );
+
+        self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+    }
+
+    public function testServeRejectsATamperedSignature(): void
+    {
+        $params = (new GlideSignature(self::SIGN_KEY))->addSignature('photo.jpg', ['w' => '10']);
+
+        $this->expectException(ImageNotFoundException::class);
+        $this->expectExceptionMessage('Invalid image signature.');
+
+        $this->createTransformer($this->tempDir . '/cache')->serve(
+            $this->createLoader(__DIR__ . '/../Fixtures'),
+            'photo.jpg',
+            new Request([...$params, 'w' => '4000']),
+            ['transformer' => 'glide', 'loader' => 'filesystem'],
+        );
+    }
+
     public function testRedirectToLoaderRejectsAnInvalidSignature(): void
     {
         $this->expectException(ImageNotFoundException::class);
@@ -462,7 +490,9 @@ class GlideTransformerServeTest extends TestCase
     public static function untransformedImagePathProvider(): iterable
     {
         yield 'filename with extension' => ['uploads/photo.jpg', '_untransformed.jpg'];
-        yield 'filename without extension' => ['uploads/photo', '_untransformed.'];
+        yield 'filename without extension' => ['uploads/photo', '_untransformed.jpg'];
+        yield 'html source' => ['uploads/page.html', '_untransformed.jpg'];
+        yield 'php source' => ['uploads/shell.php', '_untransformed.jpg'];
     }
 
     #[DataProvider('untransformedImagePathProvider')]
@@ -486,6 +516,49 @@ class GlideTransformerServeTest extends TestCase
         $this->createTransformer($this->tempDir . '/cache', publicCache: true)->purge($path, $context);
 
         self::assertDirectoryDoesNotExist($variantDir);
+    }
+
+    /**
+     * @return iterable<string, array{string, string, string}>
+     */
+    public static function nonImageExtensionPathProvider(): iterable
+    {
+        yield 'untransformed html' => ['uploads/page.html', '_untransformed.html', '_untransformed.jpg'];
+        yield 'untransformed php' => ['uploads/shell.php', '_untransformed.php', '_untransformed.jpg'];
+        yield 'transformed html' => ['uploads/page.html', 'w_10.html', 'w_10.jpg'];
+        yield 'untransformed without extension' => ['uploads/photo', '_untransformed.', '_untransformed.jpg'];
+    }
+
+    /**
+     * URLs minted before public-cache extensions were restricted to images are
+     * still validly signed: the variant must never be stored under their extension.
+     */
+    #[DataProvider('nonImageExtensionPathProvider')]
+    public function testServeRedirectsAPublicCacheUrlWithANonImageExtension(string $sourcePath, string $cacheFilename, string $canonicalFilename): void
+    {
+        $this->copyFixtureToSource($sourcePath);
+        $transformer = $this->createTransformer($this->tempDir . '/cache', publicCache: true);
+        $path = $sourcePath . '/' . $cacheFilename;
+
+        $response = $transformer->serve(
+            $this->createLoader($this->tempDir . '/source'),
+            $path,
+            $this->createSignedRequest($path, []),
+            ['transformer' => 'glide', 'loader' => 'filesystem'],
+        );
+
+        self::assertSame(Response::HTTP_MOVED_PERMANENTLY, $response->getStatusCode());
+        $location = (string) $response->headers->get('Location');
+        self::assertSame('/picasso/glide/filesystem/' . $sourcePath . '/' . $canonicalFilename, parse_url($location, \PHP_URL_PATH));
+
+        $variantDir = $this->tempDir . '/cache/glide/filesystem/' . $sourcePath;
+        self::assertFileDoesNotExist($variantDir . '/' . $cacheFilename);
+
+        $followed = $this->serveUrl($transformer, $location);
+        self::assertSame(Response::HTTP_OK, $followed->getStatusCode());
+        self::assertSame('image/jpeg', $followed->headers->get('Content-Type'));
+        self::assertFileExists($variantDir . '/' . $canonicalFilename);
+        self::assertFileDoesNotExist($variantDir . '/' . $cacheFilename);
     }
 
     /**
@@ -522,7 +595,7 @@ class GlideTransformerServeTest extends TestCase
     {
         // "my" is not a transformation param, so this is an image filename, not a params segment
         yield 'underscore in filename' => ['uploads/my_photo.jpg', 'uploads/my_photo.jpg/_untransformed.jpg'];
-        yield 'filename without extension' => ['uploads/photo', 'uploads/photo/_untransformed.'];
+        yield 'filename without extension' => ['uploads/photo', 'uploads/photo/_untransformed.jpg'];
     }
 
     #[DataProvider('untransformedLegacyPathProvider')]
@@ -541,7 +614,7 @@ class GlideTransformerServeTest extends TestCase
         self::assertSame(Response::HTTP_MOVED_PERMANENTLY, $response->getStatusCode());
 
         $location = (string) $response->headers->get('Location');
-        $signature = SignatureFactory::create(self::SIGN_KEY)->generateSignature($canonicalPath, []);
+        $signature = (new GlideSignature(self::SIGN_KEY))->generateSignature($canonicalPath, []);
         self::assertSame('/picasso/glide/filesystem/' . $canonicalPath . '?s=' . $signature, $location);
 
         // The redirect target must be served, or clients would loop through redirects
@@ -1063,6 +1136,6 @@ class GlideTransformerServeTest extends TestCase
      */
     private function createSignedRequest(string $path, array $params): Request
     {
-        return new Request(SignatureFactory::create(self::SIGN_KEY)->addSignature($path, $params));
+        return new Request((new GlideSignature(self::SIGN_KEY))->addSignature($path, $params));
     }
 }

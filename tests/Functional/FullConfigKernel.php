@@ -88,7 +88,7 @@ class FullConfigKernel extends AbstractPicassoKernel
             'transformers' => [
                 'local_glide' => [
                     'type' => 'glide',
-                    'sign_key' => 'full-test-key',
+                    'sign_key' => 'full-test-key_0123456789abcdef0123456789abcdef',
                     'cache' => '%kernel.cache_dir%/glide',
                     'driver' => 'gd',
                     'max_image_size' => 4194304,

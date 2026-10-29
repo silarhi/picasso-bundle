@@ -38,7 +38,7 @@ class CdnKernel extends AbstractPicassoKernel
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'cdn-key',
+                    'sign_key' => 'cdn-key_0123456789abcdef0123456789abcdef',
                     'cache' => '%kernel.cache_dir%/bucket',
                     'base_url' => 'https://cdn.example.com',
                     'defer_cache_write' => true,
