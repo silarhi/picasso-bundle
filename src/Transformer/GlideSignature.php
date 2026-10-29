@@ -17,12 +17,12 @@ use function is_string;
 
 use League\Glide\Signatures\SignatureException;
 use League\Glide\Signatures\SignatureInterface;
+use SensitiveParameter;
 use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
 
-use function strlen;
-
 /**
- * Signs Glide URLs with an HMAC-SHA256 of the image path and its sorted query.
+ * Signs Glide URLs with an HMAC-SHA256 of the image path and its sorted query,
+ * base64url-encoded without padding (43 characters), like Symfony's UriSigner.
  *
  * Replaces Glide's own Signature, md5(key . ':' . path . '?' . query): a
  * key-prefixed hash is open to length extension, and Glide compares it with
@@ -30,44 +30,31 @@ use function strlen;
  * covering the same path and params. Signatures are always compared with
  * hash_equals().
  *
- * Several keys allow rotating them: the first one signs, every one validates.
- * With $acceptLegacy, requests signed the Glide way with any of them still
- * validate, so the URLs already in pages, HTTP caches and CDNs keep working;
- * only HMAC signatures are generated.
+ * Several keys allow rotating them, as with Symfony's secrets: the first one
+ * signs, every one validates. Requests signed the Glide way with any of them
+ * still validate until 3.0, so the URLs already in pages, HTTP caches and CDNs
+ * keep working; only HMAC signatures are generated.
  */
 final readonly class GlideSignature implements SignatureInterface
 {
-    /**
-     * Minimum key length, in bytes, required from 3.0. A key at least as long
-     * as the SHA-256 output is what HMAC asks for (RFC 2104), and what a
-     * 32-character hexadecimal secret such as Symfony's generated APP_SECRET provides.
-     */
-    public const MIN_KEY_LENGTH = 32;
-
     /**
      * @var non-empty-list<string>
      */
     private array $signKeys;
 
     /**
-     * @param string|array<mixed> $signKey      Secret, or non-empty list of secrets: the first one signs, all of them validate
-     * @param bool                $acceptLegacy Whether requests signed with Glide's MD5 signature still validate
+     * @param string|array<mixed> $signKey Secret, or non-empty list of secrets: the first one signs, all of them validate
      *
      * @throws InvalidConfigurationException When there is no key, or a key is empty
      */
     public function __construct(
-        string|array $signKey,
-        private bool $acceptLegacy = true,
+        #[SensitiveParameter] string|array $signKey,
     ) {
         $signKeys = [];
         // Also reached at runtime, when the keys come from an environment variable
         foreach (is_string($signKey) ? [$signKey] : $signKey as $key) {
             if (!is_string($key) || '' === $key) {
                 throw new InvalidConfigurationException('A Glide "sign_key" is empty: anyone could forge image URLs. Generate one with "php -r \'echo bin2hex(random_bytes(32)), PHP_EOL;\'" and set it as "sign_key" (e.g. in the PICASSO_SIGN_KEY environment variable).');
-            }
-
-            if (strlen($key) < self::MIN_KEY_LENGTH) {
-                trigger_deprecation('silarhi/picasso-bundle', '2.7', 'A Glide "sign_key" shorter than %d characters is deprecated: 3.0 will require at least %d. Generate one with "php -r \'echo bin2hex(random_bytes(32)), PHP_EOL;\'" and put it in front of the current key ("sign_key: [new, current]"), so the published URLs keep working.', self::MIN_KEY_LENGTH, self::MIN_KEY_LENGTH);
             }
 
             $signKeys[] = $key;
@@ -120,11 +107,12 @@ final readonly class GlideSignature implements SignatureInterface
         $payload = $this->payload($path, $params);
 
         foreach ($this->signKeys as $signKey) {
-            if (hash_equals(hash_hmac('sha256', $payload, $signKey), $signature)) {
+            if (hash_equals($this->hmac($payload, $signKey), $signature)) {
                 return;
             }
 
-            if ($this->acceptLegacy && hash_equals(md5($signKey . ':' . $payload), $signature)) {
+            // Glide's MD5, in hexadecimal as Glide wrote it, validated until 3.0
+            if (hash_equals(md5($signKey . ':' . $payload), $signature)) {
                 return;
             }
         }
@@ -139,7 +127,16 @@ final readonly class GlideSignature implements SignatureInterface
      */
     public function generateSignature(string $path, array $params): string
     {
-        return hash_hmac('sha256', $this->payload($path, $params), $this->signKeys[0]);
+        return $this->hmac($this->payload($path, $params), $this->signKeys[0]);
+    }
+
+    /**
+     * The HMAC-SHA256 of a payload, base64url-encoded without padding, as
+     * Symfony's UriSigner encodes it: URL-safe, so the router leaves it untouched.
+     */
+    private function hmac(string $payload, #[SensitiveParameter] string $signKey): string
+    {
+        return strtr(rtrim(base64_encode(hash_hmac('sha256', $payload, $signKey, true)), '='), ['/' => '_', '+' => '-']);
     }
 
     /**

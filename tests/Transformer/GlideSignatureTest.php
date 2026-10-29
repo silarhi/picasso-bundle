@@ -53,27 +53,19 @@ class GlideSignatureTest extends TestCase
         new GlideSignature($signKey);
     }
 
-    public function testShortKeyIsDeprecatedButStillSigns(): void
+    public function testAnyNonEmptyKeyIsAcceptedWithoutDeprecation(): void
     {
-        $shortKey = str_repeat('k', GlideSignature::MIN_KEY_LENGTH - 1);
-
-        [$signature, $deprecations] = self::collectDeprecations(static fn (): GlideSignature => new GlideSignature([self::SIGN_KEY, $shortKey]));
-
-        self::assertSame(['Since silarhi/picasso-bundle 2.7: A Glide "sign_key" shorter than 32 characters is deprecated: 3.0 will require at least 32. Generate one with "php -r \'echo bin2hex(random_bytes(32)), PHP_EOL;\'" and put it in front of the current key ("sign_key: [new, current]"), so the published URLs keep working.'], $deprecations);
-        $signature->validateRequest('photo.jpg', ['s' => hash_hmac('sha256', 'photo.jpg?', $shortKey)]);
-    }
-
-    public function testKeyOfTheMinimumLengthIsNotDeprecated(): void
-    {
-        [$signature, $deprecations] = self::collectDeprecations(static fn (): GlideSignature => new GlideSignature(str_repeat('k', GlideSignature::MIN_KEY_LENGTH)));
+        // Like Symfony's secrets: no minimum length, only a recommendation
+        [$signature, $deprecations] = self::collectDeprecations(static fn (): GlideSignature => new GlideSignature([self::SIGN_KEY, 'k']));
 
         self::assertSame([], $deprecations);
-        self::assertSame(64, strlen($signature->generateSignature('photo.jpg', [])));
+        self::assertSame(43, strlen($signature->generateSignature('photo.jpg', [])));
+        $signature->validateRequest('photo.jpg', ['s' => $this->base64UrlHmac('photo.jpg?', 'k')]);
     }
 
     public function testFirstKeySignsAndEveryKeyValidates(): void
     {
-        $rotated = new GlideSignature([self::NEW_KEY, self::SIGN_KEY], acceptLegacy: false);
+        $rotated = new GlideSignature([self::NEW_KEY, self::SIGN_KEY]);
 
         self::assertSame((new GlideSignature(self::NEW_KEY))->generateSignature('photo.jpg', ['w' => '300']), $rotated->generateSignature('photo.jpg', ['w' => '300']));
 
@@ -102,15 +94,14 @@ class GlideSignatureTest extends TestCase
         }
     }
 
-    public function testLegacyMd5SignatureOfAnyKeyIsAcceptedWhileLegacySignaturesAreOn(): void
+    public function testLegacyMd5SignatureOfAnyKeyIsAccepted(): void
     {
-        $legacy = (new Signature(self::SIGN_KEY))->addSignature('photo.jpg', ['w' => '300']);
+        $signature = new GlideSignature([self::NEW_KEY, self::SIGN_KEY]);
 
-        (new GlideSignature([self::NEW_KEY, self::SIGN_KEY]))->validateRequest('photo.jpg', $legacy);
-        $this->addToAssertionCount(1);
-
-        $this->expectException(SignatureException::class);
-        (new GlideSignature([self::NEW_KEY, self::SIGN_KEY], acceptLegacy: false))->validateRequest('photo.jpg', $legacy);
+        // Until 3.0, URLs signed the Glide way keep working, whichever listed key signed them
+        $signature->validateRequest('photo.jpg', (new Signature(self::NEW_KEY))->addSignature('photo.jpg', ['w' => '300']));
+        $signature->validateRequest('photo.jpg', (new Signature(self::SIGN_KEY))->addSignature('photo.jpg', ['w' => '300']));
+        $this->addToAssertionCount(2);
     }
 
     public function testSignatureIsAnHmacSha256OfThePathAndTheSortedQuery(): void
@@ -118,14 +109,14 @@ class GlideSignatureTest extends TestCase
         $signature = new GlideSignature(self::SIGN_KEY);
 
         self::assertSame(
-            hash_hmac('sha256', 'uploads/photo.jpg?fm=webp&w=300', self::SIGN_KEY),
+            $this->base64UrlHmac('uploads/photo.jpg?fm=webp&w=300', self::SIGN_KEY),
             $signature->generateSignature('/uploads/photo.jpg', ['w' => 300, 'fm' => 'webp', 's' => 'ignored']),
         );
     }
 
     public function testAddedSignatureValidates(): void
     {
-        $signature = new GlideSignature(self::SIGN_KEY, acceptLegacy: false);
+        $signature = new GlideSignature(self::SIGN_KEY);
         $params = $signature->addSignature('uploads/photo.jpg', ['w' => '300', 'fm' => 'webp']);
 
         self::assertSame(['w' => '300', 'fm' => 'webp', 's' => $signature->generateSignature('uploads/photo.jpg', ['w' => '300', 'fm' => 'webp'])], $params);
@@ -136,22 +127,12 @@ class GlideSignatureTest extends TestCase
         $this->addToAssertionCount(2);
     }
 
-    public function testLegacyMd5SignatureIsAcceptedByDefault(): void
+    public function testLegacyMd5SignatureIsAccepted(): void
     {
         $legacy = (new Signature(self::SIGN_KEY))->addSignature('uploads/photo.jpg', ['w' => '300']);
 
         (new GlideSignature(self::SIGN_KEY))->validateRequest('uploads/photo.jpg', $legacy);
         $this->addToAssertionCount(1);
-    }
-
-    public function testLegacyMd5SignatureIsRejectedWhenLegacySignaturesAreOff(): void
-    {
-        $legacy = (new Signature(self::SIGN_KEY))->addSignature('uploads/photo.jpg', ['w' => '300']);
-
-        $this->expectException(SignatureException::class);
-        $this->expectExceptionMessage('Signature is not valid.');
-
-        (new GlideSignature(self::SIGN_KEY, acceptLegacy: false))->validateRequest('uploads/photo.jpg', $legacy);
     }
 
     /**
@@ -191,5 +172,33 @@ class GlideSignatureTest extends TestCase
         $this->expectExceptionMessage('Signature is missing.');
 
         (new GlideSignature(self::SIGN_KEY))->validateRequest('uploads/photo.jpg', ['w' => '300']);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function signedPathProvider(): iterable
+    {
+        for ($width = 1; $width <= 64; ++$width) {
+            yield 'w=' . $width => ['uploads/photo.jpg?w=' . $width];
+        }
+    }
+
+    /**
+     * Encoded like Symfony's UriSigner: 43 URL-safe characters, never "+", "/" nor "=".
+     */
+    #[DataProvider('signedPathProvider')]
+    public function testSignatureIsBase64UrlWithoutPadding(string $payload): void
+    {
+        $signature = (new GlideSignature(self::SIGN_KEY))->generateSignature('uploads/photo.jpg', ['w' => substr($payload, strlen('uploads/photo.jpg?w='))]);
+
+        self::assertMatchesRegularExpression('/^[A-Za-z0-9_-]{43}$/', $signature);
+        self::assertSame(rawurlencode($signature), $signature, 'The router and the URL templates must leave it unencoded.');
+        self::assertSame(hash_hmac('sha256', $payload, self::SIGN_KEY, true), base64_decode(strtr($signature, '-_', '+/'), true));
+    }
+
+    private function base64UrlHmac(string $payload, string $key): string
+    {
+        return strtr(rtrim(base64_encode(hash_hmac('sha256', $payload, $key, true)), '='), ['/' => '_', '+' => '-']);
     }
 }

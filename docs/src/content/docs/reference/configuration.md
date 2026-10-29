@@ -122,8 +122,7 @@ picasso:
         glide:
             enabled: true # false skips this transformer without removing it
             type: glide # inferred from key name
-            sign_key: ~ # required: a secret of 32+ characters signing image URLs, or a list of them (the first signs, all validate)
-            accept_legacy_signatures: true # also serve URLs signed before 2.7 (MD5); removed in 3.0
+            sign_key: ~ # required: a secret (32+ random bytes recommended), or a list to rotate keys like Symfony's secrets (the first signs, all verify), e.g. ['%env(PICASSO_SIGN_KEY)%', '%env(PICASSO_PREVIOUS_SIGN_KEY)%']
             cache: '%kernel.project_dir%/var/glide-cache' # local path OR a Flysystem storage name (e.g. 'thumbs.storage')
             driver: gd # gd | imagick | vips
             max_image_size: ~ # optional max pixel count

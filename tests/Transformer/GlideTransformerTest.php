@@ -23,10 +23,18 @@ use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
+use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
 use Silarhi\PicassoBundle\Service\UrlAliases;
 use Silarhi\PicassoBundle\Transformer\GlideSignature;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
+
+use function strlen;
+
+use Symfony\Component\Routing\Generator\UrlGenerator;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use Symfony\Component\Routing\RequestContext;
+use Symfony\Component\Routing\Route;
+use Symfony\Component\Routing\RouteCollection;
 
 class GlideTransformerTest extends TestCase
 {
@@ -525,5 +533,62 @@ class GlideTransformerTest extends TestCase
         $cachedPath = 'photos/hero.jpg/' . $parsed['paramsSegment'] . '.avif';
         $expectedSignature = (new GlideSignature(self::SIGN_KEY))->generateSignature($cachedPath, []);
         self::assertSame($expectedSignature, $query['s']);
+    }
+
+    /**
+     * The URL templates fill in the signature without the router: a base64url
+     * signature ("-", "_") must come out exactly as the router writes it, and
+     * validate once parsed back from the URL, in both URL schemes.
+     */
+    public function testBase64UrlSignaturesSurviveTheRouterAndTheUrlTemplates(): void
+    {
+        $routes = new RouteCollection();
+        $routes->add('picasso_image', new Route('/image/{transformer}/{loader}/{path}', requirements: ['path' => '.+']));
+        $router = new UrlGenerator($routes, new RequestContext());
+        $signature = new GlideSignature(self::SIGN_KEY);
+        $context = ['loader' => 'filesystem', 'transformer' => 'glide'];
+        $urlSafeCharacters = '';
+
+        foreach ([false, true] as $publicCache) {
+            $transformer = new GlideTransformer($router, new UrlAliases([], []), self::SIGN_KEY, '/tmp/cache', 'gd', null, $publicCache);
+
+            for ($width = 16; $width <= 4096; $width += 16) {
+                $url = $transformer->url(new Image(path: 'uploads/photo.jpg'), new ImageTransformation(width: $width, format: 'webp'), $context);
+                parse_str((string) parse_url($url, \PHP_URL_QUERY), $query);
+                self::assertIsString($query['s']);
+                self::assertMatchesRegularExpression('/^[A-Za-z0-9_-]{43}$/', $query['s']);
+                self::assertStringEndsWith('s=' . $query['s'], $url, 'The signature must reach the URL unencoded.');
+
+                $path = rawurldecode(substr((string) parse_url($url, \PHP_URL_PATH), strlen('/image/glide/filesystem/')));
+                $signature->validateRequest($path, $query);
+
+                if (!$publicCache) {
+                    // What the router itself writes, which the templates must reproduce
+                    self::assertSame($router->generate('picasso_image', ['transformer' => 'glide', 'loader' => 'filesystem', 'path' => 'uploads/photo.jpg', 'w' => $width, 'fm' => 'webp', 's' => $query['s']]), $url);
+                }
+
+                $urlSafeCharacters .= preg_replace('/[A-Za-z0-9]/', '', $query['s']);
+            }
+        }
+
+        self::assertStringContainsString('-', $urlSafeCharacters);
+        self::assertStringContainsString('_', $urlSafeCharacters);
+    }
+
+    public function testSignKeysStayOutOfStackTraces(): void
+    {
+        $ignoreArgs = ini_set('zend.exception_ignore_args', '0');
+
+        try {
+            new GlideTransformer($this->router, new UrlAliases([], []), [self::SIGN_KEY, ''], '/tmp/cache', 'gd', null, false);
+            self::fail('An empty key must be rejected.');
+        } catch (InvalidConfigurationException $e) {
+            $trace = $e->getTraceAsString();
+            self::assertStringContainsString('GlideTransformer->__construct(', $trace);
+            self::assertStringContainsString('SensitiveParameterValue', $trace);
+            self::assertStringNotContainsString(substr(self::SIGN_KEY, 0, 10), $trace);
+        } finally {
+            ini_set('zend.exception_ignore_args', false !== $ignoreArgs ? $ignoreArgs : '');
+        }
     }
 }

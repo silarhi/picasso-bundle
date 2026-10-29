@@ -90,7 +90,7 @@ class GlideTransformerRouteTest extends TestCase
             $this->context(['tenant' => 'acme', 'id' => 1]),
         );
 
-        self::assertMatchesRegularExpression('#^/portal/acme/documents/1/image\?s=[0-9a-f]{64}$#', $url);
+        self::assertMatchesRegularExpression('#^/portal/acme/documents/1/image\?s=[A-Za-z0-9_-]{43}$#', $url);
     }
 
     public function testPublicCacheCannotServeRoutes(): void

@@ -625,19 +625,6 @@ class BundleWiringTest extends TestCase
         return $registry;
     }
 
-    public function testGlideAcceptsLegacySignaturesUntilTurnedOff(): void
-    {
-        $container = $this->loadExtension([
-            'transformers' => [
-                'glide' => ['sign_key' => self::SIGN_KEY],
-                'strict' => ['type' => 'glide', 'sign_key' => self::SIGN_KEY, 'accept_legacy_signatures' => false],
-            ],
-        ]);
-
-        self::assertTrue($container->getDefinition('picasso.transformer.glide')->getArgument(14));
-        self::assertFalse($container->getDefinition('picasso.transformer.strict')->getArgument(14));
-    }
-
     public function testVipsDriverWithoutItsPackageSaysHowToInstallIt(): void
     {
         if (class_exists('Intervention\\Image\\Drivers\\Vips\\Driver')) {

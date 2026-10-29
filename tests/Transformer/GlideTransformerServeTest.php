@@ -444,7 +444,7 @@ class GlideTransformerServeTest extends TestCase
         self::assertSame(['s'], array_keys($query), 'Only the signature stays in the query string');
     }
 
-    public function testServeAcceptsALegacyMd5SignatureByDefault(): void
+    public function testServeAcceptsALegacyMd5Signature(): void
     {
         $response = $this->createTransformer($this->tempDir . '/cache')->serve(
             $this->createLoader(__DIR__ . '/../Fixtures'),
@@ -454,19 +454,6 @@ class GlideTransformerServeTest extends TestCase
         );
 
         self::assertSame(Response::HTTP_OK, $response->getStatusCode());
-    }
-
-    public function testServeRejectsALegacyMd5SignatureWhenLegacySignaturesAreOff(): void
-    {
-        $this->expectException(ImageNotFoundException::class);
-        $this->expectExceptionMessage('Invalid image signature.');
-
-        $this->createTransformer($this->tempDir . '/cache', acceptLegacySignatures: false)->serve(
-            $this->createLoader(__DIR__ . '/../Fixtures'),
-            'photo.jpg',
-            new Request((new Signature(self::SIGN_KEY))->addSignature('photo.jpg', ['w' => '10'])),
-            ['transformer' => 'glide', 'loader' => 'filesystem'],
-        );
     }
 
     public function testServeRejectsATamperedSignature(): void
@@ -1022,7 +1009,7 @@ class GlideTransformerServeTest extends TestCase
         return sprintf('%04o', fileperms($path) & 0o777);
     }
 
-    private function createTransformer(string $cache, ?FlysystemRegistry $flysystemRegistry = null, bool $publicCache = false, string $cachePrefix = '', ?DeferredCacheWriter $deferredCacheWriter = null, ?LockFactory $lockFactory = null, string $driver = 'gd', float $lockWait = 10.0, bool $acceptLegacySignatures = true): GlideTransformer
+    private function createTransformer(string $cache, ?FlysystemRegistry $flysystemRegistry = null, bool $publicCache = false, string $cachePrefix = '', ?DeferredCacheWriter $deferredCacheWriter = null, ?LockFactory $lockFactory = null, string $driver = 'gd', float $lockWait = 10.0): GlideTransformer
     {
         $router = self::createStub(UrlGeneratorInterface::class);
         $router->method('generate')->willReturnCallback(static function (string $name, array $params): string {
@@ -1051,7 +1038,6 @@ class GlideTransformerServeTest extends TestCase
             $lockFactory,
             30.0,
             $lockWait,
-            $acceptLegacySignatures,
         );
     }
 

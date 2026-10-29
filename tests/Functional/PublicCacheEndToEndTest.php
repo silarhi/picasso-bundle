@@ -148,7 +148,7 @@ class PublicCacheEndToEndTest extends KernelTestCase
         self::bootKernel();
 
         $legacyUrl = $this->buildLegacyUrl('photo.jpg', ['fm' => 'jpg', 'w' => '100']);
-        $tamperedUrl = preg_replace('/s=[a-f0-9]+/', 's=tampered', $legacyUrl);
+        $tamperedUrl = preg_replace('/s=[A-Za-z0-9_-]+/', 's=tampered', $legacyUrl);
         self::assertNotNull($tamperedUrl);
 
         $response = $this->handleRequest($tamperedUrl);
@@ -165,7 +165,7 @@ class PublicCacheEndToEndTest extends KernelTestCase
         $html = $rendered->toString();
 
         $srcUrl = $this->parseSrcFromImg($html);
-        $tamperedUrl = preg_replace('/s=[a-f0-9]+/', 's=tampered', $srcUrl);
+        $tamperedUrl = preg_replace('/s=[A-Za-z0-9_-]+/', 's=tampered', $srcUrl);
         self::assertNotNull($tamperedUrl);
 
         $response = $this->handleRequest($tamperedUrl);

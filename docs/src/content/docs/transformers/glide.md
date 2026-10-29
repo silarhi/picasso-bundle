@@ -15,8 +15,7 @@ composer require league/glide
 picasso:
     transformers:
         glide:
-            sign_key: '%env(PICASSO_SIGN_KEY)%' # required: a key of 32+ characters, or a list of them (see "Signing key")
-            accept_legacy_signatures: true # also serve URLs signed before 2.7 (see "Signing key")
+            sign_key: '%env(PICASSO_SIGN_KEY)%' # required: a secret, or a list to rotate keys (see "Signing key")
             cache: '%kernel.project_dir%/var/glide-cache'
             driver: gd # gd | imagick | vips
             max_image_size: ~ # optional: max pixel count (width x height)
@@ -39,7 +38,7 @@ A cached variant costs two calls to the cache storage (its size, then its conten
 
 ## Signing key
 
-Every Glide URL carries a signature (`s`), so only your application can ask your server for a rendering. `sign_key` is the secret it is computed with. It is required, and should be at least 32 characters long. Generate one and keep it out of your repository:
+Every Glide URL carries a signature (`s`), so only your application can ask your server for a rendering. `sign_key` is the secret it is computed with, and it is required. Use a random key of at least 32 bytes, as long as the SHA-256 output, and keep it out of your repository:
 
 ```bash
 php -r 'echo bin2hex(random_bytes(32)), PHP_EOL;' # 64 characters
@@ -50,32 +49,37 @@ php -r 'echo bin2hex(random_bytes(32)), PHP_EOL;' # 64 characters
 PICASSO_SIGN_KEY=…
 ```
 
-A missing or empty key is rejected: when the container is built for a key written in the configuration, at the first use of the transformer for a key read from an environment variable, so an empty `PICASSO_SIGN_KEY=` fails the first image request instead of signing URLs anyone could compute. A key shorter than 32 characters still works, but triggers a deprecation: 3.0 will require at least 32. That is the length of the SHA-256 output (32 bytes), the key length HMAC asks for, and what a 32-character hexadecimal secret such as Symfony's generated `APP_SECRET` provides.
+A missing or empty key is rejected: when the container is built for a key written in the configuration, at the first use of the transformer for a key read from an environment variable, so an empty `PICASSO_SIGN_KEY=` fails the first image request instead of signing URLs anyone could compute. Like Symfony's secrets, any other key is accepted: a short one is only as hard to guess as it is long, so replace it with a [rotation](#rotating-the-key).
 
-The signature is an HMAC-SHA256 of the image path and its sorted query string, compared in constant time. Before 2.7, Picasso used Glide's own signature (an MD5 hash prefixed with the key), which `accept_legacy_signatures` keeps accepting by default, so the URLs already in your pages, HTTP caches and CDNs keep working; only HMAC signatures are generated. Set it to `false` once those URLs are gone (after your longest page and CDN cache lifetime): 3.0 removes it, and the MD5 signatures with it.
+The signature is an HMAC-SHA256 of the image path and its sorted query string, base64url-encoded without padding (43 characters, as Symfony's `UriSigner` writes it), and compared in constant time. Before 2.7, Picasso used Glide's own signature (32 hexadecimal characters, an MD5 hash prefixed with the key): those URLs are still served in 2.x, so the ones already in your pages, HTTP caches and CDNs keep working, and only HMAC signatures are generated. 3.0 will stop accepting them.
 
 ### Rotating the key
 
-Changing the key would break every URL already published. `sign_key` also takes a list of keys: the first one signs new URLs, and every one of them validates (with the MD5 signature too, while `accept_legacy_signatures` is on). The 1.x URLs [still redirected](/upgrade/from-1x/#1x-urls) keep working too, whichever key minted them. To rotate the key, or to replace a short one:
-
-1. Generate a new key and put it **in front** of the current one, then deploy: new pages carry URLs signed with the new key, and the published URLs keep working.
-2. Wait until every URL signed with the old key is gone: your longest HTML page cache, HTTP cache and CDN lifetime (with the default [`cache_control`](/reference/routes/#error-responses), CDNs may keep an image for a year, but they only ask your server again for URLs that pages still reference).
-3. Remove the old key, then deploy.
-
-Keep the keys in one environment variable, comma-separated, and read it with Symfony's `csv` processor, so rotating only changes the environment:
+Changing the key would break every URL already published. Like Symfony's own secrets (`UriSigner`), `sign_key` also takes a list of keys: the first one signs new URLs, and every one of them validates (the pre-2.7 MD5 signatures too, until 3.0). The 1.x URLs [still redirected](/upgrade/from-1x/#1x-urls) keep working too, whichever key minted them. Give each key its own environment variable:
 
 ```yaml
 picasso:
     transformers:
         glide:
-            sign_key: '%env(csv:PICASSO_SIGN_KEYS)%'
+            sign_key: ['%env(PICASSO_SIGN_KEY)%', '%env(PICASSO_PREVIOUS_SIGN_KEY)%']
 ```
 
-```dotenv
-PICASSO_SIGN_KEYS=<new key>,<old key>
+To rotate the key, or to replace a short one with a longer, random one:
+
+1. Generate a new key (`php -r 'echo bin2hex(random_bytes(32)), PHP_EOL;'`), set it as `PICASSO_SIGN_KEY` and move the current one to `PICASSO_PREVIOUS_SIGN_KEY`, then deploy: new pages carry URLs signed with the new key, and the published URLs keep working.
+2. Wait until every URL signed with the old key is gone: your longest HTML page cache, HTTP cache and CDN lifetime (with the default [`cache_control`](/reference/routes/#error-responses), CDNs may keep an image for a year, but they only ask your server again for URLs that pages still reference).
+3. Remove the old key from the list (and `PICASSO_PREVIOUS_SIGN_KEY`), then deploy.
+
+Every listed key must be set: an empty one is rejected like an empty `sign_key`, so drop the second entry outside of a rotation. Alternatively, keep all the keys in one comma-separated environment variable, read with Symfony's `csv` processor, so that a rotation only changes the environment:
+
+```yaml
+picasso:
+    transformers:
+        glide:
+            sign_key: '%env(csv:PICASSO_SIGN_KEYS)%' # PICASSO_SIGN_KEYS=<new key>,<previous key>
 ```
 
-Hexadecimal keys need no quoting. A YAML list works as well, one environment variable per key (`sign_key: ['%env(PICASSO_SIGN_KEY)%', '%env(PICASSO_OLD_SIGN_KEY)%']`), but each listed key must then be set: an empty one is rejected like an empty `sign_key`.
+Hexadecimal keys need no quoting there.
 
 ## Choosing a driver
 

@@ -33,6 +33,7 @@ use League\Glide\Filesystem\FilesystemException;
 use League\Glide\Server;
 use League\Glide\ServerFactory;
 use League\Glide\Signatures\SignatureException;
+use SensitiveParameter;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
@@ -151,27 +152,26 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
     private ?string $renderDirectory;
 
     /**
-     * @param string|array<mixed>      $signKey                Secret signing image URLs, or a non-empty list of them
-     *                                                         to rotate keys: the first one signs, all of them validate
-     * @param string                   $driver                 "gd", "imagick", "vips" (needs intervention/image-driver-vips) or an Intervention driver class
-     * @param string|null              $baseUrl                Scheme and host (e.g. a CDN) prepended to generated URLs; null keeps them host-relative
-     * @param string                   $cachePrefix            Public-cache mode only: path prepended to every cache key, so keys can mirror the
-     *                                                         URL path (e.g. "image" when the bundle routes are served under /image)
-     * @param DeferredCacheWriter|null $deferredCacheWriter    When set, a miss is rendered to local disk and moved to the
-     *                                                         cache storage after the response has been sent
-     * @param LockFactory|null         $lockFactory            When set, concurrent requests for the same missing variant render it
-     *                                                         once: the others wait for that render and serve it
-     * @param float                    $lockTtl                Seconds a render lock outlives a crashed renderer
-     * @param float                    $lockWait               Seconds a miss waits for the render in progress of the same
-     *                                                         variant before rendering it itself
-     * @param bool                     $acceptLegacySignatures Whether URLs signed with Glide's MD5 signature (before 2.7) are still served
+     * @param string|array<mixed>      $signKey             Secret signing image URLs, or a non-empty list of them
+     *                                                      to rotate keys: the first one signs, all of them validate
+     * @param string                   $driver              "gd", "imagick", "vips" (needs intervention/image-driver-vips) or an Intervention driver class
+     * @param string|null              $baseUrl             Scheme and host (e.g. a CDN) prepended to generated URLs; null keeps them host-relative
+     * @param string                   $cachePrefix         Public-cache mode only: path prepended to every cache key, so keys can mirror the
+     *                                                      URL path (e.g. "image" when the bundle routes are served under /image)
+     * @param DeferredCacheWriter|null $deferredCacheWriter When set, a miss is rendered to local disk and moved to the
+     *                                                      cache storage after the response has been sent
+     * @param LockFactory|null         $lockFactory         When set, concurrent requests for the same missing variant render it
+     *                                                      once: the others wait for that render and serve it
+     * @param float                    $lockTtl             Seconds a render lock outlives a crashed renderer
+     * @param float                    $lockWait            Seconds a miss waits for the render in progress of the same
+     *                                                      variant before rendering it itself
      *
      * @throws InvalidConfigurationException When there is no sign key, or one is empty
      */
     public function __construct(
         private UrlGeneratorInterface $router,
         private UrlAliases $urlAliases,
-        string|array $signKey,
+        #[SensitiveParameter] string|array $signKey,
         string $cache,
         string $driver,
         ?int $maxImageSize,
@@ -183,9 +183,8 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         private ?LockFactory $lockFactory = null,
         private float $lockTtl = 30.0,
         private float $lockWait = 10.0,
-        bool $acceptLegacySignatures = true,
     ) {
-        $this->signature = new GlideSignature($signKey, $acceptLegacySignatures);
+        $this->signature = new GlideSignature($signKey);
         $this->urlTemplates = new UrlTemplates($router);
         $this->baseUrl = null !== $baseUrl && '' !== $baseUrl ? rtrim($baseUrl, '/') : null;
         $this->cachePrefix = trim($cachePrefix, '/');

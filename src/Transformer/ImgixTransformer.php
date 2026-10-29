@@ -18,6 +18,7 @@ use function in_array;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\StreamFactoryInterface;
+use SensitiveParameter;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
@@ -38,8 +39,8 @@ final readonly class ImgixTransformer implements PurgableTransformerInterface
 
     public function __construct(
         private string $baseUrl,
-        private ?string $signKey = null,
-        private ?string $apiKey = null,
+        #[SensitiveParameter] private ?string $signKey = null,
+        #[SensitiveParameter] private ?string $apiKey = null,
         private ?ClientInterface $httpClient = null,
         private ?RequestFactoryInterface $requestFactory = null,
         private ?StreamFactoryInterface $streamFactory = null,
@@ -176,7 +177,7 @@ final readonly class ImgixTransformer implements PurgableTransformerInterface
     /**
      * @see https://docs.imgix.com/setup/securing-images
      */
-    private function generateSignature(string $signKey, string $path, string $queryString): string
+    private function generateSignature(#[SensitiveParameter] string $signKey, string $path, string $queryString): string
     {
         $data = $signKey . $path;
         if ('' !== $queryString) {
