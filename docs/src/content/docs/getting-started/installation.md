@@ -11,12 +11,13 @@ sidebar:
 | --------------------------------------------------------------------------------------------- | --------------- |
 | PHP                                                                                           | 8.2+            |
 | Symfony                                                                                       | 6.4, 7.x or 8.x |
-| [Symfony UX Twig Component](https://symfony.com/bundles/ux-twig-component/current/index.html) | 2.13+           |
 
 ## Optional Dependencies
 
 | Package                                   | Required for                                                                 |
 | ----------------------------------------- | ---------------------------------------------------------------------------- |
+| `symfony/ux-twig-component` 2.13+         | The [`<twig:Picasso:Image>` component](/reference/component/)         |
+| `symfony/twig-bundle`                     | The [`picasso_image()` and `picasso_image_url()` Twig functions](/reference/twig-functions/) |
 | `league/glide`                            | Glide transformer (local image processing)                                   |
 | `intervention/image-driver-vips`          | Glide `vips` driver ([libvips](/transformers/glide/#choosing-a-driver))                          |
 | `symfony/lock`                            | Glide `lock` option ([one render per variant](/transformers/glide/#rendering-each-variant-once)) |
@@ -31,7 +32,13 @@ sidebar:
 
 ```bash
 composer require silarhi/picasso-bundle
+
+# the <twig:Picasso:Image> component
+composer require symfony/ux-twig-component
 ```
+
+Twig is optional: without it, the bundle still generates and serves images, from PHP through `ImageHelperInterface`
+([Images in a JSON API](/guides/json-api/)).
 
 If not using Symfony Flex, register the bundle in `config/bundles.php`:
 

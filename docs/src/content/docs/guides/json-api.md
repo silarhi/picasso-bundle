@@ -5,7 +5,7 @@ sidebar:
     order: 7
 ---
 
-The `picasso_image_url()` Twig function delegates to `ImageHelperInterface`, which you can also inject directly in your PHP code:
+The `picasso_image_url()` Twig function delegates to `ImageHelperInterface`, which you can also inject directly in your PHP code. It needs no Twig: an application without `symfony/twig-bundle` still generates and serves images.
 
 ```php
 use Silarhi\PicassoBundle\Service\ImageHelperInterface;

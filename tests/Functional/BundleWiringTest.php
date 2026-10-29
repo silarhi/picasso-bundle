@@ -70,6 +70,7 @@ use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Kernel;
+use Symfony\Component\String\Slugger\AsciiSlugger;
 use Vich\UploaderBundle\VichUploaderBundle;
 
 class BundleWiringTest extends TestCase
@@ -1544,6 +1545,7 @@ class BundleWiringTest extends TestCase
             'kernel.project_dir' => dirname(__DIR__, 2),
             'kernel.build_dir' => sys_get_temp_dir(),
             'kernel.cache_dir' => sys_get_temp_dir(),
+            'kernel.bundles' => [],
         ]));
 
         $bundle = new PicassoBundle();
@@ -1612,6 +1614,7 @@ class BundleWiringTestKernel extends Kernel
                 'http_method_override' => false,
                 'handle_all_throwables' => true,
                 'php_errors' => ['log' => true],
+                'property_access' => true, // see AbstractPicassoKernel
             ];
 
             if ($withPsrHttpClient) {
@@ -1704,6 +1707,7 @@ class VichWiringTestKernel extends Kernel
                 'http_method_override' => false,
                 'handle_all_throwables' => true,
                 'php_errors' => ['log' => true],
+                'property_access' => true, // see AbstractPicassoKernel
             ]);
 
             $container->loadFromExtension('twig', [
@@ -1747,6 +1751,10 @@ class VichWiringTestKernel extends Kernel
                     ],
                 ],
             ]);
+
+            // VichUploaderBundle needs the slugger, which FrameworkBundle only registers when symfony/string is a
+            // non-dev package; here it only comes with require-dev.
+            $container->register('slugger', AsciiSlugger::class);
         });
     }
 
