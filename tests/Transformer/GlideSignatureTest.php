@@ -155,7 +155,7 @@ class GlideSignatureTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{string, array<string, mixed>}>
+     * @return iterable<string, array{string, array<mixed>}>
      */
     public static function tamperedRequestProvider(): iterable
     {
@@ -174,7 +174,7 @@ class GlideSignatureTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $params
+     * @param array<mixed> $params
      */
     #[DataProvider('tamperedRequestProvider')]
     public function testTamperedRequestIsRejected(string $path, array $params): void

@@ -81,20 +81,27 @@ final readonly class GlideSignature implements SignatureInterface
     }
 
     /**
-     * @param string               $path   The image path
-     * @param array<string, mixed> $params The query params
+     * @param string       $path   The image path
+     * @param array<mixed> $params The query params
      *
      * @return array<string, mixed> The params, with their signature in "s"
      */
     public function addSignature(mixed $path, array $params): array
     {
-        // Untyped $path: Glide 2's interface declares no parameter types
-        return [...$params, 's' => $this->generateSignature($path, $params)];
+        // Untyped $path: Glide 2's interface declares no parameter types. Glide 3 declares a plain array of params,
+        // Glide 4 returns string keys: query keys are, the cast is a no-op at runtime
+        $signed = [];
+        foreach ($params as $key => $value) {
+            $signed[(string) $key] = $value;
+        }
+        $signed['s'] = $this->generateSignature($path, $params);
+
+        return $signed;
     }
 
     /**
-     * @param string               $path   The image path
-     * @param array<string, mixed> $params The query params, signature included in "s"
+     * @param string       $path   The image path
+     * @param array<mixed> $params The query params, signature included in "s"
      *
      * @throws SignatureException When the signature is missing or does not match
      */
@@ -128,7 +135,7 @@ final readonly class GlideSignature implements SignatureInterface
     /**
      * The signature of an image path and its query params ("s" excluded), with the first key.
      *
-     * @param array<string, mixed> $params
+     * @param array<mixed> $params
      */
     public function generateSignature(string $path, array $params): string
     {
@@ -139,7 +146,7 @@ final readonly class GlideSignature implements SignatureInterface
      * The signed string, Glide's: the path without its leading slash, then the
      * query without "s", sorted by key.
      *
-     * @param array<string, mixed> $params
+     * @param array<mixed> $params
      */
     private function payload(string $path, array $params): string
     {
