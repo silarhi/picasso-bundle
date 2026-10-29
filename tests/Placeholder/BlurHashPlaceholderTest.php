@@ -15,6 +15,7 @@ namespace Silarhi\PicassoBundle\Tests\Placeholder;
 
 use Imagine\Gd\Imagine;
 use kornrunner\Blurhash\Blurhash;
+use PHPUnit\Framework\Attributes\RequiresPhpunit;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\Image;
@@ -40,6 +41,7 @@ class BlurHashPlaceholderTest extends TestCase
     }
 
     #[RunInSeparateProcess]
+    #[RequiresPhpunit('>=12.0.0')]
     public function testGenerateRequiresKornrunnerBlurhash(): void
     {
         self::hideFromAutoloading(Blurhash::class);

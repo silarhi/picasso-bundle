@@ -25,6 +25,11 @@ use function trait_exists;
  * Every autoloader is replaced by one that refuses this class and delegates any
  * other to them. Hiding cannot be undone, and a class already loaded stays visible:
  * call it first thing in a test that runs in its own process (#[RunInSeparateProcess]).
+ *
+ * Such tests require PHPUnit 12+: with the lowest dependencies (PHPUnit 11), PHP
+ * 8.4+ prints deprecations to stderr while the process boots, before any test
+ * code, and PHPUnit fails a process writing to stderr, or blocks once the pipe
+ * is full.
  */
 trait HidesFromAutoloadingTrait
 {

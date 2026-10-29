@@ -20,6 +20,7 @@ use function dirname;
 use League\FlysystemBundle\FlysystemBundle;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\RequiresPhpunit;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
@@ -474,6 +475,7 @@ class BundleWiringTest extends TestCase
     }
 
     #[RunInSeparateProcess]
+    #[RequiresPhpunit('>=12.0.0')]
     public function testGlideRenderLockRequiresSymfonyLock(): void
     {
         self::hideFromAutoloading(LockFactory::class);
@@ -485,6 +487,7 @@ class BundleWiringTest extends TestCase
     }
 
     #[RunInSeparateProcess]
+    #[RequiresPhpunit('>=12.0.0')]
     public function testGlideWithoutRenderLockDoesNotNeedSymfonyLock(): void
     {
         self::hideFromAutoloading(LockFactory::class);
@@ -1514,6 +1517,7 @@ class BundleWiringTest extends TestCase
     }
 
     #[RunInSeparateProcess]
+    #[RequiresPhpunit('>=12.0.0')]
     public function testBlurhashPlaceholderRequiresImagine(): void
     {
         self::hideFromAutoloading(\Imagine\Image\ImagineInterface::class);
@@ -1525,6 +1529,7 @@ class BundleWiringTest extends TestCase
     }
 
     #[RunInSeparateProcess]
+    #[RequiresPhpunit('>=12.0.0')]
     public function testAssetMapperLoaderRequiresSymfonyAssetMapper(): void
     {
         self::hideFromAutoloading(AssetMapperInterface::class);
