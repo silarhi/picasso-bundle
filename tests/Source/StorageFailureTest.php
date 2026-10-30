@@ -27,6 +27,7 @@ use Symfony\Component\HttpClient\Exception\ServerException;
 use Symfony\Component\HttpClient\Exception\TransportException;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
+use Symfony\Contracts\HttpClient\Exception\HttpExceptionInterface;
 
 class StorageFailureTest extends TestCase
 {
@@ -103,6 +104,29 @@ class StorageFailureTest extends TestCase
         self::assertTrue($unavailable->transient);
         self::assertSame(404, $missing->status);
         self::assertFalse($missing->transient);
+    }
+
+    public function testASymfonyHttpClientExceptionWhoseStatusCannotBeReadIsTransient(): void
+    {
+        $response = self::createStub(\Symfony\Contracts\HttpClient\ResponseInterface::class);
+        $response->method('getStatusCode')->willThrowException(new TransportException('Connection reset by peer.'));
+        $httpError = new class($response) extends RuntimeException implements HttpExceptionInterface {
+            public function __construct(
+                private readonly \Symfony\Contracts\HttpClient\ResponseInterface $response,
+            ) {
+                parent::__construct('HTTP error.');
+            }
+
+            public function getResponse(): \Symfony\Contracts\HttpClient\ResponseInterface
+            {
+                return $this->response;
+            }
+        };
+
+        $failure = StorageFailure::of(UnableToReadFile::fromLocation('photo.jpg', 'failed', $httpError));
+
+        self::assertNull($failure->status);
+        self::assertTrue($failure->transient);
     }
 
     /**

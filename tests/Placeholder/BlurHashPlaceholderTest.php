@@ -14,11 +14,16 @@ declare(strict_types=1);
 namespace Silarhi\PicassoBundle\Tests\Placeholder;
 
 use Imagine\Gd\Imagine;
+use kornrunner\Blurhash\Blurhash;
+use PHPUnit\Framework\Attributes\RequiresPhpunit;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Exception\ImageProcessingException;
+use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
 use Silarhi\PicassoBundle\Placeholder\BlurHashPlaceholder;
+use Silarhi\PicassoBundle\Tests\Fixtures\HidesFromAutoloadingTrait;
 
 use function strlen;
 
@@ -26,11 +31,27 @@ use Symfony\Component\Cache\Adapter\ArrayAdapter;
 
 class BlurHashPlaceholderTest extends TestCase
 {
+    use HidesFromAutoloadingTrait;
+
     private Imagine $imagine;
 
     protected function setUp(): void
     {
         $this->imagine = new Imagine();
+    }
+
+    #[RunInSeparateProcess]
+    #[RequiresPhpunit('>=12.0.0')]
+    public function testGenerateRequiresKornrunnerBlurhash(): void
+    {
+        self::hideFromAutoloading(Blurhash::class);
+        $placeholder = new BlurHashPlaceholder($this->imagine);
+
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('The "kornrunner/blurhash" package is required for the BlurHash placeholder. Install it with: composer require kornrunner/blurhash');
+
+        // Checked before the image is read: no stream is needed
+        $placeholder->generate(new Image(path: 'photo.jpg'), new ImageTransformation(width: 100, height: 75));
     }
 
     public function testGenerateReturnsDataUri(): void

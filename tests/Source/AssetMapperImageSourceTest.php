@@ -49,6 +49,18 @@ class AssetMapperImageSourceTest extends TestCase
         (new AssetMapperImageSource($this->assetMapper()))->readStream('images/missing.jpg');
     }
 
+    public function testReadingAnAssetWhoseSourceFileIsGoneThrows(): void
+    {
+        // The asset is still mapped (e.g. a stale compiled manifest), but its source file was removed
+        $assetMapper = self::createStub(AssetMapperInterface::class);
+        $assetMapper->method('getAsset')->willReturn(new MappedAsset('images/gone.jpg', __DIR__ . '/../Fixtures/gone.jpg'));
+
+        $this->expectException(ImageNotFoundException::class);
+        $this->expectExceptionMessage('Image "images/gone.jpg" could not be opened.');
+
+        (new AssetMapperImageSource($assetMapper))->readStream('images/gone.jpg');
+    }
+
     #[DataProvider('unsafePaths')]
     public function testUnsafePathsAreMissingWithoutAskingAssetMapper(string $path): void
     {

@@ -444,6 +444,22 @@ class GlideTransformerServeTest extends TestCase
         self::assertSame(['s'], array_keys($query), 'Only the signature stays in the query string');
     }
 
+    public function testRedirectToLoaderRejectsAPublicCachePathWithoutSourcePath(): void
+    {
+        $transformer = $this->createTransformer($this->tempDir . '/cache', publicCache: true);
+
+        $this->expectException(ImageNotFoundException::class);
+        $this->expectExceptionMessage('Invalid cached image path.');
+
+        // A bare params segment: nothing is left to name the source image to redirect to
+        $transformer->redirectToLoader(
+            'uploads',
+            'w_10.jpg',
+            $this->createSignedRequest('w_10.jpg', ['_metadata' => 'pre-2.0-token']),
+            ['transformer' => 'glide', 'loader' => 'vich'],
+        );
+    }
+
     public function testServeAcceptsALegacyMd5Signature(): void
     {
         $response = $this->createTransformer($this->tempDir . '/cache')->serve(

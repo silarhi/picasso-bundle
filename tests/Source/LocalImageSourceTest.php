@@ -17,6 +17,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
 use Silarhi\PicassoBundle\Source\LocalImageSource;
+use Silarhi\PicassoBundle\Tests\Source\Stub\UnreadableFileStreamWrapper;
 
 class LocalImageSourceTest extends TestCase
 {
@@ -79,6 +80,24 @@ class LocalImageSourceTest extends TestCase
 
         self::assertSame(file_get_contents(self::$fixturesDir . '/test.txt'), stream_get_contents($stream));
         fclose($stream);
+    }
+
+    public function testReadStreamThrowsForAFileThatCannotBeOpened(): void
+    {
+        UnreadableFileStreamWrapper::register();
+
+        try {
+            $source = new LocalImageSource(UnreadableFileStreamWrapper::PROTOCOL . '://uploads');
+
+            self::assertTrue($source->exists('photo.jpg'));
+
+            $this->expectException(ImageNotFoundException::class);
+            $this->expectExceptionMessage('Image "photo.jpg" could not be opened.');
+
+            $source->readStream('photo.jpg');
+        } finally {
+            UnreadableFileStreamWrapper::unregister();
+        }
     }
 
     public function testReadStreamThrowsForMissingFile(): void
