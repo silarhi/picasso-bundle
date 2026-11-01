@@ -33,7 +33,7 @@
         "symfony/framework-bundle": "^6.4 || ^7.0 || ^8.0"
     },
     "require-dev": {
-        "ergebnis/composer-normalize": "^2.54.0",
+        "ergebnis/composer-normalize": "^2.55.0",
         "friendsofphp/php-cs-fixer": "^3.95.27",
         "imagine/imagine": "^1.5.2",
         "kornrunner/blurhash": "^1.2",
