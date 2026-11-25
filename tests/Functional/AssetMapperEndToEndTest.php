@@ -52,7 +52,7 @@ class AssetMapperEndToEndTest extends KernelTestCase
 
         // The router refuses to generate a URL with a ".." segment: forge it, signed as Glide signs, like a client could
         $path = 'images/../../composer.json';
-        $signature = new GlideSignature(AssetMapperKernel::SIGN_KEY)->generateSignature($path, ['w' => '10']);
+        $signature = (new GlideSignature(AssetMapperKernel::SIGN_KEY))->generateSignature($path, ['w' => '10']);
         $url = '/image/glide/asset_mapper/' . $path . '?' . http_build_query(['w' => '10', 's' => $signature]);
 
         $response = self::$kernel?->handle(Request::create($url));
