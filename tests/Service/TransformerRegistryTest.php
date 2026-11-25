@@ -23,7 +23,7 @@ class TransformerRegistryTest extends TestCase
 {
     public function testGetReturnsTransformer(): void
     {
-        $transformer = $this->createMock(ImageTransformerInterface::class);
+        $transformer = self::createStub(ImageTransformerInterface::class);
         $container = $this->createMock(ContainerInterface::class);
         $container->expects(self::any())->method('has')->with('glide')->willReturn(true);
         $container->expects(self::any())->method('get')->with('glide')->willReturn($transformer);

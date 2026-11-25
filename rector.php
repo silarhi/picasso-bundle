@@ -16,13 +16,15 @@ use Rector\CodeQuality\Rector\If_\ExplicitNullableObjectInstanceRector;
 use Rector\Config\RectorConfig;
 use Rector\DeadCode\Rector\ClassMethod\RemoveReturnTagIncompatibleWithNativeTypeRector;
 use Rector\DeadCode\Rector\ClassMethod\RemoveUnusedPublicMethodParameterRector;
+use Rector\Symfony\Symfony72\Rector\StmtsAwareInterface\PushRequestToRequestStackConstructorRector;
 
 return RectorConfig::configure()
     ->withPaths([
         'src',
         'tests',
     ])
-    ->withPhpSets(php82: true)
+    ->withPhpSets()
+    ->withComposerBased()
     ->withPreparedSets(
         deadCode: true,
         codeQuality: true,
@@ -42,5 +44,7 @@ return RectorConfig::configure()
             __DIR__ . '/src/Transformer/ImgixTransformer.php',
             __DIR__ . '/tests/Controller/ImageControllerTest.php',
         ],
+        // RequestStack takes its requests in the constructor only since Symfony 7.2, the bundle still supports 6.4
+        PushRequestToRequestStackConstructorRector::class,
     ])
     ->reportUnusedSkips();

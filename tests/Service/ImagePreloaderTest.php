@@ -85,7 +85,7 @@ class ImagePreloaderTest extends TestCase
     public function testKeepsTheLinksAlreadyAdded(): void
     {
         $request = new Request();
-        $request->attributes->set('_links', (new GenericLinkProvider())->withLink(new Link('preload', '/app.css')));
+        $request->attributes->set('_links', (new GenericLinkProvider())->withLink(new Link(Link::REL_PRELOAD, '/app.css')));
         $this->preloader($request)->preload($this->renderData([]));
 
         self::assertSame(['/app.css', '/a-1080.jpg'], array_map(

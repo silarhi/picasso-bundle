@@ -31,7 +31,7 @@ class ImgixTransformerPurgeTest extends TestCase
     {
         $sentRequest = null;
 
-        $stream = $this->createMock(StreamInterface::class);
+        $stream = self::createStub(StreamInterface::class);
 
         $request = $this->createMock(RequestInterface::class);
         $request->method('withHeader')->willReturnCallback(function (string $name, string $value) use ($request, &$headers): RequestInterface {
@@ -110,7 +110,7 @@ class ImgixTransformerPurgeTest extends TestCase
 
     public function testPurgeThrowsOnNon2xxResponse(): void
     {
-        $stream = $this->createMock(StreamInterface::class);
+        $stream = self::createStub(StreamInterface::class);
 
         $request = $this->createMock(RequestInterface::class);
         $request->method('withHeader')->willReturnSelf();
@@ -145,7 +145,7 @@ class ImgixTransformerPurgeTest extends TestCase
 
     public function testPurgeThrowsOnNetworkError(): void
     {
-        $stream = $this->createMock(StreamInterface::class);
+        $stream = self::createStub(StreamInterface::class);
 
         $request = $this->createMock(RequestInterface::class);
         $request->method('withHeader')->willReturnSelf();
@@ -177,7 +177,7 @@ class ImgixTransformerPurgeTest extends TestCase
 
     public function testPurgeStripsLeadingSlashFromPath(): void
     {
-        $stream = $this->createMock(StreamInterface::class);
+        $stream = self::createStub(StreamInterface::class);
 
         $request = $this->createMock(RequestInterface::class);
         $request->method('withHeader')->willReturnSelf();

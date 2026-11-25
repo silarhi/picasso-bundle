@@ -45,7 +45,7 @@ class ImageHelperTest extends TestCase
     private MockObject&SrcsetGenerator $srcsetGenerator;
     private MockObject&ImagePipeline $pipeline;
     private TransformerRegistry $transformerRegistry;
-    private MockObject&ImageTransformerInterface $glideTransformer;
+    private \PHPUnit\Framework\MockObject\Stub&ImageTransformerInterface $glideTransformer;
     private MockObject&MetadataGuesserInterface $metadataGuesser;
     private PlaceholderRegistry $placeholderRegistry;
     private LoaderRegistry $loaderRegistry;
@@ -55,7 +55,7 @@ class ImageHelperTest extends TestCase
     {
         $this->srcsetGenerator = $this->createMock(SrcsetGenerator::class);
         $this->metadataGuesser = $this->createMock(MetadataGuesserInterface::class);
-        $this->glideTransformer = $this->createMock(ImageTransformerInterface::class);
+        $this->glideTransformer = self::createStub(ImageTransformerInterface::class);
 
         $transformerLocator = $this->createMock(ContainerInterface::class);
         $transformerLocator->expects(self::any())->method('has')->with('glide')->willReturn(true);
@@ -378,7 +378,7 @@ class ImageHelperTest extends TestCase
         $stream = fopen('php://memory', 'r+');
         self::assertNotFalse($stream);
 
-        $imgixTransformer = $this->createMock(ImageTransformerInterface::class);
+        $imgixTransformer = self::createStub(ImageTransformerInterface::class);
         $transformerLocator = $this->createMock(ContainerInterface::class);
         $transformerLocator->method('has')->willReturnCallback(static fn (string $name): bool => in_array($name, ['glide', 'imgix'], true));
         $transformerLocator->method('get')->willReturnCallback(fn (string $name): ImageTransformerInterface => match ($name) {

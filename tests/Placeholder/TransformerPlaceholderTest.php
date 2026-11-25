@@ -88,7 +88,7 @@ class TransformerPlaceholderTest extends TestCase
 
     public function testGenerateThrowsWithoutTransformerInContext(): void
     {
-        $locator = $this->createMock(ContainerInterface::class);
+        $locator = self::createStub(ContainerInterface::class);
         $registry = new TransformerRegistry($locator);
 
         $placeholder = new TransformerPlaceholder($registry, size: 10, blur: 5, quality: 30, fit: 'crop', format: 'jpg');
