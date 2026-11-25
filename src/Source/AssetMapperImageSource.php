@@ -37,14 +37,14 @@ final readonly class AssetMapperImageSource implements ImageSourceInterface
 
     public function exists(string $path): bool
     {
-        return null !== $this->asset($path);
+        return $this->asset($path) instanceof MappedAsset;
     }
 
     public function readStream(string $path)
     {
         $asset = $this->asset($path);
 
-        if (null === $asset) {
+        if (!$asset instanceof MappedAsset) {
             throw new ImageNotFoundException(sprintf('Image "%s" not found.', $path));
         }
 
