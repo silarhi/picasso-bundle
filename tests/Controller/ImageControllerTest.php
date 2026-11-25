@@ -41,7 +41,7 @@ class ImageControllerTest extends TestCase
         $request = new Request();
         $expectedResponse = new Response('image-data', 200, ['Content-Type' => 'image/webp']);
 
-        $loader = $this->createMock(ServableLoaderInterface::class);
+        $loader = self::createStub(ServableLoaderInterface::class);
         $transformer = $this->createMock(LocalTransformerInterface::class);
         $transformer->expects(self::once())
             ->method('serve')
@@ -60,7 +60,7 @@ class ImageControllerTest extends TestCase
     public function testInvokeResolvesUrlAliasesToNames(): void
     {
         $request = new Request();
-        $loader = $this->createMock(ServableLoaderInterface::class);
+        $loader = self::createStub(ServableLoaderInterface::class);
         $transformer = $this->createMock(LocalTransformerInterface::class);
         $transformer->expects(self::once())
             ->method('serve')
@@ -104,7 +104,7 @@ class ImageControllerTest extends TestCase
         $transformerContainer->expects(self::any())->method('has')->with('unknown')->willReturn(false);
         $transformerRegistry = new TransformerRegistry($transformerContainer);
 
-        $loaderContainer = $this->createMock(ContainerInterface::class);
+        $loaderContainer = self::createStub(ContainerInterface::class);
         $loaderRegistry = new LoaderRegistry($loaderContainer);
 
         $controller = new ImageController($transformerRegistry, $loaderRegistry, $this->cacheControl(), new UrlAliases([], []));
@@ -116,10 +116,10 @@ class ImageControllerTest extends TestCase
 
     public function testInvokeThrowsNotFoundForNonLocalTransformer(): void
     {
-        $transformer = $this->createMock(ImageTransformerInterface::class);
+        $transformer = self::createStub(ImageTransformerInterface::class);
         $transformerRegistry = $this->createRegistry(TransformerRegistry::class, 'imgix', $transformer);
 
-        $loaderContainer = $this->createMock(ContainerInterface::class);
+        $loaderContainer = self::createStub(ContainerInterface::class);
         $loaderRegistry = new LoaderRegistry($loaderContainer);
 
         $controller = new ImageController($transformerRegistry, $loaderRegistry, $this->cacheControl(), new UrlAliases([], []));
@@ -131,7 +131,7 @@ class ImageControllerTest extends TestCase
 
     public function testInvokeThrowsNotFoundForUnknownLoader(): void
     {
-        $transformer = $this->createMock(LocalTransformerInterface::class);
+        $transformer = self::createStub(LocalTransformerInterface::class);
         $transformerRegistry = $this->createRegistry(TransformerRegistry::class, 'glide', $transformer);
 
         $loaderContainer = $this->createMock(ContainerInterface::class);
@@ -147,8 +147,8 @@ class ImageControllerTest extends TestCase
 
     public function testInvokeThrowsNotFoundForNonServableLoader(): void
     {
-        $transformer = $this->createMock(LocalTransformerInterface::class);
-        $loader = $this->createMock(ImageLoaderInterface::class);
+        $transformer = self::createStub(LocalTransformerInterface::class);
+        $loader = self::createStub(ImageLoaderInterface::class);
 
         $transformerRegistry = $this->createRegistry(TransformerRegistry::class, 'glide', $transformer);
         $loaderRegistry = $this->createRegistry(LoaderRegistry::class, 'remote', $loader);

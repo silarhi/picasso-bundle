@@ -97,8 +97,8 @@ class UrlLoaderTest extends TestCase
 
     public function testLoadWithMetadataFlagDoesNotChangeResult(): void
     {
-        $httpClient = $this->createMock(ClientInterface::class);
-        $requestFactory = $this->createMock(RequestFactoryInterface::class);
+        $httpClient = self::createStub(ClientInterface::class);
+        $requestFactory = self::createStub(RequestFactoryInterface::class);
 
         $loader = new UrlLoader($httpClient, $requestFactory);
         $image = $loader->load(new ImageReference('https://example.com/photo.jpg'), withMetadata: true);
@@ -123,7 +123,7 @@ class UrlLoaderTest extends TestCase
         $response = $this->createMock(ResponseInterface::class);
         $response->method('getBody')->willReturn($bodyStream);
 
-        $request = $this->createMock(RequestInterface::class);
+        $request = self::createStub(RequestInterface::class);
 
         $requestFactory = $this->createMock(RequestFactoryInterface::class);
         $requestFactory->expects(self::once())

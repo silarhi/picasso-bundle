@@ -1403,7 +1403,7 @@ class BundleWiringTest extends TestCase
         (new PicassoBundle())->build($container);
 
         // The loader-defaults compiler pass must skip, not fail, without the registry
-        $container->compile();
+        $container->compile(true);
 
         self::assertFalse($container->hasDefinition('picasso.loader_registry'));
     }

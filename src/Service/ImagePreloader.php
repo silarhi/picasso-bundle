@@ -48,11 +48,11 @@ final readonly class ImagePreloader
         $source = $data->sources[0] ?? null;
         if (null !== $source) {
             // The srcset's first URL, in the source's format, for browsers ignoring imagesrcset
-            $link = (new Link('preload', explode(' ', $source->srcset, 2)[0]))
+            $link = (new Link(Link::REL_PRELOAD, explode(' ', $source->srcset, 2)[0]))
                 ->withAttribute('type', $source->type)
                 ->withAttribute('imagesrcset', $source->srcset);
         } else {
-            $link = new Link('preload', $data->fallbackSrc);
+            $link = new Link(Link::REL_PRELOAD, $data->fallbackSrc);
             if (null !== $data->fallbackSrcset) {
                 $link = $link->withAttribute('imagesrcset', $data->fallbackSrcset);
             }

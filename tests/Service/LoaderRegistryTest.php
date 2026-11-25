@@ -23,7 +23,7 @@ class LoaderRegistryTest extends TestCase
 {
     public function testGetReturnsLoader(): void
     {
-        $loader = $this->createMock(ImageLoaderInterface::class);
+        $loader = self::createStub(ImageLoaderInterface::class);
         $container = $this->createMock(ContainerInterface::class);
         $container->expects(self::any())->method('has')->with('filesystem')->willReturn(true);
         $container->expects(self::any())->method('get')->with('filesystem')->willReturn($loader);
@@ -67,7 +67,7 @@ class LoaderRegistryTest extends TestCase
 
     public function testGetResolveMetadataReturnsConfiguredValue(): void
     {
-        $container = $this->createMock(ContainerInterface::class);
+        $container = self::createStub(ContainerInterface::class);
         $registry = new LoaderRegistry($container, [], [], ['filesystem' => true, 'url' => false]);
 
         self::assertTrue($registry->getResolveMetadata('filesystem'));
@@ -76,7 +76,7 @@ class LoaderRegistryTest extends TestCase
 
     public function testGetResolveMetadataReturnsNullWhenNotConfigured(): void
     {
-        $container = $this->createMock(ContainerInterface::class);
+        $container = self::createStub(ContainerInterface::class);
         $registry = new LoaderRegistry($container);
 
         self::assertNull($registry->getResolveMetadata('filesystem'));

@@ -94,6 +94,7 @@ class GlideSignatureTest extends TestCase
         }
     }
 
+    #[\PHPUnit\Framework\Attributes\DoesNotPerformAssertions]
     public function testLegacyMd5SignatureOfAnyKeyIsAccepted(): void
     {
         $signature = new GlideSignature([self::NEW_KEY, self::SIGN_KEY]);
@@ -101,7 +102,6 @@ class GlideSignatureTest extends TestCase
         // Until 3.0, URLs signed the Glide way keep working, whichever listed key signed them
         $signature->validateRequest('photo.jpg', (new Signature(self::NEW_KEY))->addSignature('photo.jpg', ['w' => '300']));
         $signature->validateRequest('photo.jpg', (new Signature(self::SIGN_KEY))->addSignature('photo.jpg', ['w' => '300']));
-        $this->addToAssertionCount(2);
     }
 
     public function testSignatureIsAnHmacSha256OfThePathAndTheSortedQuery(): void
@@ -127,12 +127,12 @@ class GlideSignatureTest extends TestCase
         $this->addToAssertionCount(2);
     }
 
+    #[\PHPUnit\Framework\Attributes\DoesNotPerformAssertions]
     public function testLegacyMd5SignatureIsAccepted(): void
     {
         $legacy = (new Signature(self::SIGN_KEY))->addSignature('uploads/photo.jpg', ['w' => '300']);
 
         (new GlideSignature(self::SIGN_KEY))->validateRequest('uploads/photo.jpg', $legacy);
-        $this->addToAssertionCount(1);
     }
 
     /**

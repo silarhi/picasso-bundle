@@ -23,7 +23,7 @@ class PlaceholderRegistryTest extends TestCase
 {
     public function testGetReturnsPlaceholder(): void
     {
-        $placeholder = $this->createMock(PlaceholderInterface::class);
+        $placeholder = self::createStub(PlaceholderInterface::class);
         $container = $this->createMock(ContainerInterface::class);
         $container->expects(self::any())->method('has')->with('blur')->willReturn(true);
         $container->expects(self::any())->method('get')->with('blur')->willReturn($placeholder);

@@ -23,7 +23,7 @@ class FlysystemRegistryTest extends TestCase
 {
     public function testGetReturnsStorage(): void
     {
-        $storage = $this->createMock(FilesystemOperator::class);
+        $storage = self::createStub(FilesystemOperator::class);
         $container = $this->createMock(ContainerInterface::class);
         $container->expects(self::any())->method('has')->with('default')->willReturn(true);
         $container->expects(self::any())->method('get')->with('default')->willReturn($storage);

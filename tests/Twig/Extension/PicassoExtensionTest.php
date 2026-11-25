@@ -28,7 +28,7 @@ class PicassoExtensionTest extends TestCase
 {
     public function testRegistersTwigFunctions(): void
     {
-        $helper = $this->createMock(ImageHelperInterface::class);
+        $helper = self::createStub(ImageHelperInterface::class);
         $extension = new PicassoExtension($helper);
 
         $functions = $extension->getFunctions();
@@ -75,7 +75,7 @@ class PicassoExtensionTest extends TestCase
 
     public function testPicassoImageUrlIsCallable(): void
     {
-        $helper = $this->createMock(ImageHelperInterface::class);
+        $helper = self::createStub(ImageHelperInterface::class);
         $extension = new PicassoExtension($helper);
 
         $functions = $extension->getFunctions();
@@ -106,7 +106,7 @@ class PicassoExtensionTest extends TestCase
 
     public function testPicassoImageIsMarkedSafeHtml(): void
     {
-        $helper = $this->createMock(ImageHelperInterface::class);
+        $helper = self::createStub(ImageHelperInterface::class);
         $extension = new PicassoExtension($helper);
 
         $functions = $extension->getFunctions();

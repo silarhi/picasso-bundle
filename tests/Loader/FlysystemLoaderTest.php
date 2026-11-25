@@ -24,7 +24,7 @@ class FlysystemLoaderTest extends TestCase
 {
     public function testLoadReturnsPathWithLazyStream(): void
     {
-        $storage = $this->createMock(FilesystemOperator::class);
+        $storage = self::createStub(FilesystemOperator::class);
         $loader = new FlysystemLoader($storage);
 
         $image = $loader->load(new ImageReference('/uploads/photo.jpg'));
@@ -67,7 +67,7 @@ class FlysystemLoaderTest extends TestCase
 
     public function testLoadEmptyPathHasNullStream(): void
     {
-        $storage = $this->createMock(FilesystemOperator::class);
+        $storage = self::createStub(FilesystemOperator::class);
         $loader = new FlysystemLoader($storage);
 
         $image = $loader->load(new ImageReference());
@@ -78,7 +78,7 @@ class FlysystemLoaderTest extends TestCase
 
     public function testGetSourceWrapsTheStorage(): void
     {
-        $storage = $this->createMock(FilesystemOperator::class);
+        $storage = self::createStub(FilesystemOperator::class);
         $loader = new FlysystemLoader($storage);
         $source = $loader->getSource();
 
