@@ -41,7 +41,7 @@ class AssetMapperEndToEndTest extends KernelTestCase
         self::assertStringStartsWith('/image/glide/asset_mapper/images/photo.jpg?', $data->fallbackSrc);
 
         $response = self::$kernel?->handle(Request::create($data->fallbackSrc));
-        assert(null !== $response);
+        assert($response instanceof \Symfony\Component\HttpFoundation\Response);
         self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
         self::assertStringStartsWith('image/', (string) $response->headers->get('Content-Type'));
     }
@@ -56,7 +56,7 @@ class AssetMapperEndToEndTest extends KernelTestCase
         $url = '/image/glide/asset_mapper/' . $path . '?' . http_build_query(['w' => '10', 's' => $signature]);
 
         $response = self::$kernel?->handle(Request::create($url));
-        assert(null !== $response);
+        assert($response instanceof \Symfony\Component\HttpFoundation\Response);
         self::assertSame(404, $response->getStatusCode());
     }
 

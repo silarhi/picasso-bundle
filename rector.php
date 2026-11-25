@@ -12,9 +12,10 @@ declare(strict_types=1);
  */
 
 use Rector\CodeQuality\Rector\Concat\DirnameDirConcatStringToDirectStringPathRector;
-use Rector\CodeQuality\Rector\Identical\FlipTypeControlToUseExclusiveTypeRector;
+use Rector\CodeQuality\Rector\If_\ExplicitNullableObjectInstanceRector;
 use Rector\Config\RectorConfig;
 use Rector\DeadCode\Rector\ClassMethod\RemoveReturnTagIncompatibleWithNativeTypeRector;
+use Rector\DeadCode\Rector\ClassMethod\RemoveUnusedPublicMethodParameterRector;
 
 return RectorConfig::configure()
     ->withPaths([
@@ -30,7 +31,9 @@ return RectorConfig::configure()
     ->withSkip([
         // Would name the vich mapping class installed locally: PropertyMapping (vich 2) or PropertyMappingInterface
         // (vich 3), and naming either breaks the other major. VichMappingHelper keeps mappings in local variables on purpose.
-        FlipTypeControlToUseExclusiveTypeRector::class => [__DIR__ . '/src/Loader/VichMappingHelper.php'],
+        ExplicitNullableObjectInstanceRector::class => [__DIR__ . '/src/Loader/VichMappingHelper.php'],
+        // A stream wrapper method keeps the signature PHP calls it with
+        RemoveUnusedPublicMethodParameterRector::class => [__DIR__ . '/tests/Source/Stub/UnreadableFileStreamWrapper.php'],
         // Would turn the Twig path into "src/../templates", which then shows in Twig cache keys, debug:twig and errors
         DirnameDirConcatStringToDirectStringPathRector::class => [__DIR__ . '/src/PicassoBundle.php'],
         // Would drop @return TransformerParams / CacheControlConfig: Rector does not resolve PHPStan type aliases
@@ -39,4 +42,5 @@ return RectorConfig::configure()
             __DIR__ . '/src/Transformer/ImgixTransformer.php',
             __DIR__ . '/tests/Controller/ImageControllerTest.php',
         ],
-    ]);
+    ])
+    ->reportUnusedSkips();

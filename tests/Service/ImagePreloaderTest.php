@@ -90,7 +90,7 @@ class ImagePreloaderTest extends TestCase
 
         self::assertSame(['/app.css', '/a-1080.jpg'], array_map(
             static fn (LinkInterface $link): string => $link->getHref(),
-            self::preloads($request),
+            $this->preloads($request),
         ));
     }
 
@@ -151,7 +151,7 @@ class ImagePreloaderTest extends TestCase
 
     private function onlyLink(Request $request): LinkInterface
     {
-        $preloads = self::preloads($request);
+        $preloads = $this->preloads($request);
         self::assertCount(1, $preloads);
 
         return $preloads[0];
@@ -160,7 +160,7 @@ class ImagePreloaderTest extends TestCase
     /**
      * @return list<LinkInterface>
      */
-    private static function preloads(Request $request): array
+    private function preloads(Request $request): array
     {
         $links = $request->attributes->get('_links');
         self::assertInstanceOf(GenericLinkProvider::class, $links);

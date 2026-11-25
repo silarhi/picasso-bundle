@@ -84,7 +84,7 @@ class PicassoImageFunctionTest extends KernelTestCase
 
         $html = $twig->createTemplate("{{ picasso_image(src='photo.jpg', sizes='100vw', priority=true) }}")->render();
 
-        $preloads = self::preloads($request);
+        $preloads = $this->preloads($request);
         self::assertCount(1, $preloads);
         self::assertSame(['preload'], $preloads[0]->getRels());
         self::assertStringStartsWith('/image/local_glide/main/photo.jpg', $preloads[0]->getHref());
@@ -126,7 +126,7 @@ class PicassoImageFunctionTest extends KernelTestCase
     /**
      * @return list<LinkInterface>
      */
-    private static function preloads(Request $request): array
+    private function preloads(Request $request): array
     {
         $links = $request->attributes->get('_links');
         self::assertInstanceOf(GenericLinkProvider::class, $links);

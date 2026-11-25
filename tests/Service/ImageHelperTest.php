@@ -750,12 +750,12 @@ class ImageHelperTest extends TestCase
         self::assertFalse($request->attributes->has('_links'));
 
         $data = $helper->imageData(src: 'photo.jpg', sizes: '100vw', priority: true);
-        $preloads = self::preloads($request);
+        $preloads = $this->preloads($request);
         self::assertCount(1, $preloads);
         self::assertSame($data->sources[0]->srcset, $preloads[0]->getAttributes()['imagesrcset'] ?? null);
 
         $helper->imageData(src: '/logo.svg', priority: true, unoptimized: true);
-        self::assertCount(2, self::preloads($request));
+        self::assertCount(2, $this->preloads($request));
     }
 
     public function testGetMimeTypeForEachSourceFormat(): void
@@ -1059,7 +1059,7 @@ class ImageHelperTest extends TestCase
     /**
      * @return list<LinkInterface>
      */
-    private static function preloads(Request $request): array
+    private function preloads(Request $request): array
     {
         $links = $request->attributes->get('_links');
         self::assertInstanceOf(GenericLinkProvider::class, $links);
