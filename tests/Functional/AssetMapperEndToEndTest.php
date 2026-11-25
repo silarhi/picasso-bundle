@@ -17,6 +17,7 @@ use function assert;
 
 use Silarhi\PicassoBundle\Service\ImageHelperInterface;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
+use Silarhi\PicassoBundle\Transformer\GlideSignature;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\HttpFoundation\Request;
 
@@ -47,7 +48,12 @@ class AssetMapperEndToEndTest extends KernelTestCase
 
     public function testAnUnmappedPathIsNotFound(): void
     {
-        $url = $this->helper()->imageUrl('images/../../composer.json', width: 10);
+        self::bootKernel();
+
+        // The router refuses to generate a URL with a ".." segment: forge it, signed as Glide signs, like a client could
+        $path = 'images/../../composer.json';
+        $signature = new GlideSignature(AssetMapperKernel::SIGN_KEY)->generateSignature($path, ['w' => '10']);
+        $url = '/image/glide/asset_mapper/' . $path . '?' . http_build_query(['w' => '10', 's' => $signature]);
 
         $response = self::$kernel?->handle(Request::create($url));
         assert(null !== $response);
