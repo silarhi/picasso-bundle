@@ -19,10 +19,14 @@ use Psr\Link\LinkInterface;
 use Silarhi\PicassoBundle\Exception\InvalidTransformationException;
 use Silarhi\PicassoBundle\Exception\PresetNotFoundException;
 use Silarhi\PicassoBundle\Service\ImageHelperInterface;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\HttpKernel\KernelInterface;
 use Symfony\Component\WebLink\GenericLinkProvider;
 use Twig\Environment;
 
@@ -219,6 +223,25 @@ class AuthoringFeaturesTest extends KernelTestCase
 
         self::assertStringContainsString('decoding="sync"', $html);
         self::assertStringNotContainsString('decoding="async"', $html);
+    }
+
+    // --- Commands ---
+
+    public function testPurgeDeletesTheCachedVariants(): void
+    {
+        $kernel = self::bootKernel();
+        $cache = $kernel->getCacheDir() . '/glide/photo.jpg';
+        self::assertSame(200, $kernel->handle(Request::create($this->helper()->imageUrl('photo.jpg', width: 40)))->getStatusCode());
+        self::assertDirectoryExists($cache);
+
+        $purge = $this->command($kernel, 'picasso:purge');
+        self::assertSame(Command::SUCCESS, $purge->execute(['paths' => ['photo.jpg']]));
+        self::assertDirectoryDoesNotExist($cache);
+    }
+
+    private function command(KernelInterface $kernel, string $name): CommandTester
+    {
+        return new CommandTester((new Application($kernel))->find($name));
     }
 
     private function helper(): ImageHelperInterface

@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Glide watermarks: the `watermarks` transformer option (a directory or a Flysystem storage) holds the images the `mark` modifier names ([Watermarks](https://picasso-bundle.silarhi.dev/guides/modifiers/#watermarks)).
 - `picasso_image_set()` Twig function and `ImageHelperInterface::imageSet()`: a CSS `image-set()` of an image for backgrounds, one candidate per configured format and pixel density ([Background images](https://picasso-bundle.silarhi.dev/guides/background-images/)).
 - `picasso_image_data()` Twig function: the `ImageRenderData` of an image instead of its HTML, for markup of your own.
+- `picasso:purge` command: purges the cached variants of images from the command line.
 - `placeholder_onload` option and `picasso_placeholder_script()` Twig function: under a Content-Security-Policy forbidding inline handlers, turn the inline `onload` off and render the script (with your nonce) in the `<head>` instead ([Content-Security-Policy](https://picasso-bundle.silarhi.dev/guides/placeholders/#content-security-policy)).
 
 ### Changed

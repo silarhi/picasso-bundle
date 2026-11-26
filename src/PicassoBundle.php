@@ -28,6 +28,7 @@ use SensitiveParameter;
 use Silarhi\PicassoBundle\Attribute\AsImageLoader;
 use Silarhi\PicassoBundle\Attribute\AsImageTransformer;
 use Silarhi\PicassoBundle\Attribute\AsPlaceholder;
+use Silarhi\PicassoBundle\Command\PurgeCommand;
 use Silarhi\PicassoBundle\Controller\ImageController;
 use Silarhi\PicassoBundle\Controller\LegacyUrlController;
 use Silarhi\PicassoBundle\DataCollector\CollectingImageHelper;
@@ -74,6 +75,7 @@ use function sprintf;
 
 use Symfony\Component\AssetMapper\AssetMapperInterface;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
+use Symfony\Component\Console\Command\Command;
 use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -1086,6 +1088,14 @@ final class PicassoBundle extends AbstractBundle
                     'key' => 'Picasso:Image',
                     'template' => '@Picasso/components/Image.html.twig',
                 ]);
+        }
+
+        // --- Console commands ---
+
+        if (class_exists(Command::class)) {
+            $services->set('.picasso.command.purge', PurgeCommand::class)
+                ->args([service('picasso.pipeline')])
+                ->tag('console.command');
         }
 
         // --- Data Collector (web profiler) ---
