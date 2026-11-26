@@ -62,6 +62,7 @@ final class PicassoExtension extends AbstractExtension
                 'needs_environment' => true,
                 'is_safe' => ['html'],
             ]),
+            new TwigFunction('picasso_image_data', $this->imageHelper->imageData(...)),
         ];
     }
 

@@ -174,6 +174,13 @@ class AuthoringFeaturesTest extends KernelTestCase
         self::assertSame(['(max-width: 640px)', 'not all and (max-width: 640px)'], $media);
     }
 
+    // --- Twig functions ---
+
+    public function testImageDataFunction(): void
+    {
+        self::assertSame('40x20', $this->render("{% set image = picasso_image_data(src='photo.jpg', width=40) %}{{ image.width }}x{{ image.height }}"));
+    }
+
     private function helper(): ImageHelperInterface
     {
         $helper = self::getContainer()->get('picasso.image_helper');

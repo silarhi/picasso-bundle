@@ -23,6 +23,7 @@ use Silarhi\PicassoBundle\Twig\Extension\PicassoExtension;
 use Twig\Environment;
 use Twig\Loader\ArrayLoader;
 use Twig\Markup;
+use Twig\TwigFunction;
 
 class PicassoExtensionTest extends TestCase
 {
@@ -33,9 +34,10 @@ class PicassoExtensionTest extends TestCase
 
         $functions = $extension->getFunctions();
 
-        self::assertCount(2, $functions);
-        self::assertSame('picasso_image_url', $functions[0]->getName());
-        self::assertSame('picasso_image', $functions[1]->getName());
+        self::assertSame(
+            ['picasso_image_url', 'picasso_image', 'picasso_image_data'],
+            array_map(static fn (TwigFunction $function): string => $function->getName(), $functions),
+        );
     }
 
     /**

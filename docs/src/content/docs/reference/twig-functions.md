@@ -1,17 +1,16 @@
 ---
 title: 'Twig functions'
-description: 'picasso_image() and picasso_image_url(): the component as a function call, and single image URLs.'
+description: 'picasso_image(), picasso_image_url() and picasso_image_data().'
 sidebar:
     order: 2
 ---
-
-Two Twig functions are available:
 
 - **`picasso_image()`** — renders a full responsive `<picture>` element (same
   output as the `<twig:Picasso:Image>` component) as a function call, for
   places where the component syntax is awkward: macros, `{{ }}` expressions,
   variables built in Twig, or a string returned by a filter.
 - **`picasso_image_url()`** — generates a single transformed image URL.
+- **`picasso_image_data()`** — returns the data of the `<picture>` instead of its HTML, for markup of your own.
 
 ## `picasso_image()`
 
@@ -91,3 +90,12 @@ All available parameters:
 | `routeParameters` | `array`  | Parameters of that route                                             |
 | `modifiers`       | `array`  | [Modifiers](/guides/modifiers/) in Glide's vocabulary                |
 | `preset`          | `string` | Named [preset](/guides/presets/) filling the parameters not given    |
+
+## `picasso_image_data()`
+
+Returns the `ImageRenderData` the component renders, with the arguments of `picasso_image()`: `fallbackSrc`, `fallbackSrcset`, `sources` (each with `type`, `srcset`, and for art-directed ones `media`, `sizes`, `width`, `height`), `placeholderUri`, `width`, `height`, `loading`, `fetchPriority`, `sizes`.
+
+```twig
+{% set image = picasso_image_data(src=product.image, preset='card') %}
+<img src="{{ image.fallbackSrc }}" srcset="{{ image.fallbackSrcset }}" sizes="{{ image.sizes }}" width="{{ image.width }}" height="{{ image.height }}" alt="{{ product.name }}">
+```

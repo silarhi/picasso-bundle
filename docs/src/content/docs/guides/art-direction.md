@@ -36,7 +36,7 @@ Give `artDirection` the sources by media query:
 
 Each art-directed source has one `<source>` per format, the fallback format included: the `<img>` belongs to the image itself. The `width` and `height` of a source let the browser reserve the right space for that crop, so the layout does not shift.
 
-`artDirection` works the same with `picasso_image()` and `ImageHelperInterface::imageData()`.
+`artDirection` works the same with `picasso_image()`, `picasso_image_data()` and `ImageHelperInterface::imageData()`.
 
 ## What an entry inherits
 
