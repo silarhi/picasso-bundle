@@ -18,7 +18,7 @@ use function dirname;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 /**
- * Presets, modifiers (with Glide watermarks), art direction and image-set().
+ * Presets, modifiers (with Glide watermarks), art direction, image-set() and the CSP-friendly placeholder.
  */
 class AuthoringKernel extends AbstractPicassoKernel
 {
@@ -29,6 +29,7 @@ class AuthoringKernel extends AbstractPicassoKernel
             'device_sizes' => [320, 640],
             'image_sizes' => [48],
             'formats' => ['webp', 'jpg'],
+            'placeholder_onload' => false,
             'placeholders' => [
                 'blur' => ['type' => 'transformer', 'size' => 10, 'blur' => 5],
             ],

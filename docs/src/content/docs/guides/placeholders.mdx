@@ -76,6 +76,28 @@ picasso:
 
 [Priority images](/guides/priority-images/) never get a placeholder: they should be on screen at once.
 
+## Content-Security-Policy
+
+The `<img>` removes its placeholder once loaded with an inline handler, `onload="this.style.backgroundImage=''"`, so a transparent image does not keep the blurred preview behind it. A Content-Security-Policy without `'unsafe-inline'` in `script-src` blocks that handler. Two ways out:
+
+- Allow that one handler by its hash: `script-src 'unsafe-hashes' 'sha256-1Uctn8lpAP34M+/dPfakiZJMK89NdVABlbpu3PSMuT8='`.
+- Or turn the handler off, and render the bundle's script once in the `<head>`, with the nonce of your policy:
+
+```yaml
+picasso:
+    placeholder_onload: false
+```
+
+```twig
+<head>
+    {{ picasso_placeholder_script(nonce=csp_nonce('script')) }}
+</head>
+```
+
+Images then carry a `data-picasso-placeholder` attribute, and one listener on the document removes the placeholder of each when it loads, images added later included. `csp_nonce()` comes from [NelmioSecurityBundle](https://github.com/nelmio/NelmioSecurityBundle); pass the nonce of your own policy otherwise, or nothing without one.
+
+The placeholder itself is an inline `style` attribute, which `style-src` allows only with `'unsafe-inline'` (or `'unsafe-hashes'` and a hash per image): without it, images render without a placeholder.
+
 ## Your own placeholder
 
 Implement `PlaceholderInterface`, for instance to use [ThumbHash](https://evanw.github.io/thumbhash/) or a dominant colour stored with the image:

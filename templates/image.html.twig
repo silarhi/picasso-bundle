@@ -13,6 +13,8 @@
 {% set blurStyle = data.placeholderUri ? 'background-size:cover;background-position:center;background-repeat:no-repeat;background-image:url(' ~ data.placeholderUri ~ ');' : '' %}
 {% set fullStyle = blurStyle ~ userStyle %}
 {% set extraAttrs = attributes|filter((_, k) => k != 'style') %}
+{# Under a Content-Security-Policy forbidding inline handlers, picasso_placeholder_script() removes the placeholder #}
+{% set placeholderOnload = picasso_placeholder_onload() %}
 
 {% if data.fallbackSrc %}
     {% if data.unoptimized or data.sources is empty %}
@@ -24,7 +26,7 @@
             loading="{{ data.loading }}"
             {% if data.fetchPriority %}fetchpriority="{{ data.fetchPriority }}"{% endif %}
             {% if fullStyle %}style="{{ fullStyle }}"{% endif %}
-            {% if data.placeholderUri %}onload="this.style.backgroundImage=''"{% endif %}
+            {% if data.placeholderUri %}{% if placeholderOnload %}onload="this.style.backgroundImage=''"{% else %}data-picasso-placeholder{% endif %}{% endif %}
             {% for name, value in extraAttrs %} {{ name }}="{{ value }}"{% endfor %}
         />
     {% else %}
@@ -48,7 +50,7 @@
                 loading="{{ data.loading }}"
                 {% if data.fetchPriority %}fetchpriority="{{ data.fetchPriority }}"{% endif %}
                 {% if fullStyle %}style="{{ fullStyle }}"{% endif %}
-                {% if data.placeholderUri %}onload="this.style.backgroundImage=''"{% endif %}
+                {% if data.placeholderUri %}{% if placeholderOnload %}onload="this.style.backgroundImage=''"{% else %}data-picasso-placeholder{% endif %}{% endif %}
                 {% for name, value in extraAttrs %} {{ name }}="{{ value }}"{% endfor %}
             />
         </picture>

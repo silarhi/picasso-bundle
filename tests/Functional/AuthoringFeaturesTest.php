@@ -194,6 +194,24 @@ class AuthoringFeaturesTest extends KernelTestCase
         );
     }
 
+    // --- Placeholder without inline handler ---
+
+    public function testPlaceholderWithoutInlineHandler(): void
+    {
+        $html = $this->render("{{ picasso_image(src='photo.jpg', width=40) }}");
+
+        self::assertStringContainsString('data-picasso-placeholder', $html);
+        self::assertStringNotContainsString('onload=', $html);
+    }
+
+    public function testPlaceholderScript(): void
+    {
+        self::assertSame(
+            "<script nonce=\"abc\">document.addEventListener('load',function(e){var t=e.target;if(t.hasAttribute&&t.hasAttribute('data-picasso-placeholder')){t.style.backgroundImage=''}},true)</script>",
+            $this->render("{{ picasso_placeholder_script(nonce='abc') }}"),
+        );
+    }
+
     private function helper(): ImageHelperInterface
     {
         $helper = self::getContainer()->get('picasso.image_helper');

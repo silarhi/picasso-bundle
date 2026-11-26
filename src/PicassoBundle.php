@@ -272,6 +272,10 @@ final class PicassoBundle extends AbstractBundle
                     ->defaultTrue()
                     ->info('Preload priority images through a Link header (and 103 Early Hints when sent). Needs symfony/web-link, does nothing without it.')
                 ->end()
+                ->booleanNode('placeholder_onload')
+                    ->defaultTrue()
+                    ->info('Remove the placeholder of a loaded image with an inline onload handler. Turn off under a Content-Security-Policy forbidding inline handlers, and render picasso_placeholder_script() in the <head> instead.')
+                ->end()
                 ->booleanNode('collector')
                     ->defaultFalse()
                     ->info('Enable the web profiler data collector for Picasso. Disabled by default; turn on in dev to debug image rendering.')
@@ -539,6 +543,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_placeholder: string|null,
          *     resolve_metadata: bool,
          *     preload: bool,
+         *     placeholder_onload: bool,
          *     collector: bool,
          *     cache: bool|string,
          *     cache_control: CacheControlConfig,
@@ -1067,6 +1072,7 @@ final class PicassoBundle extends AbstractBundle
             $services->set('.picasso.twig_extension', PicassoExtension::class)
                 ->args([
                     service('picasso.image_helper'),
+                    $config['placeholder_onload'],
                 ])
                 ->tag('twig.extension');
         }

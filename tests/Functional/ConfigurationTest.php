@@ -40,6 +40,7 @@ use Symfony\Component\Config\FileLocator;
  *     loaders: array<string, LoaderConfig>,
  *     transformers: array<string, TransformerConfig>,
  *     cache_control: CacheControlConfig,
+ *     placeholder_onload: bool,
  *     presets: array<string, array{width: int|null, height: int|null, sizes: string|null, quality: int|null, fit: string|null, placeholder: string|bool|null, loader: string|null, transformer: string|null, modifiers: array<string, int|string>}>,
  * }
  */
@@ -105,6 +106,7 @@ class ConfigurationTest extends TestCase
             'transformer' => null,
             'modifiers' => ['flip' => 'h', 'sharp' => 10],
         ], $config['presets']['card']);
+        self::assertTrue($config['placeholder_onload']);
     }
 
     public function testPresetPlaceholderMustBeABooleanOrAName(): void

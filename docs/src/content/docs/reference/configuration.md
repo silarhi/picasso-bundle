@@ -56,6 +56,9 @@ picasso:
     # --- Preload of priority images (needs symfony/web-link) ---
     preload: true # adds a Link: rel=preload header for every priority image
 
+    # --- Placeholder removal: false under a CSP forbidding inline handlers (see Placeholders) ---
+    placeholder_onload: true
+
     # --- Presets: named sets of rendering options (see Presets) ---
     presets:
         # card:
@@ -235,6 +238,13 @@ Preloads every [priority image](/guides/priority-images/#preloading) through a `
 
 - `true` (default) — preloads priority images when `symfony/web-link` is installed; does nothing without it
 - `false` — never preloads
+
+### `placeholder_onload`
+
+Whether a loaded image removes its placeholder with an inline `onload` handler.
+
+- `true` (default) — inline handler
+- `false` — images get a `data-picasso-placeholder` attribute instead, and `picasso_placeholder_script()` removes their placeholder: for a Content-Security-Policy forbidding inline handlers (see [Placeholders](/guides/placeholders/#content-security-policy))
 
 ### `presets`
 
