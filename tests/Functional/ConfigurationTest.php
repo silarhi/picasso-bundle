@@ -40,6 +40,7 @@ use Symfony\Component\Config\FileLocator;
  *     loaders: array<string, LoaderConfig>,
  *     transformers: array<string, TransformerConfig>,
  *     cache_control: CacheControlConfig,
+ *     presets: array<string, array{width: int|null, height: int|null, sizes: string|null, quality: int|null, fit: string|null, placeholder: string|bool|null, loader: string|null, transformer: string|null, modifiers: array<string, int|string>}>,
  * }
  */
 class ConfigurationTest extends TestCase
@@ -84,6 +85,42 @@ class ConfigurationTest extends TestCase
         self::assertSame([], $config['placeholders']);
         self::assertSame([], $config['loaders']);
         self::assertSame([], $config['transformers']);
+    }
+
+    // --- Presets ---
+
+    public function testPresetDefaults(): void
+    {
+        $config = $this->processConfig(['presets' => ['card' => ['width' => 400, 'modifiers' => ['flip' => 'h', 'sharp' => 10]]]]);
+
+        // Key order follows the config tree, not the declaration
+        self::assertEquals([
+            'width' => 400,
+            'height' => null,
+            'sizes' => null,
+            'quality' => null,
+            'fit' => null,
+            'placeholder' => null,
+            'loader' => null,
+            'transformer' => null,
+            'modifiers' => ['flip' => 'h', 'sharp' => 10],
+        ], $config['presets']['card']);
+    }
+
+    public function testPresetPlaceholderMustBeABooleanOrAName(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessageMatches('/"placeholder" of a preset must be a boolean or a placeholder name/');
+
+        $this->processConfig(['presets' => ['card' => ['placeholder' => 3]]]);
+    }
+
+    public function testPresetModifiersMustBeIntegersOrStrings(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessageMatches('/A modifier must be an integer or a string/');
+
+        $this->processConfig(['presets' => ['card' => ['modifiers' => ['bri' => 1.5]]]]);
     }
 
     // --- Formats validation ---

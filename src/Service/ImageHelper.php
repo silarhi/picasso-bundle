@@ -16,6 +16,7 @@ namespace Silarhi\PicassoBundle\Service;
 use function is_string;
 
 use Silarhi\PicassoBundle\Dto\Image;
+use Silarhi\PicassoBundle\Dto\ImagePreset;
 use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Dto\ImageRenderData;
 use Silarhi\PicassoBundle\Dto\ImageSource;
@@ -45,6 +46,7 @@ final readonly class ImageHelper implements ImageHelperInterface
         private bool $defaultResolveMetadata = false,
         private ?Stopwatch $stopwatch = null,
         private ?ImagePreloader $preloader = null,
+        private PresetRegistry $presetRegistry = new PresetRegistry(),
     ) {
     }
 
@@ -55,6 +57,7 @@ final readonly class ImageHelper implements ImageHelperInterface
      * @param string|null               $route           Application route serving the image (through ImageServer) instead of the bundle's
      * @param array<string, mixed>      $routeParameters Parameters of that route
      * @param array<string, int|string> $modifiers       Further manipulations, in Glide's vocabulary
+     * @param string|null               $preset          Named preset filling the options not given
      */
     public function imageUrl(
         string $path,
@@ -71,16 +74,21 @@ final readonly class ImageHelper implements ImageHelperInterface
         ?string $route = null,
         array $routeParameters = [],
         array $modifiers = [],
+        ?string $preset = null,
     ): string {
+        $presetOptions = $this->preset($preset);
+        $loader ??= $presetOptions?->loader;
+        $transformer ??= $presetOptions?->transformer;
+
         $transformation = new ImageTransformation(
-            width: $width,
-            height: $height,
+            width: $width ?? $presetOptions?->width,
+            height: $height ?? $presetOptions?->height,
             format: $format,
-            quality: $quality ?? $this->defaultQuality,
-            fit: $fit ?? $this->defaultFit,
+            quality: $quality ?? $presetOptions->quality ?? $this->defaultQuality,
+            fit: $fit ?? $presetOptions->fit ?? $this->defaultFit,
             blur: $blur,
             dpr: $dpr,
-            modifiers: $modifiers,
+            modifiers: [...$presetOptions->modifiers ?? [], ...$modifiers],
         );
 
         return $this->pipeline->url(new ImageReference($path, $context), $transformation, $loader, $transformer, $route, $routeParameters);
@@ -96,6 +104,7 @@ final readonly class ImageHelper implements ImageHelperInterface
      * @param string|null                $route           Application route serving the image (through ImageServer) instead of the bundle's
      * @param array<string, mixed>       $routeParameters Parameters of that route
      * @param array<string, int|string>  $modifiers       Further manipulations, in Glide's vocabulary
+     * @param string|null                $preset          Named preset filling the options not given
      */
     public function imageData(
         ?string $src = null,
@@ -120,7 +129,21 @@ final readonly class ImageHelper implements ImageHelperInterface
         ?string $route = null,
         array $routeParameters = [],
         array $modifiers = [],
+        ?string $preset = null,
     ): ImageRenderData {
+        $presetOptions = $this->preset($preset);
+        if ($presetOptions instanceof ImagePreset) {
+            $width ??= $presetOptions->width;
+            $height ??= $presetOptions->height;
+            $sizes ??= $presetOptions->sizes;
+            $loader ??= $presetOptions->loader;
+            $transformer ??= $presetOptions->transformer;
+            $quality ??= $presetOptions->quality;
+            $fit ??= $presetOptions->fit;
+            $placeholder ??= $presetOptions->placeholder;
+            $modifiers = [...$presetOptions->modifiers, ...$modifiers];
+        }
+
         $loading ??= $priority ? 'eager' : 'lazy';
         $fetchPriority ??= $priority ? 'high' : null;
 
@@ -193,6 +216,14 @@ final readonly class ImageHelper implements ImageHelperInterface
             transformer: $transformerName,
             placeholder: $placeholderName,
         ));
+    }
+
+    /**
+     * @throws \Silarhi\PicassoBundle\Exception\PresetNotFoundException
+     */
+    private function preset(?string $name): ?ImagePreset
+    {
+        return null !== $name ? $this->presetRegistry->get($name) : null;
     }
 
     private function preload(bool $priority, ImageRenderData $data): ImageRenderData

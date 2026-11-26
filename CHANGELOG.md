@@ -9,12 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Presets: name a set of rendering options once under `presets` (`width`, `height`, `sizes`, `quality`, `fit`, `placeholder`, `loader`, `transformer`, `modifiers`), then render with `preset="card"` on the component, any Twig function or `ImageHelperInterface`. Options given explicitly win. An unknown name throws the new `PresetNotFoundException` ([Presets](https://picasso-bundle.silarhi.dev/guides/presets/)).
 - Modifiers: `modifiers` takes further manipulations in Glide's vocabulary (`or`, `flip`, `crop`, `bri`, `con`, `gam`, `sharp`, `pixel`, `filt`, `bg`, `border`, `mark*`), e.g. `modifiers="{{ {flip: 'h', sharp: 10} }}"`. Imgix translates them (`flip: both` → `flip=hv`, `filt: greyscale` → `sat=-100`…) and passes its own parameters through. Unknown modifiers, and modifiers naming a param that has an option of its own, throw the new `InvalidTransformationException` ([Modifiers](https://picasso-bundle.silarhi.dev/guides/modifiers/)).
 - Glide watermarks: the `watermarks` transformer option (a directory or a Flysystem storage) holds the images the `mark` modifier names ([Watermarks](https://picasso-bundle.silarhi.dev/guides/modifiers/#watermarks)).
 
 ### Changed
 
-- `ImageHelperInterface::imageUrl()` and `imageData()` take one more optional parameter, `modifiers`. Custom implementations of the interface (e.g. decorators) must add them.
+- `ImageHelperInterface::imageUrl()` and `imageData()` take two more optional parameters, `modifiers` and `preset`. Custom implementations of the interface (e.g. decorators) must add them.
 
 ## [2.7.0] - 2026-10-29
 

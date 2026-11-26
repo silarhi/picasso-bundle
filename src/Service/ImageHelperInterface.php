@@ -16,6 +16,7 @@ namespace Silarhi\PicassoBundle\Service;
 use Silarhi\PicassoBundle\Dto\ImageRenderData;
 use Silarhi\PicassoBundle\Exception\InvalidRouteException;
 use Silarhi\PicassoBundle\Exception\InvalidTransformationException;
+use Silarhi\PicassoBundle\Exception\PresetNotFoundException;
 
 interface ImageHelperInterface
 {
@@ -27,10 +28,13 @@ interface ImageHelperInterface
      *                                                   bundle's: generated URLs point at it, with the transformation in the query
      * @param array<string, mixed>      $routeParameters Parameters of that route
      * @param array<string, int|string> $modifiers       Further manipulations, in Glide's vocabulary (flip, or, bri…)
+     * @param string|null               $preset          Named preset (the "presets" configuration) filling the options
+     *                                                   not given
      *
      * @throws InvalidRouteException          When the loader is private and no route is given, the transformer cannot
      *                                        serve a route, or a route parameter clashes with a transformation param
      * @throws InvalidTransformationException When the transformer cannot express a modifier
+     * @throws PresetNotFoundException        When the preset is not configured
      */
     public function imageUrl(
         string $path,
@@ -47,6 +51,7 @@ interface ImageHelperInterface
         ?string $route = null,
         array $routeParameters = [],
         array $modifiers = [],
+        ?string $preset = null,
     ): string;
 
     /**
@@ -61,10 +66,13 @@ interface ImageHelperInterface
      *                                                    placeholder point at it, with the transformation in the query
      * @param array<string, mixed>       $routeParameters Parameters of that route
      * @param array<string, int|string>  $modifiers       Further manipulations, in Glide's vocabulary (flip, or, bri…)
+     * @param string|null                $preset          Named preset (the "presets" configuration) filling the options
+     *                                                    not given
      *
      * @throws InvalidRouteException          When the loader is private and no route is given, the transformer cannot
      *                                        serve a route, or a route parameter clashes with a transformation param
      * @throws InvalidTransformationException When the transformer cannot express a modifier
+     * @throws PresetNotFoundException        When a preset is not configured
      */
     public function imageData(
         ?string $src = null,
@@ -89,5 +97,6 @@ interface ImageHelperInterface
         ?string $route = null,
         array $routeParameters = [],
         array $modifiers = [],
+        ?string $preset = null,
     ): ImageRenderData;
 }

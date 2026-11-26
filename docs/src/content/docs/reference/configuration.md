@@ -56,6 +56,19 @@ picasso:
     # --- Preload of priority images (needs symfony/web-link) ---
     preload: true # adds a Link: rel=preload header for every priority image
 
+    # --- Presets: named sets of rendering options (see Presets) ---
+    presets:
+        # card:
+        #     width: 400
+        #     height: 300
+        #     sizes: '(max-width: 768px) 100vw, 400px'
+        #     quality: ~
+        #     fit: cover
+        #     placeholder: ~     # true | false | a placeholder name
+        #     loader: ~
+        #     transformer: ~
+        #     modifiers: { sharp: 10 }
+
     # --- Web profiler data collector (dev only) ---
     collector: false # set to true to record image renders / URL generations in the Symfony toolbar
 
@@ -222,6 +235,10 @@ Preloads every [priority image](/guides/priority-images/#preloading) through a `
 
 - `true` (default) — preloads priority images when `symfony/web-link` is installed; does nothing without it
 - `false` — never preloads
+
+### `presets`
+
+Named sets of rendering options (`width`, `height`, `sizes`, `quality`, `fit`, `placeholder`, `loader`, `transformer`, `modifiers`), applied with the `preset` option of the component, the Twig functions and `ImageHelperInterface`. Options given explicitly win. See [Presets](/guides/presets/).
 
 ### `collector`
 

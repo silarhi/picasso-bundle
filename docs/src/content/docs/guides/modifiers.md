@@ -13,7 +13,7 @@ Beyond size, format, quality and fit, `modifiers` takes further manipulations in
 {{ picasso_image_url('photo.jpg', width=300, modifiers={filt: 'greyscale'}) }}
 ```
 
-Modifiers apply to every URL of the image (each srcset candidate, the fallback, the transformer placeholder).
+Modifiers apply to every URL of the image (each srcset candidate, the fallback, the transformer placeholder), and can be set by a [preset](/guides/presets/).
 
 ## Available modifiers
 

@@ -18,6 +18,7 @@ use Silarhi\PicassoBundle\Dto\ImageRenderData;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Service\ImageHelperInterface;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
+use Silarhi\PicassoBundle\Service\PresetRegistry;
 
 /**
  * Decorates ImageHelperInterface to record calls into the Picasso data collector.
@@ -30,6 +31,7 @@ final readonly class CollectingImageHelper implements ImageHelperInterface
         private ImageHelperInterface $inner,
         private PicassoDataCollector $collector,
         private ImagePipeline $pipeline,
+        private PresetRegistry $presetRegistry = new PresetRegistry(),
     ) {
     }
 
@@ -49,6 +51,7 @@ final readonly class CollectingImageHelper implements ImageHelperInterface
         ?string $route = null,
         array $routeParameters = [],
         array $modifiers = [],
+        ?string $preset = null,
     ): string {
         $start = microtime(true);
         $url = $this->inner->imageUrl(
@@ -66,15 +69,16 @@ final readonly class CollectingImageHelper implements ImageHelperInterface
             route: $route,
             routeParameters: $routeParameters,
             modifiers: $modifiers,
+            preset: $preset,
         );
         $duration = (microtime(true) - $start) * 1000;
 
         // The inner call resolved these same names without throwing, so resolution cannot fail here.
-        $loaderName = $this->pipeline->resolveLoaderName($loader);
+        [$loaderName, $transformerName] = $this->resolveNames($loader, $transformer, $preset);
         $this->collector->collectImageUrl(
             src: $path,
             loader: $loaderName,
-            transformer: $this->pipeline->resolveTransformerName($transformer, $loaderName),
+            transformer: $transformerName,
             transformation: new ImageTransformation(
                 width: $width,
                 height: $height,
@@ -116,6 +120,7 @@ final readonly class CollectingImageHelper implements ImageHelperInterface
         ?string $route = null,
         array $routeParameters = [],
         array $modifiers = [],
+        ?string $preset = null,
     ): ImageRenderData {
         $start = microtime(true);
         $data = $this->inner->imageData(
@@ -141,6 +146,7 @@ final readonly class CollectingImageHelper implements ImageHelperInterface
             route: $route,
             routeParameters: $routeParameters,
             modifiers: $modifiers,
+            preset: $preset,
         );
         $duration = (microtime(true) - $start) * 1000;
 
@@ -151,5 +157,18 @@ final readonly class CollectingImageHelper implements ImageHelperInterface
         );
 
         return $data;
+    }
+
+    /**
+     * The loader and transformer names the inner helper resolved: the given ones, else the preset's, else the defaults.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function resolveNames(?string $loader, ?string $transformer, ?string $preset): array
+    {
+        $presetOptions = null !== $preset ? $this->presetRegistry->get($preset) : null;
+        $loaderName = $this->pipeline->resolveLoaderName($loader ?? $presetOptions?->loader);
+
+        return [$loaderName, $this->pipeline->resolveTransformerName($transformer ?? $presetOptions?->transformer, $loaderName)];
     }
 }

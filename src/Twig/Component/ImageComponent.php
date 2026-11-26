@@ -84,6 +84,9 @@ class ImageComponent
     /** @var array<string, int|string> Further manipulations, in Glide's vocabulary (e.g. {flip: 'h', sharp: 10}). */
     public array $modifiers = [];
 
+    /** Named preset (the "presets" configuration) filling the props not given. */
+    public ?string $preset = null;
+
     // --- Computed state (set in PostMount, used by template) ---
 
     /** @internal */
@@ -132,6 +135,7 @@ class ImageComponent
             route: $this->route,
             routeParameters: $this->routeParameters,
             modifiers: $this->modifiers,
+            preset: $this->preset,
         );
 
         $this->placeholderUri = $data->placeholderUri;
@@ -140,6 +144,7 @@ class ImageComponent
         $this->fallbackSrcset = $data->fallbackSrcset;
         $this->width = $data->width;
         $this->height = $data->height;
+        $this->sizes = $data->sizes;
         $this->loading = $data->loading;
         $this->fetchPriority = $data->fetchPriority;
     }

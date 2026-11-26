@@ -75,6 +75,7 @@ final class PicassoExtension extends AbstractExtension
      * @param string|null                $route           Application route serving the image (through ImageServer) instead of the bundle's
      * @param array<string, mixed>       $routeParameters Parameters of that route
      * @param array<string, int|string>  $modifiers       Further manipulations, in Glide's vocabulary
+     * @param string|null                $preset          Named preset filling the options not given
      */
     public function renderImage(
         Environment $env,
@@ -100,6 +101,7 @@ final class PicassoExtension extends AbstractExtension
         ?string $route = null,
         array $routeParameters = [],
         array $modifiers = [],
+        ?string $preset = null,
     ): string {
         $data = $this->imageHelper->imageData(
             src: $src,
@@ -124,6 +126,7 @@ final class PicassoExtension extends AbstractExtension
             route: $route,
             routeParameters: $routeParameters,
             modifiers: $modifiers,
+            preset: $preset,
         );
 
         return $env->render('@Picasso/image.html.twig', [

@@ -146,11 +146,11 @@ class CollectingImageHelperTest extends TestCase
         $collector = new PicassoDataCollector();
         $decorator = new CollectingImageHelper($inner, $collector, $this->createPipeline());
 
-        $result = $decorator->imageData(src: 'hero.jpg', width: 1920, height: 1080, route: 'document_image', routeParameters: ['id' => 42], modifiers: ['flip' => 'h']);
+        $result = $decorator->imageData(src: 'hero.jpg', width: 1920, height: 1080, route: 'document_image', routeParameters: ['id' => 42], modifiers: ['flip' => 'h'], preset: 'hero');
 
         self::assertSame($renderData, $result);
-        self::assertSame(['document_image', ['id' => 42]], array_slice($forwarded, -3, 2), 'the route reaches the inner helper');
-        self::assertSame([['flip' => 'h']], array_slice($forwarded, -1), 'the modifiers reach the inner helper');
+        self::assertSame(['document_image', ['id' => 42]], array_slice($forwarded, -4, 2), 'the route reaches the inner helper');
+        self::assertSame([['flip' => 'h'], 'hero'], array_slice($forwarded, -2), 'modifiers and preset reach the inner helper');
 
         $collector->collect(new Request(), new Response());
         $renders = $collector->getRenders();

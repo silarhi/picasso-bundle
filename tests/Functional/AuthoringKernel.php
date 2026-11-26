@@ -18,7 +18,7 @@ use function dirname;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 /**
- * Modifiers, with Glide watermarks.
+ * Presets and modifiers (with Glide watermarks).
  */
 class AuthoringKernel extends AbstractPicassoKernel
 {
@@ -31,6 +31,28 @@ class AuthoringKernel extends AbstractPicassoKernel
             'formats' => ['webp', 'jpg'],
             'placeholders' => [
                 'blur' => ['type' => 'transformer', 'size' => 10, 'blur' => 5],
+            ],
+            'presets' => [
+                'card' => [
+                    'width' => 40,
+                    'height' => 30,
+                    'fit' => 'cover',
+                    'quality' => 60,
+                    'modifiers' => ['sharp' => 5],
+                ],
+                'hero' => [
+                    'sizes' => '100vw',
+                    'placeholder' => false,
+                ],
+                'square' => [
+                    'width' => 30,
+                    'height' => 30,
+                    'fit' => 'crop-50-50',
+                ],
+                'remote' => [
+                    'transformer' => 'imgix',
+                    'width' => 40,
+                ],
             ],
             'loaders' => [
                 'filesystem' => [
