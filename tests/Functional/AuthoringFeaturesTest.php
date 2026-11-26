@@ -181,6 +181,19 @@ class AuthoringFeaturesTest extends KernelTestCase
         self::assertSame('40x20', $this->render("{% set image = picasso_image_data(src='photo.jpg', width=40) %}{{ image.width }}x{{ image.height }}"));
     }
 
+    public function testImageSetFunction(): void
+    {
+        $css = $this->render("{{ picasso_image_set(src='photo.jpg', width=80) }}");
+
+        self::assertMatchesRegularExpression(
+            "#^image-set\\(url\\('/image/glide/filesystem/photo\\.jpg\\?w=80&h=40&fm=webp&q=75&fit=contain&s=[^']+'\\) 1x type\\('image/webp'\\), "
+            . "url\\('/image/glide/filesystem/photo\\.jpg\\?w=100&h=50&fm=webp[^']+'\\) 2x type\\('image/webp'\\), "
+            . "url\\('[^']+fm=jpg[^']+'\\) 1x type\\('image/jpeg'\\), url\\('[^']+'\\) 2x type\\('image/jpeg'\\)\\)$#",
+            $css,
+            'the 2x candidates are capped to the 100px source',
+        );
+    }
+
     private function helper(): ImageHelperInterface
     {
         $helper = self::getContainer()->get('picasso.image_helper');

@@ -63,6 +63,8 @@ final class PicassoExtension extends AbstractExtension
                 'is_safe' => ['html'],
             ]),
             new TwigFunction('picasso_image_data', $this->imageHelper->imageData(...)),
+            // The URLs are percent-encoded where they could end the url('…') or an HTML attribute
+            new TwigFunction('picasso_image_set', $this->imageHelper->imageSet(...), ['is_safe' => ['html']]),
         ];
     }
 

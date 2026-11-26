@@ -1,6 +1,6 @@
 ---
 title: 'Twig functions'
-description: 'picasso_image(), picasso_image_url() and picasso_image_data().'
+description: 'picasso_image(), picasso_image_url(), picasso_image_data() and picasso_image_set().'
 sidebar:
     order: 2
 ---
@@ -11,6 +11,7 @@ sidebar:
   variables built in Twig, or a string returned by a filter.
 - **`picasso_image_url()`** — generates a single transformed image URL.
 - **`picasso_image_data()`** — returns the data of the `<picture>` instead of its HTML, for markup of your own.
+- **`picasso_image_set()`** — generates a CSS `image-set()`, for backgrounds.
 
 ## `picasso_image()`
 
@@ -99,3 +100,23 @@ Returns the `ImageRenderData` the component renders, with the arguments of `pica
 {% set image = picasso_image_data(src=product.image, preset='card') %}
 <img src="{{ image.fallbackSrc }}" srcset="{{ image.fallbackSrcset }}" sizes="{{ image.sizes }}" width="{{ image.width }}" height="{{ image.height }}" alt="{{ product.name }}">
 ```
+
+See [Background images](/guides/background-images/#markup-of-your-own-picasso_image_data).
+
+## `picasso_image_set()`
+
+Returns a CSS `image-set()` of the image, one candidate per configured format and density:
+
+```twig
+<div style="background-image: {{ picasso_image_set(src='hero.jpg', width=1440) }}">
+```
+
+| Parameter         | Type        | Description                                                        |
+| ----------------- | ----------- | ------------------------------------------------------------------ |
+| `src`             | `string`    | Image path (omit it when the loader reads the `context`)           |
+| `width`           | `int`       | Width in CSS pixels (auto-detected from the source)                |
+| `height`          | `int`       | Height in CSS pixels (follows the source ratio when omitted)       |
+| `densities`       | `list<int>` | Pixel densities of the candidates, default `[1, 2]`                |
+| `quality`, `fit`, `modifiers`, `loader`, `transformer`, `sourceWidth`, `sourceHeight`, `resolveMetadata`, `context`, `route`, `routeParameters`, `preset` | | As for `picasso_image_url()` and the component |
+
+See [Background images](/guides/background-images/).

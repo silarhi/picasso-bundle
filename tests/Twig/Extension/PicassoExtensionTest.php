@@ -35,7 +35,7 @@ class PicassoExtensionTest extends TestCase
         $functions = $extension->getFunctions();
 
         self::assertSame(
-            ['picasso_image_url', 'picasso_image', 'picasso_image_data'],
+            ['picasso_image_url', 'picasso_image', 'picasso_image_data', 'picasso_image_set'],
             array_map(static fn (TwigFunction $function): string => $function->getName(), $functions),
         );
     }

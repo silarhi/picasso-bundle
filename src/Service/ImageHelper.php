@@ -246,6 +246,104 @@ final readonly class ImageHelper implements ImageHelperInterface
     }
 
     /**
+     * @param list<int>                 $densities
+     * @param array<string, int|string> $modifiers
+     * @param array<string, mixed>      $context
+     * @param array<string, mixed>      $routeParameters
+     */
+    public function imageSet(
+        ?string $src = null,
+        ?int $width = null,
+        ?int $height = null,
+        array $densities = [1, 2],
+        ?string $loader = null,
+        ?string $transformer = null,
+        ?int $quality = null,
+        ?string $fit = null,
+        array $modifiers = [],
+        ?int $sourceWidth = null,
+        ?int $sourceHeight = null,
+        ?bool $resolveMetadata = null,
+        array $context = [],
+        ?string $route = null,
+        array $routeParameters = [],
+        ?string $preset = null,
+    ): string {
+        $presetOptions = $this->preset($preset);
+        if ($presetOptions instanceof ImagePreset) {
+            $width ??= $presetOptions->width;
+            $height ??= $presetOptions->height;
+            $loader ??= $presetOptions->loader;
+            $transformer ??= $presetOptions->transformer;
+            $quality ??= $presetOptions->quality;
+            $fit ??= $presetOptions->fit;
+            $modifiers = [...$presetOptions->modifiers, ...$modifiers];
+        }
+
+        $loaderName = $this->pipeline->resolveLoaderName($loader);
+        $effectiveResolveMetadata = $resolveMetadata
+            ?? $this->loaderRegistry->getResolveMetadata($loaderName)
+            ?? $this->defaultResolveMetadata;
+        $image = $this->pipeline->load(
+            new ImageReference($src, $context),
+            $loader,
+            $this->needsMetadata($width, $height, $sourceWidth, $sourceHeight, $effectiveResolveMetadata),
+        );
+        [$width, $height, $resolvedSourceWidth] = $this->resolveDimensions(
+            $image, $loaderName, $width, $height, $sourceWidth, $sourceHeight, $effectiveResolveMetadata,
+        );
+
+        $transformerName = $this->pipeline->resolveTransformerName($transformer, $loaderName);
+        $imageTransformer = $this->transformerRegistry->get($transformerName);
+        $transformerContext = (new TransformerContextFactory($this->loaderRegistry, $this->transformerRegistry))
+            ->create($image, $loaderName, $transformerName, $route, $routeParameters);
+
+        $candidates = [];
+        foreach ($this->formats as $format) {
+            $previousWidth = null;
+            foreach ($densities as $density) {
+                $candidateWidth = null !== $width ? $width * $density : null;
+                $candidateHeight = null !== $height ? $height * $density : null;
+                if (null !== $candidateWidth && null !== $resolvedSourceWidth && $candidateWidth > $resolvedSourceWidth) {
+                    // Never upscale: the denser candidates would all be the source itself
+                    $candidateHeight = null !== $candidateHeight ? (int) round($candidateHeight * $resolvedSourceWidth / $candidateWidth) : null;
+                    $candidateWidth = $resolvedSourceWidth;
+                }
+                if (null !== $previousWidth && $candidateWidth === $previousWidth) {
+                    break;
+                }
+                $previousWidth = $candidateWidth;
+
+                $url = $imageTransformer->url($image, new ImageTransformation(
+                    width: $candidateWidth,
+                    height: $candidateHeight,
+                    format: $format,
+                    quality: $quality ?? $this->defaultQuality,
+                    fit: $fit ?? $this->defaultFit,
+                    modifiers: $modifiers,
+                ), $transformerContext);
+
+                $candidates[] = sprintf("url('%s') %dx type('%s')", $this->cssUrl($url), $density, $this->getMimeType($format));
+            }
+        }
+
+        return 'image-set(' . implode(', ', $candidates) . ')';
+    }
+
+    /**
+     * Percent-encodes what would end a quoted CSS url() or an HTML attribute: generated URLs never need those
+     * characters raw, browsers encode them anyway.
+     */
+    private function cssUrl(string $url): string
+    {
+        return (string) preg_replace_callback(
+            '/[^\x21-\x7E]|[\'"\\\\<>]/',
+            static fn (array $match): string => rawurlencode($match[0]),
+            $url,
+        );
+    }
+
+    /**
      * Explicit display dimensions need no source dimensions, except to cap srcset candidates to the source width:
      * loaders resolving metadata (filesystem by default, a cheap local read) still read them.
      */

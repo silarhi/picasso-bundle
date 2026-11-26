@@ -105,4 +105,40 @@ interface ImageHelperInterface
         ?string $preset = null,
         array $artDirection = [],
     ): ImageRenderData;
+
+    /**
+     * Generate a CSS image-set() of an image, for backgrounds: one candidate per configured format and density.
+     *
+     * The width and height are CSS pixels; each density multiplies them, capped to the source width when it is known.
+     *
+     * @param list<int>                 $densities       Pixel densities of the candidates (1x, 2x…)
+     * @param array<string, int|string> $modifiers       Further manipulations, in Glide's vocabulary (flip, or, bri…)
+     * @param array<string, mixed>      $context         Extra context for the loader
+     * @param array<string, mixed>      $routeParameters Parameters of the route
+     *
+     * @return string The image-set() value, e.g. image-set(url('…') 1x type('image/avif'), …)
+     *
+     * @throws InvalidRouteException          When the loader is private and no route is given, or the transformer
+     *                                        cannot serve a route
+     * @throws InvalidTransformationException When the transformer cannot express a modifier
+     * @throws PresetNotFoundException        When the preset is not configured
+     */
+    public function imageSet(
+        ?string $src = null,
+        ?int $width = null,
+        ?int $height = null,
+        array $densities = [1, 2],
+        ?string $loader = null,
+        ?string $transformer = null,
+        ?int $quality = null,
+        ?string $fit = null,
+        array $modifiers = [],
+        ?int $sourceWidth = null,
+        ?int $sourceHeight = null,
+        ?bool $resolveMetadata = null,
+        array $context = [],
+        ?string $route = null,
+        array $routeParameters = [],
+        ?string $preset = null,
+    ): string;
 }
