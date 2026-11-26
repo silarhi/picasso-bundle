@@ -45,6 +45,39 @@ class ImagePreloaderTest extends TestCase
         ], $link->getAttributes());
     }
 
+    public function testPreloadsEachArtDirectedMediaQuery(): void
+    {
+        $request = new Request();
+        $this->preloader($request)->preload($this->renderData([
+            new ImageSource('image/webp', '/m.webp 320w', media: '(max-width: 640px)', sizes: '50vw'),
+            new ImageSource('image/jpeg', '/m.jpg 320w', media: '(max-width: 640px)', sizes: '50vw'),
+            new ImageSource('image/webp', '/p.webp 320w', media: '(orientation: portrait)'),
+            new ImageSource('image/webp', '/a-640.webp 640w'),
+        ]));
+
+        $links = $this->links($request);
+
+        self::assertSame(['/m.webp', '/p.webp', '/a-640.webp'], array_map(static fn (LinkInterface $link): string => $link->getHref(), $links));
+        self::assertSame('(max-width: 640px)', $links[0]->getAttributes()['media']);
+        self::assertSame('50vw', $links[0]->getAttributes()['imagesizes'], 'an art-directed source keeps its own sizes');
+        self::assertSame('100vw', $links[1]->getAttributes()['imagesizes'], 'else the image\'s');
+        self::assertSame('not all and (((max-width: 640px)) or ((orientation: portrait)))', $links[2]->getAttributes()['media']);
+    }
+
+    public function testLeavesTheImagePreloadUnconditionalWhenAQueryCannotBeNegated(): void
+    {
+        $request = new Request();
+        $this->preloader($request)->preload($this->renderData([
+            new ImageSource('image/webp', '/m.webp 320w', media: 'screen and (max-width: 640px)'),
+            new ImageSource('image/webp', '/a-640.webp 640w'),
+        ]));
+
+        $links = $this->links($request);
+
+        self::assertCount(2, $links);
+        self::assertArrayNotHasKey('media', $links[1]->getAttributes());
+    }
+
     public function testPreloadsTheImgWhenThereIsNoSource(): void
     {
         $request = new Request();
@@ -120,6 +153,23 @@ class ImagePreloaderTest extends TestCase
         $this->preloader($request)->preload($data);
 
         self::assertFalse($request->attributes->has('_links'));
+    }
+
+    /**
+     * @return list<LinkInterface>
+     */
+    private function links(Request $request): array
+    {
+        $provider = $request->attributes->get('_links');
+        self::assertInstanceOf(GenericLinkProvider::class, $provider);
+
+        $links = [];
+        foreach ($provider->getLinks() as $link) {
+            self::assertInstanceOf(LinkInterface::class, $link);
+            $links[] = $link;
+        }
+
+        return $links;
     }
 
     private function preloader(Request $request): ImagePreloader

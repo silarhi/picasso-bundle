@@ -38,7 +38,7 @@ Then name the preset where the image is rendered:
 <meta property="og:image" content="{{ absolute_url(picasso_image_url(article.cover, preset='og', format='jpg')) }}">
 ```
 
-`preset` works on the component, on every Twig function and on `ImageHelperInterface` (`imageUrl()`, `imageData()`).
+`preset` works on the component, on every Twig function and on `ImageHelperInterface` (`imageUrl()`, `imageData()`), and in [art-direction](/guides/art-direction/) entries.
 
 ## What a preset sets
 

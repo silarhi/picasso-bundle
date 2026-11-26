@@ -13,6 +13,9 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Service;
 
+use function array_key_exists;
+use function is_array;
+use function is_int;
 use function is_string;
 
 use Silarhi\PicassoBundle\Dto\Image;
@@ -21,7 +24,11 @@ use Silarhi\PicassoBundle\Dto\ImageReference;
 use Silarhi\PicassoBundle\Dto\ImageRenderData;
 use Silarhi\PicassoBundle\Dto\ImageSource;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
+use Silarhi\PicassoBundle\Exception\InvalidTransformationException;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
+
+use function sprintf;
+
 use Symfony\Component\Stopwatch\Stopwatch;
 
 /**
@@ -29,6 +36,11 @@ use Symfony\Component\Stopwatch\Stopwatch;
  */
 final readonly class ImageHelper implements ImageHelperInterface
 {
+    /**
+     * Keys an art-direction entry may set; it inherits the others from the image.
+     */
+    private const ART_DIRECTION_KEYS = ['src', 'context', 'width', 'height', 'sourceWidth', 'sourceHeight', 'sizes', 'quality', 'fit', 'modifiers', 'preset'];
+
     /**
      * @param string[] $formats
      */
@@ -99,12 +111,13 @@ final readonly class ImageHelper implements ImageHelperInterface
      *
      * Returns an immutable DTO suitable for both Twig component rendering and JSON API responses.
      *
-     * @param array<string, mixed>       $context         Extra context for the loader
-     * @param array<string, scalar|null> $attributes      Extra HTML attributes (alt, class, …)
-     * @param string|null                $route           Application route serving the image (through ImageServer) instead of the bundle's
-     * @param array<string, mixed>       $routeParameters Parameters of that route
-     * @param array<string, int|string>  $modifiers       Further manipulations, in Glide's vocabulary
-     * @param string|null                $preset          Named preset filling the options not given
+     * @param array<string, mixed>                $context         Extra context for the loader
+     * @param array<string, scalar|null>          $attributes      Extra HTML attributes (alt, class, …)
+     * @param string|null                         $route           Application route serving the image (through ImageServer) instead of the bundle's
+     * @param array<string, mixed>                $routeParameters Parameters of that route
+     * @param array<string, int|string>           $modifiers       Further manipulations, in Glide's vocabulary
+     * @param string|null                         $preset          Named preset filling the options not given
+     * @param array<string, array<string, mixed>> $artDirection    Art-directed sources by media query
      */
     public function imageData(
         ?string $src = null,
@@ -130,6 +143,7 @@ final readonly class ImageHelper implements ImageHelperInterface
         array $routeParameters = [],
         array $modifiers = [],
         ?string $preset = null,
+        array $artDirection = [],
     ): ImageRenderData {
         $presetOptions = $this->preset($preset);
         if ($presetOptions instanceof ImagePreset) {
@@ -169,13 +183,13 @@ final readonly class ImageHelper implements ImageHelperInterface
             ?? $this->loaderRegistry->getResolveMetadata($loaderName)
             ?? $this->defaultResolveMetadata;
 
-        $reference = new ImageReference($src, $context);
-        $hasAllDisplayDims = null !== $width && null !== $height;
-        $hasAllSourceDims = null !== $sourceWidth && null !== $sourceHeight;
-        // Explicit display dimensions need no source dimensions, except to cap srcset candidates to the
-        // source width: loaders resolving metadata (filesystem by default, a cheap local read) still read them
-        $needsMetadata = !$hasAllSourceDims && (!$hasAllDisplayDims || $effectiveResolveMetadata);
-        $image = $this->pipeline->load($reference, $loader, $needsMetadata);
+        $image = $this->pipeline->load(
+            new ImageReference($src, $context),
+            $loader,
+            $this->needsMetadata($width, $height, $sourceWidth, $sourceHeight, $effectiveResolveMetadata),
+        );
+        $requestedWidth = $width;
+        $requestedHeight = $height;
 
         [$width, $height, $resolvedSourceWidth, $resolvedSourceHeight] = $this->resolveDimensions(
             $image, $loaderName, $width, $height, $sourceWidth, $sourceHeight, $effectiveResolveMetadata,
@@ -200,6 +214,19 @@ final readonly class ImageHelper implements ImageHelperInterface
             $resolvedSourceWidth, $resolvedSourceHeight, $width, $height, $sizes, $quality, $fit, $modifiers,
         );
 
+        $artDirectedSources = [];
+        foreach ($artDirection as $media => $entry) {
+            $artDirectedSources[] = $this->generateArtDirectedSources(
+                $media, $entry, $imageTransformer, $loader, $loaderName, $transformerName,
+                $route, $routeParameters, $effectiveResolveMetadata,
+                $src, $context, $image, $transformerContext, $resolvedSourceWidth, $resolvedSourceHeight,
+                $requestedWidth, $requestedHeight, $sizes, $quality, $fit, $modifiers,
+            );
+        }
+        if ([] !== $artDirectedSources) {
+            $sources = [...array_merge(...$artDirectedSources), ...$sources];
+        }
+
         return $this->preload($priority, new ImageRenderData(
             fallbackSrc: $fallbackSrc,
             fallbackSrcset: $fallbackSrcset,
@@ -219,11 +246,202 @@ final readonly class ImageHelper implements ImageHelperInterface
     }
 
     /**
+     * Explicit display dimensions need no source dimensions, except to cap srcset candidates to the source width:
+     * loaders resolving metadata (filesystem by default, a cheap local read) still read them.
+     */
+    private function needsMetadata(?int $width, ?int $height, ?int $sourceWidth, ?int $sourceHeight, bool $resolveMetadata): bool
+    {
+        $hasAllDisplayDims = null !== $width && null !== $height;
+        $hasAllSourceDims = null !== $sourceWidth && null !== $sourceHeight;
+
+        return !$hasAllSourceDims && (!$hasAllDisplayDims || $resolveMetadata);
+    }
+
+    /**
      * @throws \Silarhi\PicassoBundle\Exception\PresetNotFoundException
      */
     private function preset(?string $name): ?ImagePreset
     {
         return null !== $name ? $this->presetRegistry->get($name) : null;
+    }
+
+    /**
+     * The <source> elements of one art-direction entry, one per format (the fallback format included: the <img>
+     * fallback is the image's own). The entry inherits from the image every option it omits; its width and height
+     * are inherited together, since setting one changes the aspect ratio.
+     *
+     * @param array<string, mixed>      $entry
+     * @param array<string, mixed>      $routeParameters
+     * @param array<string, mixed>      $context
+     * @param TransformerContext        $transformerContext
+     * @param array<string, int|string> $modifiers
+     *
+     * @return list<ImageSource>
+     *
+     * @throws InvalidTransformationException When the entry has an unknown key or a value of the wrong type
+     */
+    private function generateArtDirectedSources(
+        string $media,
+        array $entry,
+        ImageTransformerInterface $imageTransformer,
+        ?string $loader,
+        string $loaderName,
+        string $transformerName,
+        ?string $route,
+        array $routeParameters,
+        bool $resolveMetadata,
+        ?string $src,
+        array $context,
+        Image $image,
+        array $transformerContext,
+        ?int $sourceWidth,
+        ?int $sourceHeight,
+        ?int $width,
+        ?int $height,
+        ?string $sizes,
+        ?int $quality,
+        ?string $fit,
+        array $modifiers,
+    ): array {
+        $unknown = array_diff(array_keys($entry), self::ART_DIRECTION_KEYS);
+        if ([] !== $unknown) {
+            throw new InvalidTransformationException(sprintf('Art direction "%s": unknown option "%s". Known options: "%s".', $media, implode('", "', $unknown), implode('", "', self::ART_DIRECTION_KEYS)));
+        }
+
+        $entryPreset = $this->preset($this->entryString($media, $entry, 'preset'));
+        $entryWidth = $this->entryInt($media, $entry, 'width') ?? $entryPreset?->width;
+        $entryHeight = $this->entryInt($media, $entry, 'height') ?? $entryPreset?->height;
+        if (null === $entryWidth && null === $entryHeight) {
+            $entryWidth = $width;
+            $entryHeight = $height;
+        }
+        $sizes = $this->entryString($media, $entry, 'sizes') ?? $entryPreset->sizes ?? $sizes;
+        $quality = $this->entryInt($media, $entry, 'quality') ?? $entryPreset->quality ?? $quality;
+        $fit = $this->entryString($media, $entry, 'fit') ?? $entryPreset->fit ?? $fit;
+        $modifiers = [...$modifiers, ...$entryPreset->modifiers ?? [], ...$this->entryModifiers($media, $entry)];
+
+        // Another image (src or context of its own) is loaded and measured like the image itself; the same image
+        // reuses the image's load and source dimensions
+        if (array_key_exists('src', $entry) || array_key_exists('context', $entry)) {
+            $entrySourceWidth = $this->entryInt($media, $entry, 'sourceWidth');
+            $entrySourceHeight = $this->entryInt($media, $entry, 'sourceHeight');
+            $image = $this->pipeline->load(
+                new ImageReference($this->entryString($media, $entry, 'src') ?? $src, $this->entryContext($media, $entry) ?? $context),
+                $loader,
+                $this->needsMetadata($entryWidth, $entryHeight, $entrySourceWidth, $entrySourceHeight, $resolveMetadata),
+            );
+            $transformerContext = (new TransformerContextFactory($this->loaderRegistry, $this->transformerRegistry))
+                ->create($image, $loaderName, $transformerName, $route, $routeParameters);
+            [$entryWidth, $entryHeight, $sourceWidth, $sourceHeight] = $this->resolveDimensions(
+                $image, $loaderName, $entryWidth, $entryHeight, $entrySourceWidth, $entrySourceHeight, $resolveMetadata,
+            );
+        } else {
+            [$entryWidth, $entryHeight] = $this->resolveDimensions(
+                $image, $loaderName, $entryWidth, $entryHeight, $sourceWidth, $sourceHeight, false,
+            );
+        }
+
+        $hasDimensions = null !== $entryWidth && null !== $entryHeight;
+        $sources = [];
+        foreach ($this->formats as $format) {
+            $entries = $this->srcsetGenerator->generateSrcset(
+                transformer: $imageTransformer,
+                image: $image,
+                format: $format,
+                width: $entryWidth,
+                height: $entryHeight,
+                sizes: $sizes,
+                quality: $quality ?? $this->defaultQuality,
+                fit: $fit ?? $this->defaultFit,
+                context: $transformerContext,
+                sourceWidth: $sourceWidth,
+                sourceHeight: $sourceHeight,
+                modifiers: $modifiers,
+            );
+
+            $sources[] = new ImageSource(
+                type: $this->getMimeType($format),
+                srcset: $this->srcsetGenerator->buildSrcsetString($entries),
+                media: $media,
+                sizes: $sizes,
+                width: $hasDimensions ? $entryWidth : null,
+                height: $hasDimensions ? $entryHeight : null,
+            );
+        }
+
+        return $sources;
+    }
+
+    /**
+     * @param array<string, mixed> $entry
+     */
+    private function entryInt(string $media, array $entry, string $key): ?int
+    {
+        $value = $entry[$key] ?? null;
+        if (null !== $value && !is_int($value)) {
+            throw new InvalidTransformationException(sprintf('Art direction "%s": "%s" must be an integer.', $media, $key));
+        }
+
+        return $value;
+    }
+
+    /**
+     * @param array<string, mixed> $entry
+     */
+    private function entryString(string $media, array $entry, string $key): ?string
+    {
+        $value = $entry[$key] ?? null;
+        if (null !== $value && !is_string($value)) {
+            throw new InvalidTransformationException(sprintf('Art direction "%s": "%s" must be a string.', $media, $key));
+        }
+
+        return $value;
+    }
+
+    /**
+     * @param array<string, mixed> $entry
+     *
+     * @return array<string, mixed>|null
+     */
+    private function entryContext(string $media, array $entry): ?array
+    {
+        $value = $entry['context'] ?? null;
+        if (null === $value) {
+            return null;
+        }
+        if (!is_array($value)) {
+            throw new InvalidTransformationException(sprintf('Art direction "%s": "context" must be an array.', $media));
+        }
+
+        $context = [];
+        foreach ($value as $key => $item) {
+            $context[(string) $key] = $item;
+        }
+
+        return $context;
+    }
+
+    /**
+     * @param array<string, mixed> $entry
+     *
+     * @return array<string, int|string>
+     */
+    private function entryModifiers(string $media, array $entry): array
+    {
+        $value = $entry['modifiers'] ?? [];
+        if (!is_array($value)) {
+            throw new InvalidTransformationException(sprintf('Art direction "%s": "modifiers" must be an array.', $media));
+        }
+
+        $modifiers = [];
+        foreach ($value as $key => $item) {
+            if (!is_int($item) && !is_string($item)) {
+                throw new InvalidTransformationException(sprintf('Art direction "%s": modifier "%s" must be an integer or a string.', $media, $key));
+            }
+            $modifiers[(string) $key] = $item;
+        }
+
+        return $modifiers;
     }
 
     private function preload(bool $priority, ImageRenderData $data): ImageRenderData

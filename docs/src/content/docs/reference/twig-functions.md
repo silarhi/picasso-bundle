@@ -37,7 +37,7 @@ All available parameters mirror the `<twig:Picasso:Image>` component:
 `src`, `width`, `height`, `sizes`, `sourceWidth`, `sourceHeight`, `loader`,
 `transformer`, `quality`, `fit`, `placeholder`, `placeholderData`, `priority`,
 `loading`, `fetchPriority`, `unoptimized`, `resolveMetadata`, `context`,
-`attributes`, `route`, `routeParameters`, `preset`, `modifiers`.
+`attributes`, `route`, `routeParameters`, `preset`, `modifiers`, `artDirection`.
 
 See [Component Properties](/reference/component/#properties) for the full reference.
 

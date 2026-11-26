@@ -18,7 +18,7 @@ use function dirname;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 /**
- * Presets and modifiers (with Glide watermarks).
+ * Presets, modifiers (with Glide watermarks), art direction and image-set().
  */
 class AuthoringKernel extends AbstractPicassoKernel
 {

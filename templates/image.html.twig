@@ -30,10 +30,13 @@
     {% else %}
         <picture>
             {% for source in data.sources %}
+                {% set sourceSizes = source.sizes ?? data.sizes %}
                 <source
+                    {% if source.media %}media="{{ source.media }}"{% endif %}
                     type="{{ source.type }}"
                     srcset="{{ source.srcset|picasso_escape_urls }}"
-                    {% if data.sizes %}sizes="{{ data.sizes }}"{% endif %}
+                    {% if sourceSizes %}sizes="{{ sourceSizes }}"{% endif %}
+                    {% if source.width and source.height %}width="{{ source.width }}" height="{{ source.height }}"{% endif %}
                 />
             {% endfor %}
 

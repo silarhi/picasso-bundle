@@ -59,19 +59,24 @@ interface ImageHelperInterface
      *
      * Returns an immutable DTO suitable for both Twig component rendering and JSON API responses.
      *
-     * @param array<string, mixed>       $context         Extra context for the loader
-     * @param array<string, scalar|null> $attributes      Extra HTML attributes (alt, class, …)
-     * @param string|null                $route           Application route serving the image (through ImageServer) instead
-     *                                                    of the bundle's: every srcset candidate and the transformer
-     *                                                    placeholder point at it, with the transformation in the query
-     * @param array<string, mixed>       $routeParameters Parameters of that route
-     * @param array<string, int|string>  $modifiers       Further manipulations, in Glide's vocabulary (flip, or, bri…)
-     * @param string|null                $preset          Named preset (the "presets" configuration) filling the options
-     *                                                    not given
+     * @param array<string, mixed>                $context         Extra context for the loader
+     * @param array<string, scalar|null>          $attributes      Extra HTML attributes (alt, class, …)
+     * @param string|null                         $route           Application route serving the image (through ImageServer) instead
+     *                                                             of the bundle's: every srcset candidate and the transformer
+     *                                                             placeholder point at it, with the transformation in the query
+     * @param array<string, mixed>                $routeParameters Parameters of that route
+     * @param array<string, int|string>           $modifiers       Further manipulations, in Glide's vocabulary (flip, or, bri…)
+     * @param string|null                         $preset          Named preset (the "presets" configuration) filling the options
+     *                                                             not given
+     * @param array<string, array<string, mixed>> $artDirection    Art-directed sources by media query, rendered before the
+     *                                                             image's own: each takes src, context, width, height,
+     *                                                             sourceWidth, sourceHeight, sizes, quality, fit, modifiers
+     *                                                             and preset, and inherits from the image what it omits
      *
      * @throws InvalidRouteException          When the loader is private and no route is given, the transformer cannot
      *                                        serve a route, or a route parameter clashes with a transformation param
-     * @throws InvalidTransformationException When the transformer cannot express a modifier
+     * @throws InvalidTransformationException When the transformer cannot express a modifier, or an art-direction entry
+     *                                        has an unknown key or a value of the wrong type
      * @throws PresetNotFoundException        When a preset is not configured
      */
     public function imageData(
@@ -98,5 +103,6 @@ interface ImageHelperInterface
         array $routeParameters = [],
         array $modifiers = [],
         ?string $preset = null,
+        array $artDirection = [],
     ): ImageRenderData;
 }

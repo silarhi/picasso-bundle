@@ -65,8 +65,8 @@ The JSON response contains everything a frontend needs to render a responsive `<
     "fallbackSrc": "/image/glide/filesystem/hero.jpg?w=1200&h=800&fm=jpg&s=...",
     "fallbackSrcset": "/image/glide/.../hero.jpg?w=640&fm=jpg&s=... 640w, ... 1920w",
     "sources": [
-        { "type": "image/avif", "srcset": "..." },
-        { "type": "image/webp", "srcset": "..." }
+        { "type": "image/avif", "srcset": "...", "media": null, "sizes": null, "width": null, "height": null },
+        { "type": "image/webp", "srcset": "...", "media": null, "sizes": null, "width": null, "height": null }
     ],
     "placeholderUri": "/image/glide/filesystem/hero.jpg?w=10&h=7&fm=jpg&q=30&fit=crop&blur=5&s=...",
     "width": 1200,

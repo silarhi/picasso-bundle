@@ -87,6 +87,12 @@ class ImageComponent
     /** Named preset (the "presets" configuration) filling the props not given. */
     public ?string $preset = null;
 
+    /**
+     * @var array<string, array<string, mixed>> Art-directed sources by media query (e.g. {'(max-width: 640px)': {width: 640,
+     *                                          height: 640, fit: 'crop-50-30'}}): each inherits from the image what it omits
+     */
+    public array $artDirection = [];
+
     // --- Computed state (set in PostMount, used by template) ---
 
     /** @internal */
@@ -136,6 +142,7 @@ class ImageComponent
             routeParameters: $this->routeParameters,
             modifiers: $this->modifiers,
             preset: $this->preset,
+            artDirection: $this->artDirection,
         );
 
         $this->placeholderUri = $data->placeholderUri;

@@ -121,6 +121,7 @@ final readonly class CollectingImageHelper implements ImageHelperInterface
         array $routeParameters = [],
         array $modifiers = [],
         ?string $preset = null,
+        array $artDirection = [],
     ): ImageRenderData {
         $start = microtime(true);
         $data = $this->inner->imageData(
@@ -147,6 +148,7 @@ final readonly class CollectingImageHelper implements ImageHelperInterface
             routeParameters: $routeParameters,
             modifiers: $modifiers,
             preset: $preset,
+            artDirection: $artDirection,
         );
         $duration = (microtime(true) - $start) * 1000;
 

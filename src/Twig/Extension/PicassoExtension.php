@@ -70,12 +70,13 @@ final class PicassoExtension extends AbstractExtension
      *
      * The function-call counterpart of the component, for templates that cannot use the component syntax.
      *
-     * @param array<string, mixed>       $context         Extra context passed to the loader (e.g. entity, field for Vich).
-     * @param array<string, scalar|null> $attributes      extra HTML attributes forwarded to the inner <img> tag (alt, class, id, data-*, …)
-     * @param string|null                $route           Application route serving the image (through ImageServer) instead of the bundle's
-     * @param array<string, mixed>       $routeParameters Parameters of that route
-     * @param array<string, int|string>  $modifiers       Further manipulations, in Glide's vocabulary
-     * @param string|null                $preset          Named preset filling the options not given
+     * @param array<string, mixed>                $context         Extra context passed to the loader (e.g. entity, field for Vich).
+     * @param array<string, scalar|null>          $attributes      extra HTML attributes forwarded to the inner <img> tag (alt, class, id, data-*, …)
+     * @param string|null                         $route           Application route serving the image (through ImageServer) instead of the bundle's
+     * @param array<string, mixed>                $routeParameters Parameters of that route
+     * @param array<string, int|string>           $modifiers       Further manipulations, in Glide's vocabulary
+     * @param string|null                         $preset          Named preset filling the options not given
+     * @param array<string, array<string, mixed>> $artDirection    Art-directed sources by media query
      */
     public function renderImage(
         Environment $env,
@@ -102,6 +103,7 @@ final class PicassoExtension extends AbstractExtension
         array $routeParameters = [],
         array $modifiers = [],
         ?string $preset = null,
+        array $artDirection = [],
     ): string {
         $data = $this->imageHelper->imageData(
             src: $src,
@@ -127,6 +129,7 @@ final class PicassoExtension extends AbstractExtension
             routeParameters: $routeParameters,
             modifiers: $modifiers,
             preset: $preset,
+            artDirection: $artDirection,
         );
 
         return $env->render('@Picasso/image.html.twig', [

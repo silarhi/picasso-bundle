@@ -15,12 +15,15 @@ namespace Silarhi\PicassoBundle\Tests\Functional;
 
 use function assert;
 
+use Psr\Link\LinkInterface;
 use Silarhi\PicassoBundle\Exception\InvalidTransformationException;
 use Silarhi\PicassoBundle\Exception\PresetNotFoundException;
 use Silarhi\PicassoBundle\Service\ImageHelperInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\WebLink\GenericLinkProvider;
 use Twig\Environment;
 
 class AuthoringFeaturesTest extends KernelTestCase
@@ -101,6 +104,74 @@ class AuthoringFeaturesTest extends KernelTestCase
 
         self::assertSame(200, $response->getStatusCode());
         self::assertSame('image/png', $response->headers->get('Content-Type'));
+    }
+
+    // --- Art direction ---
+
+    public function testArtDirectedSourcesComeFirst(): void
+    {
+        $html = $this->render(<<<'TWIG'
+            {{ picasso_image(src='photo.jpg', sizes='100vw', artDirection={
+                '(max-width: 640px)': {width: 30, height: 30, fit: 'crop-50-50'},
+            }) }}
+            TWIG);
+
+        self::assertMatchesRegularExpression(
+            // Responsive candidates are the configured widths, capped to the largest square the 100x50 source holds
+            '#<source\s+media="\(max-width: 640px\)"\s+type="image/webp"\s+srcset="/image/glide/filesystem/photo\.jpg\?w=48&amp;h=48&amp;fm=webp&amp;q=75&amp;fit=crop-50-50&amp;s=[^"]+ 48w, /image/glide/filesystem/photo\.jpg\?w=50&amp;h=50&amp;[^"]+ 50w"\s+sizes="100vw"\s+width="30" height="30"\s*/>'
+            . '\s*<source\s+media="\(max-width: 640px\)"\s+type="image/jpeg"[^>]+/>'
+            . '\s*<source\s+type="image/webp"#',
+            $html,
+        );
+    }
+
+    public function testArtDirectionTakesAPreset(): void
+    {
+        $data = $this->helper()->imageData(src: 'photo.jpg', width: 100, artDirection: ['(orientation: portrait)' => ['preset' => 'square']]);
+
+        self::assertSame('(orientation: portrait)', $data->sources[0]->media);
+        self::assertSame(30, $data->sources[0]->width);
+        self::assertSame(30, $data->sources[0]->height);
+        self::assertStringContainsString('fit=crop-50-50', $data->sources[0]->srcset);
+        self::assertNull($data->sources[2]->media, 'the image\'s own sources follow');
+    }
+
+    public function testArtDirectionInheritsTheImageDimensions(): void
+    {
+        $data = $this->helper()->imageData(src: 'photo.jpg', width: 40, height: 20, artDirection: ['(max-width: 640px)' => ['modifiers' => ['flip' => 'v']]]);
+
+        self::assertSame(40, $data->sources[0]->width);
+        self::assertSame(20, $data->sources[0]->height);
+        self::assertStringContainsString('flip=v', $data->sources[0]->srcset);
+        self::assertStringNotContainsString('flip=v', $data->sources[2]->srcset);
+    }
+
+    public function testUnknownArtDirectionOptionFails(): void
+    {
+        $this->expectException(InvalidTransformationException::class);
+        $this->expectExceptionMessage('Art direction "(max-width: 640px)": unknown option "widht".');
+
+        $this->helper()->imageData(src: 'photo.jpg', artDirection: ['(max-width: 640px)' => ['widht' => 30]]);
+    }
+
+    public function testPriorityArtDirectionPreloadsEachMediaQuery(): void
+    {
+        self::bootKernel();
+        $request = Request::create('/');
+        $requestStack = self::getContainer()->get('request_stack');
+        assert($requestStack instanceof RequestStack);
+        $requestStack->push($request);
+
+        $this->helper()->imageData(src: 'photo.jpg', sizes: '100vw', priority: true, artDirection: ['(max-width: 640px)' => ['width' => 30, 'height' => 30]]);
+
+        $links = $request->attributes->get('_links');
+        assert($links instanceof GenericLinkProvider);
+        $media = [];
+        foreach ($links->getLinks() as $link) {
+            assert($link instanceof LinkInterface);
+            $media[] = $link->getAttributes()['media'] ?? null;
+        }
+        self::assertSame(['(max-width: 640px)', 'not all and (max-width: 640px)'], $media);
     }
 
     private function helper(): ImageHelperInterface

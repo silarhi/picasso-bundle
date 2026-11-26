@@ -43,6 +43,7 @@ The `<twig:Picasso:Image>` component renders a responsive `<picture>` element wi
 | `routeParameters` | `array`        | `[]`    | Parameters of that route                                             |
 | `preset`          | `string`       | —       | Named [preset](/guides/presets/) filling the props not given          |
 | `modifiers`       | `array`        | `[]`    | [Modifiers](/guides/modifiers/) in Glide's vocabulary (`{flip: 'h'}`) |
+| `artDirection`    | `array`        | `[]`    | [Art-directed sources](/guides/art-direction/) by media query         |
 
 ### Automatic Dimension Detection
 

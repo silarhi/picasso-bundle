@@ -10,12 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Presets: name a set of rendering options once under `presets` (`width`, `height`, `sizes`, `quality`, `fit`, `placeholder`, `loader`, `transformer`, `modifiers`), then render with `preset="card"` on the component, any Twig function or `ImageHelperInterface`. Options given explicitly win. An unknown name throws the new `PresetNotFoundException` ([Presets](https://picasso-bundle.silarhi.dev/guides/presets/)).
+- Art direction: `artDirection` (component, `picasso_image()`, `ImageHelperInterface::imageData()`) takes sources by media query, rendered before the image's own, e.g. a square crop on phones: `{'(max-width: 640px)': {width: 640, height: 640, fit: 'crop-50-30'}}`. Each entry inherits from the image what it omits, may name another `src` or a preset, and gets `width` and `height` on its `<source>`. Priority images preload each media query, and the image's own preload is skipped where one of them matches ([Art direction](https://picasso-bundle.silarhi.dev/guides/art-direction/)).
 - Modifiers: `modifiers` takes further manipulations in Glide's vocabulary (`or`, `flip`, `crop`, `bri`, `con`, `gam`, `sharp`, `pixel`, `filt`, `bg`, `border`, `mark*`), e.g. `modifiers="{{ {flip: 'h', sharp: 10} }}"`. Imgix translates them (`flip: both` → `flip=hv`, `filt: greyscale` → `sat=-100`…) and passes its own parameters through. Unknown modifiers, and modifiers naming a param that has an option of its own, throw the new `InvalidTransformationException` ([Modifiers](https://picasso-bundle.silarhi.dev/guides/modifiers/)).
 - Glide watermarks: the `watermarks` transformer option (a directory or a Flysystem storage) holds the images the `mark` modifier names ([Watermarks](https://picasso-bundle.silarhi.dev/guides/modifiers/#watermarks)).
 
 ### Changed
 
-- `ImageHelperInterface::imageUrl()` and `imageData()` take two more optional parameters, `modifiers` and `preset`. Custom implementations of the interface (e.g. decorators) must add them.
+- `ImageHelperInterface::imageUrl()` takes two more optional parameters, `modifiers` and `preset`, `imageData()` three, `modifiers`, `preset` and `artDirection`. Custom implementations of the interface (e.g. decorators) must add them.
+- The `sources` of `ImageRenderData` (and its JSON) have `media`, `sizes`, `width` and `height`, set for art-directed sources and `null` otherwise.
 
 ## [2.7.0] - 2026-10-29
 
