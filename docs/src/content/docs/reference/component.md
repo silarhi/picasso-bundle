@@ -107,7 +107,7 @@ of the given `width` and `height`, like the fallback `src`.
 
 ### Extra HTML Attributes
 
-The component forwards any extra attributes to the inner `<img>` tag:
+The component forwards any extra attributes to the inner `<img>` tag. The `<img>` gets `decoding="async"` unless a `decoding` attribute is given:
 
 ```twig
 <twig:Picasso:Image

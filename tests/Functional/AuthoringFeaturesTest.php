@@ -202,6 +202,7 @@ class AuthoringFeaturesTest extends KernelTestCase
 
         self::assertStringContainsString('data-picasso-placeholder', $html);
         self::assertStringNotContainsString('onload=', $html);
+        self::assertStringContainsString('decoding="async"', $html);
     }
 
     public function testPlaceholderScript(): void
@@ -210,6 +211,14 @@ class AuthoringFeaturesTest extends KernelTestCase
             "<script nonce=\"abc\">document.addEventListener('load',function(e){var t=e.target;if(t.hasAttribute&&t.hasAttribute('data-picasso-placeholder')){t.style.backgroundImage=''}},true)</script>",
             $this->render("{{ picasso_placeholder_script(nonce='abc') }}"),
         );
+    }
+
+    public function testDecodingCanBeOverridden(): void
+    {
+        $html = $this->render("{{ picasso_image(src='photo.jpg', width=40, attributes={decoding: 'sync'}) }}");
+
+        self::assertStringContainsString('decoding="sync"', $html);
+        self::assertStringNotContainsString('decoding="async"', $html);
     }
 
     private function helper(): ImageHelperInterface

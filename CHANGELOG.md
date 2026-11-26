@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Rendered `<img>` tags carry `decoding="async"`, unless a `decoding` attribute is given.
 - `ImageHelperInterface::imageUrl()` takes two more optional parameters, `modifiers` and `preset`, `imageData()` three, `modifiers`, `preset` and `artDirection`, and the interface has a new `imageSet()` method. Custom implementations of the interface (e.g. decorators) must add them.
 - The `sources` of `ImageRenderData` (and its JSON) have `media`, `sizes`, `width` and `height`, set for art-directed sources and `null` otherwise.
 

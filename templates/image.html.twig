@@ -27,6 +27,7 @@
             {% if data.fetchPriority %}fetchpriority="{{ data.fetchPriority }}"{% endif %}
             {% if fullStyle %}style="{{ fullStyle }}"{% endif %}
             {% if data.placeholderUri %}{% if placeholderOnload %}onload="this.style.backgroundImage=''"{% else %}data-picasso-placeholder{% endif %}{% endif %}
+            {% if attributes.decoding is not defined %}decoding="async"{% endif %}
             {% for name, value in extraAttrs %} {{ name }}="{{ value }}"{% endfor %}
         />
     {% else %}
@@ -51,6 +52,7 @@
                 {% if data.fetchPriority %}fetchpriority="{{ data.fetchPriority }}"{% endif %}
                 {% if fullStyle %}style="{{ fullStyle }}"{% endif %}
                 {% if data.placeholderUri %}{% if placeholderOnload %}onload="this.style.backgroundImage=''"{% else %}data-picasso-placeholder{% endif %}{% endif %}
+                {% if attributes.decoding is not defined %}decoding="async"{% endif %}
                 {% for name, value in extraAttrs %} {{ name }}="{{ value }}"{% endfor %}
             />
         </picture>
