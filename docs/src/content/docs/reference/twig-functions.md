@@ -37,7 +37,7 @@ All available parameters mirror the `<twig:Picasso:Image>` component:
 `src`, `width`, `height`, `sizes`, `sourceWidth`, `sourceHeight`, `loader`,
 `transformer`, `quality`, `fit`, `placeholder`, `placeholderData`, `priority`,
 `loading`, `fetchPriority`, `unoptimized`, `resolveMetadata`, `context`,
-`attributes`, `route`, `routeParameters`.
+`attributes`, `route`, `routeParameters`, `modifiers`.
 
 See [Component Properties](/reference/component/#properties) for the full reference.
 
@@ -89,3 +89,4 @@ All available parameters:
 | `context`         | `array`  | Extra context for the loader                                         |
 | `route`           | `string` | Your route serving the image (see [Private Images](/guides/private-images/)) |
 | `routeParameters` | `array`  | Parameters of that route                                             |
+| `modifiers`       | `array`  | [Modifiers](/guides/modifiers/) in Glide's vocabulary                |

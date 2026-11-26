@@ -48,6 +48,7 @@ final readonly class CollectingImageHelper implements ImageHelperInterface
         array $context = [],
         ?string $route = null,
         array $routeParameters = [],
+        array $modifiers = [],
     ): string {
         $start = microtime(true);
         $url = $this->inner->imageUrl(
@@ -64,6 +65,7 @@ final readonly class CollectingImageHelper implements ImageHelperInterface
             context: $context,
             route: $route,
             routeParameters: $routeParameters,
+            modifiers: $modifiers,
         );
         $duration = (microtime(true) - $start) * 1000;
 
@@ -81,6 +83,7 @@ final readonly class CollectingImageHelper implements ImageHelperInterface
                 fit: $fit,
                 blur: $blur,
                 dpr: $dpr,
+                modifiers: $modifiers,
             ),
             url: $url,
             duration: $duration,
@@ -112,6 +115,7 @@ final readonly class CollectingImageHelper implements ImageHelperInterface
         array $attributes = [],
         ?string $route = null,
         array $routeParameters = [],
+        array $modifiers = [],
     ): ImageRenderData {
         $start = microtime(true);
         $data = $this->inner->imageData(
@@ -136,6 +140,7 @@ final readonly class CollectingImageHelper implements ImageHelperInterface
             attributes: $attributes,
             route: $route,
             routeParameters: $routeParameters,
+            modifiers: $modifiers,
         );
         $duration = (microtime(true) - $start) * 1000;
 

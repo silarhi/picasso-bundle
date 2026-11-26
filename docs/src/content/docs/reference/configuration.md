@@ -126,6 +126,7 @@ picasso:
             cache: '%kernel.project_dir%/var/glide-cache' # local path OR a Flysystem storage name (e.g. 'thumbs.storage')
             driver: gd # gd | imagick | vips
             max_image_size: ~ # optional max pixel count
+            watermarks: ~ # directory OR Flysystem storage name holding the images the "mark" modifier names
             base_url: ~ # optional scheme + host prepended to image URLs, e.g. a CDN
             defer_cache_write: false # store a cache miss after the response is sent
             url_alias: ~ # name of this transformer in image URLs (see Routes)

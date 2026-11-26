@@ -40,6 +40,7 @@ use Silarhi\PicassoBundle\Exception\ImageNotFoundException;
 use Silarhi\PicassoBundle\Exception\ImageSourceUnavailableException;
 use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
 use Silarhi\PicassoBundle\Exception\InvalidRouteException;
+use Silarhi\PicassoBundle\Exception\InvalidTransformationException;
 use Silarhi\PicassoBundle\Exception\LoaderNotFoundException;
 use Silarhi\PicassoBundle\Exception\PurgeException;
 use Silarhi\PicassoBundle\Exception\TransformerNotFoundException;
@@ -66,10 +67,34 @@ use Throwable;
 final readonly class GlideTransformer implements LocalTransformerInterface, PurgableTransformerInterface
 {
     /**
+     * Glide params a transformation may set through its modifiers: every Glide
+     * manipulation the bundle does not map from an option of its own, except
+     * Glide's presets ("p"), which would hide the transformation from the URL.
+     *
+     * @see https://glide.thephpleague.com/2.0/api/quick-reference/
+     */
+    public const MODIFIERS = [
+        'or', 'flip', 'crop', 'bri', 'con', 'gam', 'sharp', 'pixel', 'filt', 'bg', 'border',
+        'mark', 'markw', 'markh', 'markx', 'marky', 'markpad', 'markpos', 'markalpha', 'markfit',
+    ];
+
+    /**
+     * Params Glide reads from options of the transformation (width, format…),
+     * never from its modifiers.
+     */
+    private const OPTION_PARAMS = ['w', 'h', 'fm', 'q', 'fit', 'blur', 'dpr'];
+
+    /**
      * Transformation params {@see mapToGlideParams()} can emit. Used to tell a
      * public-cache params segment apart from a plain image filename.
      */
-    private const TRANSFORMATION_PARAMS = ['w', 'h', 'fm', 'q', 'fit', 'blur', 'dpr'];
+    private const TRANSFORMATION_PARAMS = [...self::OPTION_PARAMS, ...self::MODIFIERS];
+
+    /**
+     * Characters a modifier value may hold in public-cache mode, where params are
+     * stored in the variant filename: "," separates params and "/" directories.
+     */
+    private const PUBLIC_CACHE_VALUE = '/^[A-Za-z0-9._-]+$/';
 
     /**
      * Route parameters that would collide with the query string of a routed image
@@ -144,6 +169,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
     private string $cachePrefix;
     private FilesystemOperator $cacheStorage;
     private UrlTemplates $urlTemplates;
+    private bool $hasWatermarks;
 
     /**
      * Local directory a miss is rendered to when cache writes are deferred. Only
@@ -165,6 +191,8 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
      * @param float                    $lockTtl             Seconds a render lock outlives a crashed renderer
      * @param float                    $lockWait            Seconds a miss waits for the render in progress of the same
      *                                                      variant before rendering it itself
+     * @param string|null              $watermarks          Local directory or Flysystem storage name holding the images the
+     *                                                      "mark" modifier names; null disables watermarks
      *
      * @throws InvalidConfigurationException When there is no sign key, or one is empty
      */
@@ -183,6 +211,7 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
         private ?LockFactory $lockFactory = null,
         private float $lockTtl = 30.0,
         private float $lockWait = 10.0,
+        ?string $watermarks = null,
     ) {
         $this->signature = new GlideSignature($signKey);
         $this->urlTemplates = new UrlTemplates($router);
@@ -210,6 +239,13 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
 
         if (null !== $maxImageSize) {
             $serverConfig['max_image_size'] = $maxImageSize;
+        }
+
+        $this->hasWatermarks = null !== $watermarks && '' !== $watermarks;
+        if (null !== $watermarks && '' !== $watermarks) {
+            $serverConfig['watermarks'] = $flysystemRegistry instanceof FlysystemRegistry && $flysystemRegistry->has($watermarks)
+                ? $flysystemRegistry->get($watermarks)
+                : $watermarks;
         }
 
         $this->server = ServerFactory::create($serverConfig);
@@ -700,6 +736,13 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
                 fit: $this->stringParam($params, 'fit'),
                 blur: $this->intParam($params, 'blur'),
                 dpr: $this->intParam($params, 'dpr'),
+                modifiers: array_map(
+                    strval(...),
+                    array_filter(
+                        array_intersect_key($params, array_flip(self::MODIFIERS)),
+                        is_scalar(...),
+                    ),
+                ),
             ),
             $context,
         );
@@ -838,6 +881,35 @@ final readonly class GlideTransformer implements LocalTransformerInterface, Purg
             $glide['dpr'] = $transformation->dpr;
         }
 
+        foreach ($transformation->modifiers as $key => $value) {
+            $glide[$key] = $this->checkModifier($key, $value);
+        }
+
         return $glide;
+    }
+
+    /**
+     * @throws InvalidTransformationException When the modifier is not a Glide manipulation the bundle lets through,
+     *                                        or its value cannot be stored in a public-cache filename
+     */
+    private function checkModifier(string $key, int|string $value): int|string
+    {
+        if (in_array($key, self::OPTION_PARAMS, true)) {
+            throw new InvalidTransformationException(sprintf('The "%s" modifier is set by its own option (width, height, format, quality, fit, blur, dpr): use the option instead.', $key));
+        }
+
+        if (!in_array($key, self::MODIFIERS, true)) {
+            throw new InvalidTransformationException(sprintf('Unknown Glide modifier "%s". Known modifiers: "%s".', $key, implode('", "', self::MODIFIERS)));
+        }
+
+        if (!$this->hasWatermarks && str_starts_with($key, 'mark')) {
+            throw new InvalidTransformationException(sprintf('The "%s" modifier needs watermarks: set the "watermarks" option of the Glide transformer to the directory or Flysystem storage holding them.', $key));
+        }
+
+        if ($this->isPublicCacheEnabled() && 1 !== preg_match(self::PUBLIC_CACHE_VALUE, (string) $value)) {
+            throw new InvalidTransformationException(sprintf('The "%s" modifier value "%s" cannot be stored in a public-cache filename: only letters, digits, ".", "_" and "-" can.', $key, $value));
+        }
+
+        return $value;
     }
 }

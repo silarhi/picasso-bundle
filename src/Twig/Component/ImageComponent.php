@@ -81,6 +81,9 @@ class ImageComponent
     /** @var array<string, mixed> Parameters of the route. */
     public array $routeParameters = [];
 
+    /** @var array<string, int|string> Further manipulations, in Glide's vocabulary (e.g. {flip: 'h', sharp: 10}). */
+    public array $modifiers = [];
+
     // --- Computed state (set in PostMount, used by template) ---
 
     /** @internal */
@@ -128,6 +131,7 @@ class ImageComponent
             context: $this->context,
             route: $this->route,
             routeParameters: $this->routeParameters,
+            modifiers: $this->modifiers,
         );
 
         $this->placeholderUri = $data->placeholderUri;

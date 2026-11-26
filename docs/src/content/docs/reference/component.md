@@ -41,6 +41,7 @@ The `<twig:Picasso:Image>` component renders a responsive `<picture>` element wi
 | `context`         | `array`        | `[]`    | Extra context for the loader (e.g. Vich)                             |
 | `route`           | `string`       | —       | Your route serving the image (see [Private Images](/guides/private-images/)) |
 | `routeParameters` | `array`        | `[]`    | Parameters of that route                                             |
+| `modifiers`       | `array`        | `[]`    | [Modifiers](/guides/modifiers/) in Glide's vocabulary (`{flip: 'h'}`) |
 
 ### Automatic Dimension Detection
 

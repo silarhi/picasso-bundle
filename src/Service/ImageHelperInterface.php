@@ -15,19 +15,22 @@ namespace Silarhi\PicassoBundle\Service;
 
 use Silarhi\PicassoBundle\Dto\ImageRenderData;
 use Silarhi\PicassoBundle\Exception\InvalidRouteException;
+use Silarhi\PicassoBundle\Exception\InvalidTransformationException;
 
 interface ImageHelperInterface
 {
     /**
      * Generate a single image URL with named parameters.
      *
-     * @param array<string, mixed> $context         Extra context passed to the loader (e.g. entity, field for Vich).
-     * @param string|null          $route           Application route serving the image (through ImageServer) instead of the
-     *                                              bundle's: generated URLs point at it, with the transformation in the query
-     * @param array<string, mixed> $routeParameters Parameters of that route
+     * @param array<string, mixed>      $context         Extra context passed to the loader (e.g. entity, field for Vich).
+     * @param string|null               $route           Application route serving the image (through ImageServer) instead of the
+     *                                                   bundle's: generated URLs point at it, with the transformation in the query
+     * @param array<string, mixed>      $routeParameters Parameters of that route
+     * @param array<string, int|string> $modifiers       Further manipulations, in Glide's vocabulary (flip, or, bri…)
      *
-     * @throws InvalidRouteException When the loader is private and no route is given, the transformer cannot serve a
-     *                               route, or a route parameter clashes with a transformation param
+     * @throws InvalidRouteException          When the loader is private and no route is given, the transformer cannot
+     *                                        serve a route, or a route parameter clashes with a transformation param
+     * @throws InvalidTransformationException When the transformer cannot express a modifier
      */
     public function imageUrl(
         string $path,
@@ -43,6 +46,7 @@ interface ImageHelperInterface
         array $context = [],
         ?string $route = null,
         array $routeParameters = [],
+        array $modifiers = [],
     ): string;
 
     /**
@@ -56,9 +60,11 @@ interface ImageHelperInterface
      *                                                    of the bundle's: every srcset candidate and the transformer
      *                                                    placeholder point at it, with the transformation in the query
      * @param array<string, mixed>       $routeParameters Parameters of that route
+     * @param array<string, int|string>  $modifiers       Further manipulations, in Glide's vocabulary (flip, or, bri…)
      *
-     * @throws InvalidRouteException When the loader is private and no route is given, the transformer cannot serve a
-     *                               route, or a route parameter clashes with a transformation param
+     * @throws InvalidRouteException          When the loader is private and no route is given, the transformer cannot
+     *                                        serve a route, or a route parameter clashes with a transformation param
+     * @throws InvalidTransformationException When the transformer cannot express a modifier
      */
     public function imageData(
         ?string $src = null,
@@ -82,5 +88,6 @@ interface ImageHelperInterface
         array $attributes = [],
         ?string $route = null,
         array $routeParameters = [],
+        array $modifiers = [],
     ): ImageRenderData;
 }

@@ -51,9 +51,10 @@ final readonly class ImageHelper implements ImageHelperInterface
     /**
      * Generate a single image URL with named parameters.
      *
-     * @param array<string, mixed> $context         Extra context passed to the loader (e.g. entity, field for Vich).
-     * @param string|null          $route           Application route serving the image (through ImageServer) instead of the bundle's
-     * @param array<string, mixed> $routeParameters Parameters of that route
+     * @param array<string, mixed>      $context         Extra context passed to the loader (e.g. entity, field for Vich).
+     * @param string|null               $route           Application route serving the image (through ImageServer) instead of the bundle's
+     * @param array<string, mixed>      $routeParameters Parameters of that route
+     * @param array<string, int|string> $modifiers       Further manipulations, in Glide's vocabulary
      */
     public function imageUrl(
         string $path,
@@ -69,6 +70,7 @@ final readonly class ImageHelper implements ImageHelperInterface
         array $context = [],
         ?string $route = null,
         array $routeParameters = [],
+        array $modifiers = [],
     ): string {
         $transformation = new ImageTransformation(
             width: $width,
@@ -78,6 +80,7 @@ final readonly class ImageHelper implements ImageHelperInterface
             fit: $fit ?? $this->defaultFit,
             blur: $blur,
             dpr: $dpr,
+            modifiers: $modifiers,
         );
 
         return $this->pipeline->url(new ImageReference($path, $context), $transformation, $loader, $transformer, $route, $routeParameters);
@@ -92,6 +95,7 @@ final readonly class ImageHelper implements ImageHelperInterface
      * @param array<string, scalar|null> $attributes      Extra HTML attributes (alt, class, …)
      * @param string|null                $route           Application route serving the image (through ImageServer) instead of the bundle's
      * @param array<string, mixed>       $routeParameters Parameters of that route
+     * @param array<string, int|string>  $modifiers       Further manipulations, in Glide's vocabulary
      */
     public function imageData(
         ?string $src = null,
@@ -115,6 +119,7 @@ final readonly class ImageHelper implements ImageHelperInterface
         array $attributes = [],
         ?string $route = null,
         array $routeParameters = [],
+        array $modifiers = [],
     ): ImageRenderData {
         $loading ??= $priority ? 'eager' : 'lazy';
         $fetchPriority ??= $priority ? 'high' : null;
@@ -164,12 +169,12 @@ final readonly class ImageHelper implements ImageHelperInterface
         $placeholderUri = $this->generatePlaceholder(
             $image, $transformerContext,
             $priority, $placeholderData, $placeholderName,
-            $width, $height, $quality, $fit,
+            $width, $height, $quality, $fit, $modifiers,
         );
 
         [$sources, $fallbackSrc, $fallbackSrcset] = $this->generateSources(
             $imageTransformer, $image, $transformerContext,
-            $resolvedSourceWidth, $resolvedSourceHeight, $width, $height, $sizes, $quality, $fit,
+            $resolvedSourceWidth, $resolvedSourceHeight, $width, $height, $sizes, $quality, $fit, $modifiers,
         );
 
         return $this->preload($priority, new ImageRenderData(
@@ -276,7 +281,8 @@ final readonly class ImageHelper implements ImageHelperInterface
     }
 
     /**
-     * @param TransformerContext $transformerContext
+     * @param TransformerContext        $transformerContext
+     * @param array<string, int|string> $modifiers
      */
     private function generatePlaceholder(
         Image $image,
@@ -288,6 +294,7 @@ final readonly class ImageHelper implements ImageHelperInterface
         ?int $height,
         ?int $quality,
         ?string $fit,
+        array $modifiers,
     ): ?string {
         if ($priority) {
             return null;
@@ -305,6 +312,7 @@ final readonly class ImageHelper implements ImageHelperInterface
                     height: $height,
                     quality: $quality ?? $this->defaultQuality,
                     fit: $fit ?? $this->defaultFit,
+                    modifiers: $modifiers,
                 ), $transformerContext);
         }
 
@@ -312,7 +320,8 @@ final readonly class ImageHelper implements ImageHelperInterface
     }
 
     /**
-     * @param TransformerContext $transformerContext
+     * @param TransformerContext        $transformerContext
+     * @param array<string, int|string> $modifiers
      *
      * @return array{0: ImageSource[], 1: string|null, 2: string|null} [sources, fallbackSrc, fallbackSrcset]
      */
@@ -327,6 +336,7 @@ final readonly class ImageHelper implements ImageHelperInterface
         ?string $sizes,
         ?int $quality,
         ?string $fit,
+        array $modifiers,
     ): array {
         $quality ??= $this->defaultQuality;
         $fit ??= $this->defaultFit;
@@ -350,6 +360,7 @@ final readonly class ImageHelper implements ImageHelperInterface
                 context: $transformerContext,
                 sourceWidth: $sourceWidth,
                 sourceHeight: $sourceHeight,
+                modifiers: $modifiers,
             );
 
             $srcsetString = $this->srcsetGenerator->buildSrcsetString($entries);
@@ -365,6 +376,7 @@ final readonly class ImageHelper implements ImageHelperInterface
                     quality: $quality,
                     fit: $fit,
                     context: $transformerContext,
+                    modifiers: $modifiers,
                 );
             } else {
                 $sources[] = new ImageSource(

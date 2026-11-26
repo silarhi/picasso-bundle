@@ -5,6 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.0] - Unreleased
+
+### Added
+
+- Modifiers: `modifiers` takes further manipulations in Glide's vocabulary (`or`, `flip`, `crop`, `bri`, `con`, `gam`, `sharp`, `pixel`, `filt`, `bg`, `border`, `mark*`), e.g. `modifiers="{{ {flip: 'h', sharp: 10} }}"`. Imgix translates them (`flip: both` → `flip=hv`, `filt: greyscale` → `sat=-100`…) and passes its own parameters through. Unknown modifiers, and modifiers naming a param that has an option of its own, throw the new `InvalidTransformationException` ([Modifiers](https://picasso-bundle.silarhi.dev/guides/modifiers/)).
+- Glide watermarks: the `watermarks` transformer option (a directory or a Flysystem storage) holds the images the `mark` modifier names ([Watermarks](https://picasso-bundle.silarhi.dev/guides/modifiers/#watermarks)).
+
+### Changed
+
+- `ImageHelperInterface::imageUrl()` and `imageData()` take one more optional parameter, `modifiers`. Custom implementations of the interface (e.g. decorators) must add them.
+
 ## [2.7.0] - 2026-10-29
 
 ### Security
@@ -249,6 +260,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release.
 
+[2.8.0]: https://github.com/silarhi/picasso-bundle/compare/v2.7.0...HEAD
 [2.7.0]: https://github.com/silarhi/picasso-bundle/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/silarhi/picasso-bundle/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/silarhi/picasso-bundle/compare/v2.4.0...v2.5.0

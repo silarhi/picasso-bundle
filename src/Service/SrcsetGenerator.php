@@ -63,7 +63,8 @@ class SrcsetGenerator
     /**
      * Generate srcset entries for a given image and format.
      *
-     * @param TransformerContext $context
+     * @param TransformerContext        $context
+     * @param array<string, int|string> $modifiers
      *
      * @return SrcsetEntry[]
      */
@@ -79,6 +80,7 @@ class SrcsetGenerator
         array $context = [],
         ?int $sourceWidth = null,
         ?int $sourceHeight = null,
+        array $modifiers = [],
     ): array {
         $quality ??= $this->defaultQuality;
         $fit ??= $this->defaultFit;
@@ -114,6 +116,7 @@ class SrcsetGenerator
                 format: $format,
                 quality: $quality,
                 fit: $fit,
+                modifiers: $modifiers,
             );
 
             $url = $transformer->url($image, $transformation, $context);
@@ -141,7 +144,8 @@ class SrcsetGenerator
     /**
      * Get the fallback src URL.
      *
-     * @param TransformerContext $context
+     * @param TransformerContext        $context
+     * @param array<string, int|string> $modifiers
      */
     public function getFallbackUrl(
         ImageTransformerInterface $transformer,
@@ -152,6 +156,7 @@ class SrcsetGenerator
         ?int $quality = null,
         ?string $fit = null,
         array $context = [],
+        array $modifiers = [],
     ): string {
         $quality ??= $this->defaultQuality;
         $fit ??= $this->defaultFit;
@@ -162,6 +167,7 @@ class SrcsetGenerator
             format: $format,
             quality: $quality,
             fit: $fit,
+            modifiers: $modifiers,
         ), $context);
     }
 }

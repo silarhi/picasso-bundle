@@ -74,6 +74,7 @@ final class PicassoExtension extends AbstractExtension
      * @param array<string, scalar|null> $attributes      extra HTML attributes forwarded to the inner <img> tag (alt, class, id, data-*, …)
      * @param string|null                $route           Application route serving the image (through ImageServer) instead of the bundle's
      * @param array<string, mixed>       $routeParameters Parameters of that route
+     * @param array<string, int|string>  $modifiers       Further manipulations, in Glide's vocabulary
      */
     public function renderImage(
         Environment $env,
@@ -98,6 +99,7 @@ final class PicassoExtension extends AbstractExtension
         array $attributes = [],
         ?string $route = null,
         array $routeParameters = [],
+        array $modifiers = [],
     ): string {
         $data = $this->imageHelper->imageData(
             src: $src,
@@ -121,6 +123,7 @@ final class PicassoExtension extends AbstractExtension
             attributes: $attributes,
             route: $route,
             routeParameters: $routeParameters,
+            modifiers: $modifiers,
         );
 
         return $env->render('@Picasso/image.html.twig', [

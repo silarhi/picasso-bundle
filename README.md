@@ -111,6 +111,7 @@ PicassoBundle solves this the same way Next.js Image did for React:
 - **Blur placeholders** — built-in LQIP and [BlurHash](https://blurha.sh/) support for instant perceived loading
 - **Smart dimension detection** — reads image dimensions from the stream automatically, preserves aspect ratio
 - **Priority images** — one prop for `loading="eager"` + `fetchpriority="high"` (LCP optimization)
+- **Modifiers and watermarks** — rotate, flip, crop, adjust colours and watermark, translated for Imgix too
 - **Multiple image sources** — Local filesystem, [Flysystem](https://flysystem.thephpleague.com/) (S3, GCS, Azure),
   [VichUploaderBundle](https://github.com/dustin10/VichUploaderBundle), remote URLs, AssetMapper assets
 - **Local or CDN transforms** —
@@ -193,7 +194,7 @@ placeholder — all automatically. Placeholders are opt-in: without the
 
 Everything else is on **[picasso-bundle.silarhi.dev](https://picasso-bundle.silarhi.dev)**:
 
-- **Guides**: [responsive images](https://picasso-bundle.silarhi.dev/guides/responsive-images/), [fit modes](https://picasso-bundle.silarhi.dev/guides/fit-modes/), [placeholders](https://picasso-bundle.silarhi.dev/guides/placeholders/), [priority images](https://picasso-bundle.silarhi.dev/guides/priority-images/), [private images](https://picasso-bundle.silarhi.dev/guides/private-images/), [cache purge](https://picasso-bundle.silarhi.dev/guides/cache-purge/), [JSON API](https://picasso-bundle.silarhi.dev/guides/json-api/)
+- **Guides**: [responsive images](https://picasso-bundle.silarhi.dev/guides/responsive-images/), [fit modes](https://picasso-bundle.silarhi.dev/guides/fit-modes/), [placeholders](https://picasso-bundle.silarhi.dev/guides/placeholders/), [priority images](https://picasso-bundle.silarhi.dev/guides/priority-images/), [private images](https://picasso-bundle.silarhi.dev/guides/private-images/), [modifiers](https://picasso-bundle.silarhi.dev/guides/modifiers/), [cache purge](https://picasso-bundle.silarhi.dev/guides/cache-purge/), [JSON API](https://picasso-bundle.silarhi.dev/guides/json-api/)
 - **Image sources**: [filesystem](https://picasso-bundle.silarhi.dev/sources/filesystem/), [Flysystem](https://picasso-bundle.silarhi.dev/sources/flysystem/), [VichUploaderBundle](https://picasso-bundle.silarhi.dev/sources/vichuploader/), [AssetMapper](https://picasso-bundle.silarhi.dev/sources/asset-mapper/), [remote URLs](https://picasso-bundle.silarhi.dev/sources/remote-urls/), [chain](https://picasso-bundle.silarhi.dev/sources/chain/), [custom](https://picasso-bundle.silarhi.dev/sources/custom/)
 - **Transformers**: [Glide](https://picasso-bundle.silarhi.dev/transformers/glide/), [Imgix](https://picasso-bundle.silarhi.dev/transformers/imgix/), [serving from a CDN](https://picasso-bundle.silarhi.dev/transformers/cdn/), [custom](https://picasso-bundle.silarhi.dev/transformers/custom/)
 - **Reference**: [configuration](https://picasso-bundle.silarhi.dev/reference/configuration/), [component](https://picasso-bundle.silarhi.dev/reference/component/), [Twig functions](https://picasso-bundle.silarhi.dev/reference/twig-functions/), [routes](https://picasso-bundle.silarhi.dev/reference/routes/)

@@ -440,6 +440,7 @@ final class PicassoBundle extends AbstractBundle
                                 ->end()
                             ->end()
                             ->integerNode('max_image_size')->defaultNull()->info('Max image size for glide.')->end()
+                            ->scalarNode('watermarks')->defaultNull()->info('Glide: directory or Flysystem storage name holding the watermark images the "mark" modifier names.')->end()
                             ->scalarNode('base_url')->defaultNull()->info('Imgix: source domain (e.g. https://my-source.imgix.net). Glide: optional scheme and host prepended to generated image URLs, e.g. a CDN (https://img.example.com).')->end()
                             ->scalarNode('api_key')->defaultNull()->info('Imgix API key for cache purge operations.')->end()
                             ->scalarNode('http_client')->defaultNull()->info('PSR-18 HTTP client service ID for imgix purge.')->end()
@@ -509,7 +510,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_fit: string,
          *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int|null, quality: int|null, fit: string|null, format: string|null, components_x: int, components_y: int, driver: string, service: string|null}>,
          *     loaders: array<string, array{enabled: bool, type: string|null, path: string|null, paths: mixed, loaders: list<string>, mapping: string|null, storage: string|null, http_client: string|null, request_factory: string|null, allowed_hosts: list<string>, default_placeholder: string|null, default_transformer: string|null, url_alias: string|null, private: bool, resolve_metadata: bool|null}>,
-         *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|list<string>|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, api_key: string|null, http_client: string|null, request_factory: string|null, stream_factory: string|null, service: string|null, url_alias: string|null, defer_cache_write: bool, lock: array{enabled: bool, factory: string, ttl: float|int, wait: float|int}, public_cache: array{enabled: bool, prefix: string}}>
+         *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|list<string>|null, cache: string|null, driver: string, max_image_size: int|null, watermarks: string|null, base_url: string|null, api_key: string|null, http_client: string|null, request_factory: string|null, stream_factory: string|null, service: string|null, url_alias: string|null, defer_cache_write: bool, lock: array{enabled: bool, factory: string, ttl: float|int, wait: float|int}, public_cache: array{enabled: bool, prefix: string}}>
          * } $config
          */
         $services = $container->services();
@@ -769,6 +770,7 @@ final class PicassoBundle extends AbstractBundle
                             $transformerConfig['lock']['enabled'] ? service($transformerConfig['lock']['factory']) : null,
                             (float) $transformerConfig['lock']['ttl'],
                             (float) $transformerConfig['lock']['wait'],
+                            $transformerConfig['watermarks'],
                         ])
                         ->tag('picasso.transformer', $tag);
                     $glideTransformers[$name] = service('picasso.transformer.' . $name);

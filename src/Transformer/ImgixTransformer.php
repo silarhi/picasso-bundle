@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Transformer;
 
+use function array_slice;
+use function count;
 use function in_array;
 
 use Psr\Http\Client\ClientInterface;
@@ -22,6 +24,7 @@ use SensitiveParameter;
 use Silarhi\PicassoBundle\Dto\Image;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
 use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
+use Silarhi\PicassoBundle\Exception\InvalidTransformationException;
 use Silarhi\PicassoBundle\Exception\PurgeException;
 
 use function sprintf;
@@ -36,6 +39,27 @@ use Throwable;
 final readonly class ImgixTransformer implements PurgableTransformerInterface
 {
     private const PURGE_API_URL = 'https://api.imgix.com/api/v1/purge';
+
+    /**
+     * Params Imgix reads from options of the transformation (width, format…),
+     * never from its modifiers.
+     */
+    private const OPTION_PARAMS = ['w', 'h', 'fm', 'q', 'fit', 'crop', 'fp-x', 'fp-y', 'fp-z', 'blur', 'dpr', 's'];
+
+    /**
+     * Glide watermark modifiers and the Imgix params they become. "mark" names the
+     * watermark image: an absolute URL for Imgix, a path in the watermarks storage for Glide.
+     */
+    private const MARK_PARAMS = [
+        'mark' => 'mark',
+        'markw' => 'mark-w',
+        'markh' => 'mark-h',
+        'markx' => 'mark-x',
+        'marky' => 'mark-y',
+        'markpad' => 'mark-pad',
+        'markalpha' => 'mark-alpha',
+        'markfit' => 'mark-fit',
+    ];
 
     public function __construct(
         private string $baseUrl,
@@ -134,7 +158,70 @@ final readonly class ImgixTransformer implements PurgableTransformerInterface
             $imgix['dpr'] = $transformation->dpr;
         }
 
+        foreach ($transformation->modifiers as $key => $value) {
+            $imgix = [...$imgix, ...$this->mapModifier($key, $value)];
+        }
+
         return $imgix;
+    }
+
+    /**
+     * Map a modifier, in Glide's vocabulary, to Imgix params. Other modifiers are Imgix params, passed through
+     * unchanged (e.g. "auto" => "compress").
+     *
+     * @see https://glide.thephpleague.com/2.0/api/quick-reference/
+     *
+     * @return TransformerParams
+     *
+     * @throws InvalidTransformationException When the modifier is set by an option, or Imgix has no equivalent
+     */
+    private function mapModifier(string $key, int|string $value): array
+    {
+        if (isset(self::MARK_PARAMS[$key])) {
+            return [self::MARK_PARAMS[$key] => $value];
+        }
+
+        $string = (string) $value;
+
+        return match ($key) {
+            // Glide rotates counter-clockwise; Imgix's degree aliases are Exif orientations, rotating clockwise
+            'or' => match ($string) {
+                'auto' => [],
+                '0' => ['orient' => 1],
+                '90' => ['orient' => 270],
+                '180' => ['orient' => 180],
+                '270' => ['orient' => 90],
+                default => throw new InvalidTransformationException(sprintf('Invalid "or" modifier "%s": use "auto", "0", "90", "180" or "270".', $string)),
+            },
+            'flip' => ['flip' => 'both' === $string ? 'hv' : $string],
+            // Glide: "width,height,x,y"; Imgix: "x,y,width,height"
+            'crop' => ['rect' => $this->mapCropRectangle($string)],
+            'pixel' => ['px' => $value],
+            'filt' => match ($string) {
+                'greyscale' => ['sat' => -100],
+                'sepia' => ['sepia' => 100],
+                default => throw new InvalidTransformationException(sprintf('The "filt" modifier "%s" has no Imgix equivalent: use "greyscale" or "sepia".', $string)),
+            },
+            // Glide: "width,color,method"; Imgix: "width,color"
+            'border' => ['border' => implode(',', array_slice(explode(',', $string), 0, 2))],
+            'markpos' => ['mark-align' => 'center' === $string ? 'middle,center' : str_replace('-', ',', $string)],
+            'gam' => throw new InvalidTransformationException('The "gam" modifier has no Imgix equivalent: Glide\'s takes 0.1 to 9.99, Imgix\'s -100 to 100.'),
+            default => in_array($key, self::OPTION_PARAMS, true)
+                ? throw new InvalidTransformationException(sprintf('The "%s" modifier is set by its own option (width, height, format, quality, fit, blur, dpr): use the option instead.', $key)) : [$key => $value],
+        };
+    }
+
+    /**
+     * @throws InvalidTransformationException When the value is not "width,height,x,y"
+     */
+    private function mapCropRectangle(string $rectangle): string
+    {
+        $parts = explode(',', $rectangle);
+        if (4 !== count($parts)) {
+            throw new InvalidTransformationException(sprintf('Invalid "crop" modifier "%s": use "width,height,x,y".', $rectangle));
+        }
+
+        return implode(',', [$parts[2], $parts[3], $parts[0], $parts[1]]);
     }
 
     /**

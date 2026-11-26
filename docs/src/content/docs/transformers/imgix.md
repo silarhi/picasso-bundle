@@ -17,3 +17,5 @@ picasso:
 ```
 
 Imgix fetches the sources itself: no route to import, no local processing. See [Cache purge](/guides/cache-purge/#imgix) to purge its caches.
+
+Templates keep Glide's vocabulary whatever the transformer: [fit values](/guides/fit-modes/) (focal points included) and [modifiers](/guides/modifiers/#available-modifiers) are translated to Imgix parameters (`flip: both` becomes `flip=hv`, `filt: greyscale` becomes `sat=-100`…). A modifier outside Glide's vocabulary is passed through as an Imgix parameter, e.g. `{auto: 'compress'}`.
