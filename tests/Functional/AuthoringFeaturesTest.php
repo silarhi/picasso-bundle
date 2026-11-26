@@ -227,16 +227,36 @@ class AuthoringFeaturesTest extends KernelTestCase
 
     // --- Commands ---
 
-    public function testPurgeDeletesTheCachedVariants(): void
+    public function testWarmupRendersTheVariantsAndPurgeDeletesThem(): void
     {
         $kernel = self::bootKernel();
         $cache = $kernel->getCacheDir() . '/glide/photo.jpg';
-        self::assertSame(200, $kernel->handle(Request::create($this->helper()->imageUrl('photo.jpg', width: 40)))->getStatusCode());
+
+        $warmup = $this->command($kernel, 'picasso:warmup');
+        self::assertSame(Command::SUCCESS, $warmup->execute(['paths' => ['photo.jpg'], '--preset' => ['card']]));
+        // 2 candidates × 2 formats, the jpg 1x one being the fallback, and the placeholder
+        self::assertStringContainsString('Served 5 variants of 1 image.', $warmup->getDisplay());
         self::assertDirectoryExists($cache);
 
         $purge = $this->command($kernel, 'picasso:purge');
         self::assertSame(Command::SUCCESS, $purge->execute(['paths' => ['photo.jpg']]));
         self::assertDirectoryDoesNotExist($cache);
+    }
+
+    public function testWarmupSkipsVariantsRenderedElsewhere(): void
+    {
+        $warmup = $this->command(self::bootKernel(), 'picasso:warmup');
+
+        self::assertSame(Command::SUCCESS, $warmup->execute(['paths' => ['photo.jpg'], '--preset' => ['remote']]));
+        self::assertStringContainsString('only local transformers (Glide) can be warmed up', (string) preg_replace('/\s+/', ' ', $warmup->getDisplay()));
+    }
+
+    public function testWarmupReportsMissingImages(): void
+    {
+        $warmup = $this->command(self::bootKernel(), 'picasso:warmup');
+
+        self::assertSame(Command::FAILURE, $warmup->execute(['paths' => ['missing.jpg'], '--width' => '40']));
+        self::assertStringContainsString('HTTP 404', $warmup->getDisplay());
     }
 
     private function command(KernelInterface $kernel, string $name): CommandTester

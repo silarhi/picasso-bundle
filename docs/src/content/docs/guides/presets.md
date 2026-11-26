@@ -68,3 +68,7 @@ Options given explicitly win over the preset's, and the preset's win over the lo
 Modifiers are merged: the preset's apply, and those given explicitly replace them key by key.
 
 An unknown preset name throws a `PresetNotFoundException` listing the configured ones.
+
+## Warming up presets
+
+Presets also tell [`picasso:warmup`](/guides/cache-warmup/) which variants to render ahead of time.

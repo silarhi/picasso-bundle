@@ -29,6 +29,7 @@ use Silarhi\PicassoBundle\Attribute\AsImageLoader;
 use Silarhi\PicassoBundle\Attribute\AsImageTransformer;
 use Silarhi\PicassoBundle\Attribute\AsPlaceholder;
 use Silarhi\PicassoBundle\Command\PurgeCommand;
+use Silarhi\PicassoBundle\Command\WarmupCommand;
 use Silarhi\PicassoBundle\Controller\ImageController;
 use Silarhi\PicassoBundle\Controller\LegacyUrlController;
 use Silarhi\PicassoBundle\DataCollector\CollectingImageHelper;
@@ -1095,6 +1096,15 @@ final class PicassoBundle extends AbstractBundle
         if (class_exists(Command::class)) {
             $services->set('.picasso.command.purge', PurgeCommand::class)
                 ->args([service('picasso.pipeline')])
+                ->tag('console.command');
+
+            $services->set('.picasso.command.warmup', WarmupCommand::class)
+                ->args([
+                    service('picasso.image_helper'),
+                    service('router'),
+                    service('picasso.controller.image'),
+                    $deferredCacheWriterRegistered ? service('picasso.deferred_cache_writer') : null,
+                ])
                 ->tag('console.command');
         }
 

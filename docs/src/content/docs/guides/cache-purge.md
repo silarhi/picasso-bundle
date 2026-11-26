@@ -44,7 +44,7 @@ picasso:
 php bin/console picasso:purge products/shoe.jpg products/bag.jpg --loader=uploads
 ```
 
-`--transformer` picks another transformer than the loader's.
+`--transformer` picks another transformer than the loader's. To render the variants again right away, see [Cache warm-up](/guides/cache-warmup/).
 
 ## Programmatic Usage
 
