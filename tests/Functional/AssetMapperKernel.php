@@ -22,6 +22,8 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
  */
 class AssetMapperKernel extends AbstractPicassoKernel
 {
+    public const SIGN_KEY = 'asset-mapper-key_0123456789abcdef0123456789abcdef';
+
     protected function configureContainer(ContainerBuilder $container): void
     {
         $container->loadFromExtension('framework', [
@@ -47,7 +49,7 @@ class AssetMapperKernel extends AbstractPicassoKernel
             ],
             'transformers' => [
                 'glide' => [
-                    'sign_key' => 'asset-mapper-key_0123456789abcdef0123456789abcdef',
+                    'sign_key' => self::SIGN_KEY,
                     'cache' => '%kernel.cache_dir%/glide',
                 ],
             ],
