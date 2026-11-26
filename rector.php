@@ -17,6 +17,7 @@ use Rector\Config\RectorConfig;
 use Rector\DeadCode\Rector\ClassMethod\RemoveReturnTagIncompatibleWithNativeTypeRector;
 use Rector\DeadCode\Rector\ClassMethod\RemoveUnusedPublicMethodParameterRector;
 use Rector\Symfony\Symfony72\Rector\StmtsAwareInterface\PushRequestToRequestStackConstructorRector;
+use Rector\Symfony\Symfony73\Rector\Class_\CommandHelpToAttributeRector;
 
 return RectorConfig::configure()
     ->withPaths([
@@ -46,5 +47,7 @@ return RectorConfig::configure()
         ],
         // RequestStack takes its requests in the constructor only since Symfony 7.2, the bundle still supports 6.4
         PushRequestToRequestStackConstructorRector::class,
+        // #[AsCommand] takes a help text only since Symfony 7.3
+        CommandHelpToAttributeRector::class,
     ])
     ->reportUnusedSkips();

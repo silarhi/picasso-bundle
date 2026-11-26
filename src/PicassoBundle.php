@@ -28,6 +28,8 @@ use SensitiveParameter;
 use Silarhi\PicassoBundle\Attribute\AsImageLoader;
 use Silarhi\PicassoBundle\Attribute\AsImageTransformer;
 use Silarhi\PicassoBundle\Attribute\AsPlaceholder;
+use Silarhi\PicassoBundle\Command\PurgeCommand;
+use Silarhi\PicassoBundle\Command\WarmupCommand;
 use Silarhi\PicassoBundle\Controller\ImageController;
 use Silarhi\PicassoBundle\Controller\LegacyUrlController;
 use Silarhi\PicassoBundle\DataCollector\CollectingImageHelper;
@@ -35,6 +37,7 @@ use Silarhi\PicassoBundle\DataCollector\CollectingMetadataGuesser;
 use Silarhi\PicassoBundle\DataCollector\PicassoDataCollector;
 use Silarhi\PicassoBundle\DependencyInjection\UrlAliasPass;
 use Silarhi\PicassoBundle\DependencyInjection\VichLoaderPass;
+use Silarhi\PicassoBundle\Dto\ImagePreset;
 use Silarhi\PicassoBundle\Loader\AssetMapperLoader;
 use Silarhi\PicassoBundle\Loader\ChainLoader;
 use Silarhi\PicassoBundle\Loader\FilesystemLoader;
@@ -57,6 +60,7 @@ use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Service\MetadataGuesser;
 use Silarhi\PicassoBundle\Service\MetadataGuesserInterface;
 use Silarhi\PicassoBundle\Service\PlaceholderRegistry;
+use Silarhi\PicassoBundle\Service\PresetRegistry;
 use Silarhi\PicassoBundle\Service\SrcsetGenerator;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
 use Silarhi\PicassoBundle\Service\UrlAliases;
@@ -72,10 +76,14 @@ use function sprintf;
 
 use Symfony\Component\AssetMapper\AssetMapperInterface;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
+use Symfony\Component\Console\Command\Command;
 use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
+
+use function Symfony\Component\DependencyInjection\Loader\Configurator\inline_service;
+
 use Symfony\Component\DependencyInjection\Loader\Configurator\ReferenceConfigurator;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
@@ -267,6 +275,10 @@ final class PicassoBundle extends AbstractBundle
                     ->defaultTrue()
                     ->info('Preload priority images through a Link header (and 103 Early Hints when sent). Needs symfony/web-link, does nothing without it.')
                 ->end()
+                ->booleanNode('placeholder_onload')
+                    ->defaultTrue()
+                    ->info('Remove the placeholder of a loaded image with an inline onload handler. Turn off under a Content-Security-Policy forbidding inline handlers, and render picasso_placeholder_script() in the <head> instead.')
+                ->end()
                 ->booleanNode('collector')
                     ->defaultFalse()
                     ->info('Enable the web profiler data collector for Picasso. Disabled by default; turn on in dev to debug image rendering.')
@@ -324,6 +336,40 @@ final class PicassoBundle extends AbstractBundle
                             ->scalarNode('service')
                                 ->defaultNull()
                                 ->info('Service ID for custom placeholders (type: service).')
+                            ->end()
+                        ->end()
+                    ->end()
+                ->end()
+                ->arrayNode('presets')
+                    ->info('Named sets of rendering options, applied with the "preset" option of the component, the Twig functions and ImageHelperInterface. Options given explicitly win.')
+                    ->useAttributeAsKey('name')
+                    ->defaultValue([])
+                    ->arrayPrototype()
+                        ->children()
+                            ->integerNode('width')->defaultNull()->min(1)->info('Display width.')->end()
+                            ->integerNode('height')->defaultNull()->min(1)->info('Display height.')->end()
+                            ->scalarNode('sizes')->defaultNull()->info('Responsive sizes attribute.')->end()
+                            ->integerNode('quality')->defaultNull()->min(1)->max(100)->info('Quality (1–100).')->end()
+                            ->scalarNode('fit')->defaultNull()->info('Fit mode (contain, cover, crop, fill, crop-<x>-<y>…).')->end()
+                            ->scalarNode('placeholder')
+                                ->defaultNull()
+                                ->info('true or false to enable or disable the placeholder, or a placeholder name.')
+                                ->validate()
+                                    ->ifTrue(static fn (mixed $v): bool => null !== $v && !is_bool($v) && !is_string($v))
+                                    ->thenInvalid('The "placeholder" of a preset must be a boolean or a placeholder name.')
+                                ->end()
+                            ->end()
+                            ->scalarNode('loader')->defaultNull()->info('Loader name.')->end()
+                            ->scalarNode('transformer')->defaultNull()->info('Transformer name.')->end()
+                            ->arrayNode('modifiers')
+                                ->info('Further manipulations, in Glide\'s vocabulary (e.g. {flip: h, sharp: 10}).')
+                                ->useAttributeAsKey('name')
+                                ->scalarPrototype()
+                                    ->validate()
+                                        ->ifTrue(static fn (mixed $v): bool => !is_int($v) && !is_string($v))
+                                        ->thenInvalid('A modifier must be an integer or a string, %s given.')
+                                    ->end()
+                                ->end()
                             ->end()
                         ->end()
                     ->end()
@@ -440,6 +486,7 @@ final class PicassoBundle extends AbstractBundle
                                 ->end()
                             ->end()
                             ->integerNode('max_image_size')->defaultNull()->info('Max image size for glide.')->end()
+                            ->scalarNode('watermarks')->defaultNull()->info('Glide: directory or Flysystem storage name holding the watermark images the "mark" modifier names.')->end()
                             ->scalarNode('base_url')->defaultNull()->info('Imgix: source domain (e.g. https://my-source.imgix.net). Glide: optional scheme and host prepended to generated image URLs, e.g. a CDN (https://img.example.com).')->end()
                             ->scalarNode('api_key')->defaultNull()->info('Imgix API key for cache purge operations.')->end()
                             ->scalarNode('http_client')->defaultNull()->info('PSR-18 HTTP client service ID for imgix purge.')->end()
@@ -499,6 +546,7 @@ final class PicassoBundle extends AbstractBundle
          *     default_placeholder: string|null,
          *     resolve_metadata: bool,
          *     preload: bool,
+         *     placeholder_onload: bool,
          *     collector: bool,
          *     cache: bool|string,
          *     cache_control: CacheControlConfig,
@@ -507,9 +555,10 @@ final class PicassoBundle extends AbstractBundle
          *     formats: list<string>,
          *     default_quality: int|null,
          *     default_fit: string,
+         *     presets: array<string, array{width: int|null, height: int|null, sizes: string|null, quality: int|null, fit: string|null, placeholder: string|bool|null, loader: string|null, transformer: string|null, modifiers: array<string, int|string>}>,
          *     placeholders: array<string, array{enabled: bool, type: string|null, size: int, blur: int|null, quality: int|null, fit: string|null, format: string|null, components_x: int, components_y: int, driver: string, service: string|null}>,
          *     loaders: array<string, array{enabled: bool, type: string|null, path: string|null, paths: mixed, loaders: list<string>, mapping: string|null, storage: string|null, http_client: string|null, request_factory: string|null, allowed_hosts: list<string>, default_placeholder: string|null, default_transformer: string|null, url_alias: string|null, private: bool, resolve_metadata: bool|null}>,
-         *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|list<string>|null, cache: string|null, driver: string, max_image_size: int|null, base_url: string|null, api_key: string|null, http_client: string|null, request_factory: string|null, stream_factory: string|null, service: string|null, url_alias: string|null, defer_cache_write: bool, lock: array{enabled: bool, factory: string, ttl: float|int, wait: float|int}, public_cache: array{enabled: bool, prefix: string}}>
+         *     transformers: array<string, array{enabled: bool, type: string|null, sign_key: string|list<string>|null, cache: string|null, driver: string, max_image_size: int|null, watermarks: string|null, base_url: string|null, api_key: string|null, http_client: string|null, request_factory: string|null, stream_factory: string|null, service: string|null, url_alias: string|null, defer_cache_write: bool, lock: array{enabled: bool, factory: string, ttl: float|int, wait: float|int}, public_cache: array{enabled: bool, prefix: string}}>
          * } $config
          */
         $services = $container->services();
@@ -769,6 +818,7 @@ final class PicassoBundle extends AbstractBundle
                             $transformerConfig['lock']['enabled'] ? service($transformerConfig['lock']['factory']) : null,
                             (float) $transformerConfig['lock']['ttl'],
                             (float) $transformerConfig['lock']['wait'],
+                            $transformerConfig['watermarks'],
                         ])
                         ->tag('picasso.transformer', $tag);
                     $glideTransformers[$name] = service('picasso.transformer.' . $name);
@@ -974,6 +1024,26 @@ final class PicassoBundle extends AbstractBundle
                 ->args([service('request_stack')]);
         }
 
+        // --- Presets ---
+
+        $presets = [];
+        foreach ($config['presets'] as $name => $preset) {
+            $presets[$name] = inline_service(ImagePreset::class)->args([
+                $preset['width'],
+                $preset['height'],
+                $preset['sizes'],
+                $preset['quality'],
+                $preset['fit'],
+                $preset['placeholder'],
+                $preset['loader'],
+                $preset['transformer'],
+                $preset['modifiers'],
+            ]);
+        }
+        $services->set('picasso.preset_registry', PresetRegistry::class)
+            ->args([$presets]);
+        $services->alias(PresetRegistry::class, 'picasso.preset_registry');
+
         $services->set('picasso.image_helper', ImageHelper::class)
             ->args([
                 service('picasso.pipeline'),
@@ -989,6 +1059,7 @@ final class PicassoBundle extends AbstractBundle
                 $config['resolve_metadata'],
                 service('debug.stopwatch')->nullOnInvalid(),
                 $preload ? service('.picasso.image_preloader') : null,
+                service('picasso.preset_registry'),
             ]);
         $services->alias(ImageHelper::class, 'picasso.image_helper');
         $services->alias(ImageHelperInterface::class, 'picasso.image_helper');
@@ -1004,6 +1075,7 @@ final class PicassoBundle extends AbstractBundle
             $services->set('.picasso.twig_extension', PicassoExtension::class)
                 ->args([
                     service('picasso.image_helper'),
+                    $config['placeholder_onload'],
                 ])
                 ->tag('twig.extension');
         }
@@ -1017,6 +1089,23 @@ final class PicassoBundle extends AbstractBundle
                     'key' => 'Picasso:Image',
                     'template' => '@Picasso/components/Image.html.twig',
                 ]);
+        }
+
+        // --- Console commands ---
+
+        if (class_exists(Command::class)) {
+            $services->set('.picasso.command.purge', PurgeCommand::class)
+                ->args([service('picasso.pipeline')])
+                ->tag('console.command');
+
+            $services->set('.picasso.command.warmup', WarmupCommand::class)
+                ->args([
+                    service('picasso.image_helper'),
+                    service('router'),
+                    service('picasso.controller.image'),
+                    $deferredCacheWriterRegistered ? service('picasso.deferred_cache_writer') : null,
+                ])
+                ->tag('console.command');
         }
 
         // --- Data Collector (web profiler) ---
@@ -1034,6 +1123,7 @@ final class PicassoBundle extends AbstractBundle
                     service('.picasso.image_helper.collecting.inner'),
                     service('picasso.data_collector'),
                     service('picasso.pipeline'),
+                    service('picasso.preset_registry'),
                 ]);
 
             $services->set('.picasso.metadata_guesser.collecting', CollectingMetadataGuesser::class)

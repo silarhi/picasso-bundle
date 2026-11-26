@@ -1,17 +1,18 @@
 ---
 title: 'Twig functions'
-description: 'picasso_image() and picasso_image_url(): the component as a function call, and single image URLs.'
+description: 'picasso_image(), picasso_image_url(), picasso_image_data(), picasso_image_set() and picasso_placeholder_script().'
 sidebar:
     order: 2
 ---
-
-Two Twig functions are available:
 
 - **`picasso_image()`** — renders a full responsive `<picture>` element (same
   output as the `<twig:Picasso:Image>` component) as a function call, for
   places where the component syntax is awkward: macros, `{{ }}` expressions,
   variables built in Twig, or a string returned by a filter.
 - **`picasso_image_url()`** — generates a single transformed image URL.
+- **`picasso_image_data()`** — returns the data of the `<picture>` instead of its HTML, for markup of your own.
+- **`picasso_image_set()`** — generates a CSS `image-set()`, for backgrounds.
+- **`picasso_placeholder_script()`** — renders the `<script>` removing placeholders under a strict Content-Security-Policy.
 
 ## `picasso_image()`
 
@@ -37,7 +38,7 @@ All available parameters mirror the `<twig:Picasso:Image>` component:
 `src`, `width`, `height`, `sizes`, `sourceWidth`, `sourceHeight`, `loader`,
 `transformer`, `quality`, `fit`, `placeholder`, `placeholderData`, `priority`,
 `loading`, `fetchPriority`, `unoptimized`, `resolveMetadata`, `context`,
-`attributes`, `route`, `routeParameters`.
+`attributes`, `route`, `routeParameters`, `preset`, `modifiers`, `artDirection`.
 
 See [Component Properties](/reference/component/#properties) for the full reference.
 
@@ -89,3 +90,48 @@ All available parameters:
 | `context`         | `array`  | Extra context for the loader                                         |
 | `route`           | `string` | Your route serving the image (see [Private Images](/guides/private-images/)) |
 | `routeParameters` | `array`  | Parameters of that route                                             |
+| `modifiers`       | `array`  | [Modifiers](/guides/modifiers/) in Glide's vocabulary                |
+| `preset`          | `string` | Named [preset](/guides/presets/) filling the parameters not given    |
+
+## `picasso_image_data()`
+
+Returns the `ImageRenderData` the component renders, with the arguments of `picasso_image()`: `fallbackSrc`, `fallbackSrcset`, `sources` (each with `type`, `srcset`, and for art-directed ones `media`, `sizes`, `width`, `height`), `placeholderUri`, `width`, `height`, `loading`, `fetchPriority`, `sizes`.
+
+```twig
+{% set image = picasso_image_data(src=product.image, preset='card') %}
+<img src="{{ image.fallbackSrc }}" srcset="{{ image.fallbackSrcset }}" sizes="{{ image.sizes }}" width="{{ image.width }}" height="{{ image.height }}" alt="{{ product.name }}">
+```
+
+See [Background images](/guides/background-images/#markup-of-your-own-picasso_image_data).
+
+## `picasso_image_set()`
+
+Returns a CSS `image-set()` of the image, one candidate per configured format and density:
+
+```twig
+<div style="background-image: {{ picasso_image_set(src='hero.jpg', width=1440) }}">
+```
+
+| Parameter         | Type        | Description                                                        |
+| ----------------- | ----------- | ------------------------------------------------------------------ |
+| `src`             | `string`    | Image path (omit it when the loader reads the `context`)           |
+| `width`           | `int`       | Width in CSS pixels (auto-detected from the source)                |
+| `height`          | `int`       | Height in CSS pixels (follows the source ratio when omitted)       |
+| `densities`       | `list<int>` | Pixel densities of the candidates, default `[1, 2]`                |
+| `quality`, `fit`, `modifiers`, `loader`, `transformer`, `sourceWidth`, `sourceHeight`, `resolveMetadata`, `context`, `route`, `routeParameters`, `preset` | | As for `picasso_image_url()` and the component |
+
+See [Background images](/guides/background-images/).
+
+## `picasso_placeholder_script()`
+
+Renders the `<script>` that removes the placeholder of loaded images when `placeholder_onload` is off, for a Content-Security-Policy forbidding inline handlers. Render it once in the `<head>`:
+
+```twig
+{{ picasso_placeholder_script(nonce=csp_nonce('script')) }}
+```
+
+| Parameter | Type     | Description                                        |
+| --------- | -------- | -------------------------------------------------- |
+| `nonce`   | `string` | Nonce of your policy's `script-src`, if it has one |
+
+See [Placeholders](/guides/placeholders/#content-security-policy).

@@ -22,8 +22,18 @@ use Twig\TwigFunction;
 
 final class PicassoExtension extends AbstractExtension
 {
+    /**
+     * Removes the placeholder of the images rendered with placeholder_onload off, once they are loaded. Load events
+     * do not bubble: a listener capturing them on the document sees every image, including those added later.
+     */
+    private const PLACEHOLDER_SCRIPT = "document.addEventListener('load',function(e){var t=e.target;if(t.hasAttribute&&t.hasAttribute('data-picasso-placeholder')){t.style.backgroundImage=''}},true)";
+
+    /**
+     * @param bool $placeholderOnload Whether images remove their placeholder with an inline onload handler
+     */
     public function __construct(
         private readonly ImageHelperInterface $imageHelper,
+        private readonly bool $placeholderOnload = true,
     ) {
     }
 
@@ -62,7 +72,26 @@ final class PicassoExtension extends AbstractExtension
                 'needs_environment' => true,
                 'is_safe' => ['html'],
             ]),
+            new TwigFunction('picasso_image_data', $this->imageHelper->imageData(...)),
+            // The URLs are percent-encoded where they could end the url('…') or an HTML attribute
+            new TwigFunction('picasso_image_set', $this->imageHelper->imageSet(...), ['is_safe' => ['html']]),
+            new TwigFunction('picasso_placeholder_script', $this->placeholderScript(...), ['is_safe' => ['html']]),
+            // @internal: used by @Picasso/image.html.twig
+            new TwigFunction('picasso_placeholder_onload', fn (): bool => $this->placeholderOnload),
         ];
+    }
+
+    /**
+     * The <script> removing the placeholder of images once loaded, for applications whose Content-Security-Policy
+     * forbids the inline onload handler (placeholder_onload: false). Render it in the <head>, before any image.
+     *
+     * @param string|null $nonce Nonce of the script-src directive (e.g. csp_nonce('script') of NelmioSecurityBundle)
+     */
+    public function placeholderScript(?string $nonce = null): string
+    {
+        $nonceAttribute = null !== $nonce ? ' nonce="' . htmlspecialchars($nonce, \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8') . '"' : '';
+
+        return '<script' . $nonceAttribute . '>' . self::PLACEHOLDER_SCRIPT . '</script>';
     }
 
     /**
@@ -70,10 +99,13 @@ final class PicassoExtension extends AbstractExtension
      *
      * The function-call counterpart of the component, for templates that cannot use the component syntax.
      *
-     * @param array<string, mixed>       $context         Extra context passed to the loader (e.g. entity, field for Vich).
-     * @param array<string, scalar|null> $attributes      extra HTML attributes forwarded to the inner <img> tag (alt, class, id, data-*, …)
-     * @param string|null                $route           Application route serving the image (through ImageServer) instead of the bundle's
-     * @param array<string, mixed>       $routeParameters Parameters of that route
+     * @param array<string, mixed>                $context         Extra context passed to the loader (e.g. entity, field for Vich).
+     * @param array<string, scalar|null>          $attributes      extra HTML attributes forwarded to the inner <img> tag (alt, class, id, data-*, …)
+     * @param string|null                         $route           Application route serving the image (through ImageServer) instead of the bundle's
+     * @param array<string, mixed>                $routeParameters Parameters of that route
+     * @param array<string, int|string>           $modifiers       Further manipulations, in Glide's vocabulary
+     * @param string|null                         $preset          Named preset filling the options not given
+     * @param array<string, array<string, mixed>> $artDirection    Art-directed sources by media query
      */
     public function renderImage(
         Environment $env,
@@ -98,6 +130,9 @@ final class PicassoExtension extends AbstractExtension
         array $attributes = [],
         ?string $route = null,
         array $routeParameters = [],
+        array $modifiers = [],
+        ?string $preset = null,
+        array $artDirection = [],
     ): string {
         $data = $this->imageHelper->imageData(
             src: $src,
@@ -121,6 +156,9 @@ final class PicassoExtension extends AbstractExtension
             attributes: $attributes,
             route: $route,
             routeParameters: $routeParameters,
+            modifiers: $modifiers,
+            preset: $preset,
+            artDirection: $artDirection,
         );
 
         return $env->render('@Picasso/image.html.twig', [

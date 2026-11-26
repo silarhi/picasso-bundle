@@ -19,6 +19,7 @@ picasso:
             cache: '%kernel.project_dir%/var/glide-cache'
             driver: gd # gd | imagick | vips
             max_image_size: ~ # optional: max pixel count (width x height)
+            watermarks: ~ # optional: directory or Flysystem storage of watermark images (see Modifiers)
             base_url: ~ # optional: e.g. https://img.example.com to point image URLs at a CDN
             defer_cache_write: false # store a cache miss after the response is sent
             lock:

@@ -36,6 +36,16 @@ picasso:
             # stream_factory: 'psr18.http_client'
 ```
 
+## From the command line
+
+`picasso:purge` purges the given images, or the paths read from the standard input, one per line:
+
+```bash
+php bin/console picasso:purge products/shoe.jpg products/bag.jpg --loader=uploads
+```
+
+`--transformer` picks another transformer than the loader's. To render the variants again right away, see [Cache warm-up](/guides/cache-warmup/).
+
 ## Programmatic Usage
 
 Use the `ImagePipeline` service to purge from your code:

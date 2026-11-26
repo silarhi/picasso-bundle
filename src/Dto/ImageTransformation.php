@@ -15,6 +15,11 @@ namespace Silarhi\PicassoBundle\Dto;
 
 final readonly class ImageTransformation
 {
+    /**
+     * @param array<string, int|string> $modifiers Further manipulations, in Glide's vocabulary (e.g. ['flip' => 'h',
+     *                                             'sharp' => 10]): Glide reads them as they are, other transformers
+     *                                             translate them
+     */
     public function __construct(
         public ?int $width = null,
         public ?int $height = null,
@@ -23,6 +28,7 @@ final readonly class ImageTransformation
         public ?string $fit = null,
         public ?int $blur = null,
         public ?int $dpr = null,
+        public array $modifiers = [],
     ) {
     }
 }

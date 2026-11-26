@@ -60,6 +60,8 @@ final readonly class TransformerPlaceholder implements PlaceholderInterface
             quality: $this->quality,
             fit: $this->fit,
             blur: $this->blur,
+            // Orientation, flips and crops change what the placeholder shows
+            modifiers: $transformation->modifiers,
         ), $context);
     }
 }

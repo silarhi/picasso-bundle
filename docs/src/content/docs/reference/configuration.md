@@ -56,6 +56,22 @@ picasso:
     # --- Preload of priority images (needs symfony/web-link) ---
     preload: true # adds a Link: rel=preload header for every priority image
 
+    # --- Placeholder removal: false under a CSP forbidding inline handlers (see Placeholders) ---
+    placeholder_onload: true
+
+    # --- Presets: named sets of rendering options (see Presets) ---
+    presets:
+        # card:
+        #     width: 400
+        #     height: 300
+        #     sizes: '(max-width: 768px) 100vw, 400px'
+        #     quality: ~
+        #     fit: cover
+        #     placeholder: ~     # true | false | a placeholder name
+        #     loader: ~
+        #     transformer: ~
+        #     modifiers: { sharp: 10 }
+
     # --- Web profiler data collector (dev only) ---
     collector: false # set to true to record image renders / URL generations in the Symfony toolbar
 
@@ -126,6 +142,7 @@ picasso:
             cache: '%kernel.project_dir%/var/glide-cache' # local path OR a Flysystem storage name (e.g. 'thumbs.storage')
             driver: gd # gd | imagick | vips
             max_image_size: ~ # optional max pixel count
+            watermarks: ~ # directory OR Flysystem storage name holding the images the "mark" modifier names
             base_url: ~ # optional scheme + host prepended to image URLs, e.g. a CDN
             defer_cache_write: false # store a cache miss after the response is sent
             url_alias: ~ # name of this transformer in image URLs (see Routes)
@@ -221,6 +238,17 @@ Preloads every [priority image](/guides/priority-images/#preloading) through a `
 
 - `true` (default) — preloads priority images when `symfony/web-link` is installed; does nothing without it
 - `false` — never preloads
+
+### `placeholder_onload`
+
+Whether a loaded image removes its placeholder with an inline `onload` handler.
+
+- `true` (default) — inline handler
+- `false` — images get a `data-picasso-placeholder` attribute instead, and `picasso_placeholder_script()` removes their placeholder: for a Content-Security-Policy forbidding inline handlers (see [Placeholders](/guides/placeholders/#content-security-policy))
+
+### `presets`
+
+Named sets of rendering options (`width`, `height`, `sizes`, `quality`, `fit`, `placeholder`, `loader`, `transformer`, `modifiers`), applied with the `preset` option of the component, the Twig functions and `ImageHelperInterface`. Options given explicitly win. See [Presets](/guides/presets/).
 
 ### `collector`
 

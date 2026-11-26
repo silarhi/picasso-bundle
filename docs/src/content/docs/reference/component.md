@@ -41,6 +41,9 @@ The `<twig:Picasso:Image>` component renders a responsive `<picture>` element wi
 | `context`         | `array`        | `[]`    | Extra context for the loader (e.g. Vich)                             |
 | `route`           | `string`       | —       | Your route serving the image (see [Private Images](/guides/private-images/)) |
 | `routeParameters` | `array`        | `[]`    | Parameters of that route                                             |
+| `preset`          | `string`       | —       | Named [preset](/guides/presets/) filling the props not given          |
+| `modifiers`       | `array`        | `[]`    | [Modifiers](/guides/modifiers/) in Glide's vocabulary (`{flip: 'h'}`) |
+| `artDirection`    | `array`        | `[]`    | [Art-directed sources](/guides/art-direction/) by media query         |
 
 ### Automatic Dimension Detection
 
@@ -104,7 +107,7 @@ of the given `width` and `height`, like the fallback `src`.
 
 ### Extra HTML Attributes
 
-The component forwards any extra attributes to the inner `<img>` tag:
+The component forwards any extra attributes to the inner `<img>` tag. The `<img>` gets `decoding="async"` unless a `decoding` attribute is given:
 
 ```twig
 <twig:Picasso:Image

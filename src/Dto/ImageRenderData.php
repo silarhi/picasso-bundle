@@ -24,7 +24,8 @@ use JsonSerializable;
 final readonly class ImageRenderData implements JsonSerializable
 {
     /**
-     * @param ImageSource[]              $sources     <source> elements for the <picture> tag
+     * @param ImageSource[]              $sources     <source> elements for the <picture> tag: the art-directed ones
+     *                                                (with a media query) first, then those of the image itself
      * @param array<string, scalar|null> $attributes  Extra HTML attributes (alt, class, …)
      * @param string|null                $loader      Resolved loader name (null when unoptimized)
      * @param string|null                $transformer Resolved transformer name (null when unoptimized)
@@ -52,7 +53,7 @@ final readonly class ImageRenderData implements JsonSerializable
      * @return array{
      *     fallbackSrc: string|null,
      *     fallbackSrcset: string|null,
-     *     sources: list<array{type: string, srcset: string}>,
+     *     sources: list<array{type: string, srcset: string, media: string|null, sizes: string|null, width: int|null, height: int|null}>,
      *     placeholderUri: string|null,
      *     width: int|null,
      *     height: int|null,
@@ -75,6 +76,10 @@ final readonly class ImageRenderData implements JsonSerializable
                 static fn (ImageSource $source): array => [
                     'type' => $source->type,
                     'srcset' => $source->srcset,
+                    'media' => $source->media,
+                    'sizes' => $source->sizes,
+                    'width' => $source->width,
+                    'height' => $source->height,
                 ],
                 $this->sources,
             )),
