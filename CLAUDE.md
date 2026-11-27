@@ -117,6 +117,7 @@ The JS tooling (husky + lint-staged at the root, the Starlight site in `docs/`) 
 ## CI/CD
 
 - Uses **Laminas CI Matrix Action** (`.github/workflows/continuous-integration.yml`)
+- PHPStan runs once, on the latest PHP with the latest dependencies ("PHPStan on the latest PHP" in `.laminas-ci.json`), not in the matrix: an inline `@phpstan-ignore` only has to match that setup
 - Configured extensions: `gd`, `pcov`
 - Ignores PHP platform requirements for PHP 8.4, 8.5, 8.6; PHPUnit is excluded on 8.6 and README Linting is excluded
 - Additional checks (`.laminas-ci.json`, lowest PHP, latest dependencies): `composer validate --strict && composer normalize --dry-run --diff`, and
