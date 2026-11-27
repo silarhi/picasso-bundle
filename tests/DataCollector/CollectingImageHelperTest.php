@@ -19,10 +19,12 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\DataCollector\CollectingImageHelper;
 use Silarhi\PicassoBundle\DataCollector\PicassoDataCollector;
+use Silarhi\PicassoBundle\Dto\ImagePreset;
 use Silarhi\PicassoBundle\Dto\ImageRenderData;
 use Silarhi\PicassoBundle\Service\ImageHelperInterface;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
+use Silarhi\PicassoBundle\Service\PresetRegistry;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
 use Silarhi\PicassoBundle\Tests\Fixtures\ServiceLocator;
 use Symfony\Component\HttpFoundation\Request;
@@ -163,6 +165,70 @@ class CollectingImageHelperTest extends TestCase
         self::assertSame(1080, $renders[0]->height);
         self::assertFalse($renders[0]->priority);
         self::assertFalse($renders[0]->hasPlaceholder);
+    }
+
+    public function testImageSetForwardsToInnerAndRecordsUrlCall(): void
+    {
+        $imageSet = "image-set(url('/a.webp') 1x type('image/webp'), url('/b.webp') 2x type('image/webp'))";
+        $inner = $this->createMock(ImageHelperInterface::class);
+        $inner->expects(self::once())
+            ->method('imageSet')
+            ->with('hero.jpg', 300, 200, [1, 2, 3], null, null, 75, 'cover', ['flip' => 'h'], 1200, 800, true, ['ctx' => 1], 'document_image', ['id' => 42], 'card')
+            ->willReturn($imageSet);
+
+        $collector = new PicassoDataCollector();
+        $presets = new PresetRegistry(['card' => new ImagePreset(loader: 'private_files', transformer: 'private_glide')]);
+        $decorator = new CollectingImageHelper($inner, $collector, $this->createPipeline(), $presets);
+
+        $result = $decorator->imageSet(
+            src: 'hero.jpg',
+            width: 300,
+            height: 200,
+            densities: [1, 2, 3],
+            quality: 75,
+            fit: 'cover',
+            modifiers: ['flip' => 'h'],
+            sourceWidth: 1200,
+            sourceHeight: 800,
+            resolveMetadata: true,
+            context: ['ctx' => 1],
+            route: 'document_image',
+            routeParameters: ['id' => 42],
+            preset: 'card',
+        );
+
+        self::assertSame($imageSet, $result);
+
+        $collector->collect(new Request(), new Response());
+        $urls = $collector->getUrls();
+        self::assertCount(1, $urls, 'an image-set() is recorded as one URL call');
+        self::assertSame('hero.jpg', $urls[0]->src);
+        self::assertSame('private_files', $urls[0]->loader, 'the preset loader is recorded, like the inner helper uses it');
+        self::assertSame('private_glide', $urls[0]->transformer, 'the preset transformer is recorded, like the inner helper uses it');
+        self::assertSame(300, $urls[0]->width);
+        self::assertSame(200, $urls[0]->height);
+        self::assertNull($urls[0]->format);
+        self::assertSame(75, $urls[0]->quality);
+        self::assertSame('cover', $urls[0]->fit);
+        self::assertSame($imageSet, $urls[0]->url);
+    }
+
+    public function testImageSetWithoutSourceRecordsEmptySource(): void
+    {
+        $inner = $this->createMock(ImageHelperInterface::class);
+        $inner->method('imageSet')->willReturn("image-set(url('/a.webp') 1x type('image/webp'))");
+
+        $collector = new PicassoDataCollector();
+        $decorator = new CollectingImageHelper($inner, $collector, $this->createPipeline());
+
+        $decorator->imageSet(context: ['entity' => 42]);
+
+        $collector->collect(new Request(), new Response());
+        $urls = $collector->getUrls();
+        self::assertCount(1, $urls);
+        self::assertSame('', $urls[0]->src, 'an image set from the context only has no source path');
+        self::assertSame('filesystem', $urls[0]->loader);
+        self::assertSame('glide', $urls[0]->transformer);
     }
 
     private function createPipeline(): ImagePipeline&MockObject

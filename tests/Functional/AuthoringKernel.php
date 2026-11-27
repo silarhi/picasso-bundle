@@ -15,15 +15,23 @@ namespace Silarhi\PicassoBundle\Tests\Functional;
 
 use function dirname;
 
+use Silarhi\PicassoBundle\Tests\Functional\Stub\StubQueryTransformer;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 /**
- * Presets, modifiers (with Glide watermarks), art direction, image-set() and the CSP-friendly placeholder.
+ * Presets, modifiers (with Glide watermarks), art direction, image-set(), the CSP-friendly placeholder and the
+ * console commands (an application route sharing the path of Imgix URLs, a transformer whose URLs have no path).
  */
 class AuthoringKernel extends AbstractPicassoKernel
 {
     protected function configureContainer(ContainerBuilder $container): void
     {
+        $container->loadFromExtension('framework', [
+            'router' => [
+                'resource' => __DIR__ . '/authoring_routes.php',
+            ],
+        ]);
+
         $container->loadFromExtension('picasso', [
             'default_placeholder' => 'blur',
             'device_sizes' => [320, 640],
@@ -70,8 +78,14 @@ class AuthoringKernel extends AbstractPicassoKernel
                 'imgix' => [
                     'base_url' => 'https://test.imgix.net',
                 ],
+                'query' => [
+                    'type' => 'service',
+                    'service' => StubQueryTransformer::class,
+                ],
             ],
         ]);
+
+        $container->register(StubQueryTransformer::class, StubQueryTransformer::class);
     }
 
     public function getCacheDir(): string

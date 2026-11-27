@@ -28,9 +28,11 @@ use Symfony\Component\Console\Input\StreamableInputInterface;
 final class PathsInput
 {
     /**
+     * @param resource|null $stdin The standard input, read when the input has no stream of its own (default: STDIN)
+     *
      * @return list<string>
      */
-    public static function read(InputInterface $input): array
+    public static function read(InputInterface $input, $stdin = null): array
     {
         /** @var list<string> $paths */
         $paths = $input->getArgument('paths');
@@ -40,11 +42,11 @@ final class PathsInput
 
         $stream = $input instanceof StreamableInputInterface ? $input->getStream() : null;
         if (!is_resource($stream)) {
+            $stream = $stdin ?? (defined('STDIN') ? \STDIN : null);
             // Without piped input, STDIN is the terminal: reading it would wait for the user
-            if (!defined('STDIN') || stream_isatty(\STDIN)) {
+            if (!is_resource($stream) || stream_isatty($stream)) {
                 return [];
             }
-            $stream = \STDIN;
         }
 
         $paths = [];
