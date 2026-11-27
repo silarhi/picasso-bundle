@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Silarhi\PicassoBundle\Tests\DependencyInjection;
 
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\DependencyInjection\UrlAliasPass;
 use Silarhi\PicassoBundle\Exception\InvalidConfigurationException;
@@ -20,6 +21,11 @@ use Silarhi\PicassoBundle\Service\UrlAliases;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 
+/**
+ * Needs symfony/config and symfony/dependency-injection: the "PHPUnit without the bundle dependencies" CI job removes
+ * both and excludes this group.
+ */
+#[Group('bundle')]
 class UrlAliasPassTest extends TestCase
 {
     public function testAliasesAreCollectedFromTheTags(): void

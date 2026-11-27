@@ -24,7 +24,7 @@ use Silarhi\PicassoBundle\Service\ImageHelperInterface;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
-use Symfony\Component\DependencyInjection\ServiceLocator;
+use Silarhi\PicassoBundle\Tests\Fixtures\ServiceLocator;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 

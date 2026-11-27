@@ -27,9 +27,9 @@ use Silarhi\PicassoBundle\Loader\ImageLoaderInterface;
 use Silarhi\PicassoBundle\Service\ImagePipeline;
 use Silarhi\PicassoBundle\Service\LoaderRegistry;
 use Silarhi\PicassoBundle\Service\TransformerRegistry;
+use Silarhi\PicassoBundle\Tests\Fixtures\ServiceLocator;
 use Silarhi\PicassoBundle\Transformer\ImageTransformerInterface;
 use Silarhi\PicassoBundle\Transformer\PurgableTransformerInterface;
-use Symfony\Component\DependencyInjection\ServiceLocator;
 
 class ImagePipelineTest extends TestCase
 {

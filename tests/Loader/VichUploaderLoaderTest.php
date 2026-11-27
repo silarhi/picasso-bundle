@@ -15,6 +15,7 @@ namespace Silarhi\PicassoBundle\Tests\Loader;
 
 use Closure;
 use League\Flysystem\FilesystemOperator;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
@@ -30,6 +31,11 @@ use Silarhi\PicassoBundle\Source\LocalImageSource;
 use stdClass;
 use Vich\UploaderBundle\Storage\StorageInterface;
 
+/**
+ * Needs vich/uploader-bundle, which requires symfony/dependency-injection: the "PHPUnit without the bundle dependencies"
+ * CI job removes it and excludes this group.
+ */
+#[Group('bundle')]
 class VichUploaderLoaderTest extends TestCase
 {
     private Stub&StorageInterface $storage;

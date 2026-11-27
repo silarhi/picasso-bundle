@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.0] - Unreleased
+
+### Changed
+
+- `symfony/framework-bundle` is no longer required: the runtime code requires `symfony/http-foundation`, `symfony/http-kernel`, `symfony/routing`, `symfony/service-contracts` and `psr/container` (for the loader, transformer and placeholder registries), each of which it imports. Registering `PicassoBundle` still needs the framework, which every Symfony application has; `conflict` keeps it, `symfony/config` and `symfony/dependency-injection` at 6.4+, like the optional `symfony/asset-mapper`, `symfony/console`, `symfony/lock`, `symfony/stopwatch` and `symfony/web-link`, whose floors the framework used to enforce. An application without the framework builds the loaders, transformers and `ImageHelper` by hand ([Without the bundle](https://github.com/silarhi/picasso-bundle#without-the-bundle)).
+- `PicassoDataCollector` extends the `DataCollector` of `symfony/http-kernel` instead of FrameworkBundle's `AbstractDataCollector`, so it loads without the framework. The profiler still reads its id and template from the `data_collector` tag.
+
 ## [2.8.0] - 2026-11-26
 
 ### Added
@@ -269,6 +276,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release.
 
+[2.9.0]: https://github.com/silarhi/picasso-bundle/compare/v2.8.0...HEAD
 [2.8.0]: https://github.com/silarhi/picasso-bundle/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/silarhi/picasso-bundle/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/silarhi/picasso-bundle/compare/v2.5.0...v2.6.0

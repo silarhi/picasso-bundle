@@ -15,6 +15,7 @@ namespace Silarhi\PicassoBundle\Tests\Loader;
 
 use Metadata\Driver\DriverChain;
 use Metadata\MetadataFactory;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Silarhi\PicassoBundle\Exception\InvalidImageReferenceException;
 use Silarhi\PicassoBundle\Loader\VichMappingHelper;
@@ -33,7 +34,11 @@ use Vich\UploaderBundle\Metadata\MetadataReader;
 /**
  * Tests VichMappingHelper using a real PropertyMappingFactory
  * backed by real entity classes with VichUploader attributes.
+ *
+ * Needs vich/uploader-bundle, which requires symfony/dependency-injection: the "PHPUnit without the bundle dependencies"
+ * CI job removes it and excludes this group.
  */
+#[Group('bundle')]
 class VichMappingHelperTest extends TestCase
 {
     private VichMappingHelper $helper;

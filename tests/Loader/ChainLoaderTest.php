@@ -22,8 +22,8 @@ use Silarhi\PicassoBundle\Loader\ChainLoader;
 use Silarhi\PicassoBundle\Loader\FilesystemLoader;
 use Silarhi\PicassoBundle\Loader\ServableLoaderInterface;
 use Silarhi\PicassoBundle\Source\ImageSourceInterface;
+use Silarhi\PicassoBundle\Tests\Fixtures\ServiceLocator;
 use stdClass;
-use Symfony\Component\DependencyInjection\ServiceLocator;
 
 class ChainLoaderTest extends TestCase
 {
