@@ -15,6 +15,7 @@ namespace Silarhi\PicassoBundle\Tests\Functional;
 
 use function assert;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use Psr\Link\LinkInterface;
 use Silarhi\PicassoBundle\Exception\InvalidTransformationException;
 use Silarhi\PicassoBundle\Exception\PresetNotFoundException;
@@ -27,6 +28,7 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpKernel\KernelInterface;
+use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\WebLink\GenericLinkProvider;
 use Twig\Environment;
 
@@ -158,6 +160,46 @@ class AuthoringFeaturesTest extends KernelTestCase
         $this->helper()->imageData(src: 'photo.jpg', artDirection: ['(max-width: 640px)' => ['widht' => 30]]);
     }
 
+    public function testArtDirectionLoadsTheImagesOfItsOwn(): void
+    {
+        $data = $this->helper()->imageData(src: 'photo.jpg', width: 40, artDirection: [
+            '(max-width: 640px)' => ['src' => '2x3.png', 'width' => 2],
+            '(orientation: portrait)' => ['context' => ['tenant' => 'acme'], 'width' => 20, 'sourceWidth' => 200, 'sourceHeight' => 200],
+        ]);
+
+        self::assertSame('(max-width: 640px)', $data->sources[0]->media);
+        self::assertStringStartsWith('/image/glide/filesystem/2x3.png?', $data->sources[0]->srcset);
+        self::assertSame([2, 3], [$data->sources[0]->width, $data->sources[0]->height], 'the other image is measured: 2x3 pixels');
+        self::assertSame('(orientation: portrait)', $data->sources[2]->media);
+        self::assertStringStartsWith('/image/glide/filesystem/photo.jpg?', $data->sources[2]->srcset, 'an entry with a context only keeps the image src');
+        self::assertSame([20, 20], [$data->sources[2]->width, $data->sources[2]->height], 'its own source dimensions give the height');
+        self::assertSame([40, 20], [$data->width, $data->height], 'the image keeps its own dimensions');
+    }
+
+    /**
+     * @param array<string, mixed> $entry
+     */
+    #[DataProvider('provideWronglyTypedArtDirectionEntries')]
+    public function testWronglyTypedArtDirectionOptionFails(array $entry, string $message): void
+    {
+        $this->expectException(InvalidTransformationException::class);
+        $this->expectExceptionMessage('Art direction "(max-width: 640px)": ' . $message);
+
+        $this->helper()->imageData(src: 'photo.jpg', artDirection: ['(max-width: 640px)' => $entry]);
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>, string}>
+     */
+    public static function provideWronglyTypedArtDirectionEntries(): iterable
+    {
+        yield 'source width' => [['src' => 'photo.jpg', 'sourceWidth' => 'x'], '"sourceWidth" must be an integer.'];
+        yield 'src' => [['src' => 1], '"src" must be a string.'];
+        yield 'context' => [['context' => 'x'], '"context" must be an array.'];
+        yield 'modifiers' => [['modifiers' => 'x'], '"modifiers" must be an array.'];
+        yield 'modifier value' => [['modifiers' => ['sharp' => [1]]], 'modifier "sharp" must be an integer or a string.'];
+    }
+
     public function testPriorityArtDirectionPreloadsEachMediaQuery(): void
     {
         self::bootKernel();
@@ -195,6 +237,20 @@ class AuthoringFeaturesTest extends KernelTestCase
             . "url\\('[^']+fm=jpg[^']+'\\) 1x type\\('image/jpeg'\\), url\\('[^']+'\\) 2x type\\('image/jpeg'\\)\\)$#",
             $css,
             'the 2x candidates are capped to the 100px source',
+        );
+    }
+
+    public function testImageSetTakesAPresetAndStopsOnceCapped(): void
+    {
+        $css = $this->helper()->imageSet(src: 'photo.jpg', densities: [1, 2, 3, 4], preset: 'card');
+
+        self::assertMatchesRegularExpression(
+            "#^image-set\\(url\\('/image/glide/filesystem/photo\\.jpg\\?w=40&h=30&fm=webp&q=60&fit=cover&sharp=5&s=[^']+'\\) 1x type\\('image/webp'\\), "
+            . "url\\('[^']+\\?w=80&h=60&fm=webp[^']+'\\) 2x type\\('image/webp'\\), "
+            . "url\\('[^']+\\?w=100&h=75&fm=webp[^']+'\\) 3x type\\('image/webp'\\), "
+            . "url\\('[^']+fm=jpg[^']+'\\) 1x type\\('image/jpeg'\\), url\\('[^']+'\\) 2x type\\('image/jpeg'\\), url\\('[^']+'\\) 3x type\\('image/jpeg'\\)\\)$#",
+            $css,
+            'the 3x candidates are capped to the 100px source, and no 4x one repeats them',
         );
     }
 
@@ -243,12 +299,110 @@ class AuthoringFeaturesTest extends KernelTestCase
         self::assertDirectoryDoesNotExist($cache);
     }
 
-    public function testWarmupSkipsVariantsRenderedElsewhere(): void
+    public function testWarmupStripsTheRouterBaseUrl(): void
+    {
+        $kernel = self::bootKernel();
+        $router = self::getContainer()->get('router');
+        assert($router instanceof RouterInterface);
+        // The application lives in a sub-directory: its image URLs start with it
+        $router->getContext()->setBaseUrl('/app');
+        self::assertStringStartsWith('/app/image/glide/filesystem/photo.jpg?', $this->helper()->imageUrl('photo.jpg', width: 40));
+
+        $warmup = $this->command($kernel, 'picasso:warmup');
+
+        self::assertSame(Command::SUCCESS, $warmup->execute(['paths' => ['photo.jpg'], '--preset' => ['card']]));
+        self::assertStringContainsString('Served 5 variants of 1 image.', $warmup->getDisplay());
+        self::assertDirectoryExists($kernel->getCacheDir() . '/glide/photo.jpg');
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    #[DataProvider('provideVariantsRenderedElsewhere')]
+    public function testWarmupSkipsVariantsRenderedElsewhere(string $path, array $options): void
     {
         $warmup = $this->command(self::bootKernel(), 'picasso:warmup');
 
-        self::assertSame(Command::SUCCESS, $warmup->execute(['paths' => ['photo.jpg'], '--preset' => ['remote']]));
-        self::assertStringContainsString('only local transformers (Glide) can be warmed up', (string) preg_replace('/\s+/', ' ', $warmup->getDisplay()));
+        self::assertSame(Command::SUCCESS, $warmup->execute(['paths' => [$path], ...$options]));
+        $display = (string) preg_replace('/\s+/', ' ', $warmup->getDisplay());
+        self::assertStringContainsString('only local transformers (Glide) can be warmed up', $display);
+        self::assertStringContainsString('Served 0 variants of 1 image.', $display);
+    }
+
+    /**
+     * @return iterable<string, array{string, array<string, mixed>}>
+     */
+    public static function provideVariantsRenderedElsewhere(): iterable
+    {
+        yield 'no route matches the Imgix URL path' => ['2x3.png', ['--preset' => ['remote']]];
+        yield 'an application route matches the Imgix URL path' => ['photo.jpg', ['--preset' => ['remote']]];
+        yield 'the URLs have no path' => ['photo.jpg', ['--transformer' => 'query', '--width' => '40']];
+    }
+
+    public function testCommandsReadThePathsFromTheStandardInput(): void
+    {
+        $kernel = self::bootKernel();
+
+        $warmup = $this->command($kernel, 'picasso:warmup');
+        $warmup->setInputs(['photo.jpg', '', 'pixel.gif']);
+        self::assertSame(Command::SUCCESS, $warmup->execute(['--width' => '40']));
+        self::assertStringContainsString('of 2 images.', $warmup->getDisplay());
+        self::assertDirectoryExists($kernel->getCacheDir() . '/glide/pixel.gif');
+
+        $purge = $this->command($kernel, 'picasso:purge');
+        $purge->setInputs(['photo.jpg', 'pixel.gif']);
+        self::assertSame(Command::SUCCESS, $purge->execute([]));
+        self::assertStringContainsString('Purged 2 images.', $purge->getDisplay());
+        self::assertDirectoryDoesNotExist($kernel->getCacheDir() . '/glide/pixel.gif');
+    }
+
+    #[DataProvider('provideCommands')]
+    public function testCommandsWithoutPathsFail(string $name, string $error): void
+    {
+        $command = $this->command(self::bootKernel(), $name);
+        $command->setInputs(['']);
+
+        self::assertSame(Command::INVALID, $command->execute([]));
+        self::assertStringContainsString($error, (string) preg_replace('/\s+/', ' ', $command->getDisplay()));
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function provideCommands(): iterable
+    {
+        yield 'warmup' => ['picasso:warmup', 'Give the paths of the images to warm up, as arguments or on the standard input.'];
+        yield 'purge' => ['picasso:purge', 'Give the paths of the images to purge, as arguments or on the standard input.'];
+    }
+
+    public function testWarmupReportsImagesItCannotRender(): void
+    {
+        $warmup = $this->command(self::bootKernel(), 'picasso:warmup');
+
+        self::assertSame(Command::FAILURE, $warmup->execute(['paths' => ['photo.jpg'], '--preset' => ['nope']]));
+        $display = (string) preg_replace('/\s+/', ' ', $warmup->getDisplay());
+        self::assertStringContainsString('photo.jpg: Preset "nope" not found.', $display);
+        self::assertStringContainsString('Served 0 variants, 1 failed.', $display);
+    }
+
+    #[DataProvider('provideTransformersWithoutPurge')]
+    public function testPurgeReportsImagesItCannotPurge(string $transformer, string $error): void
+    {
+        $purge = $this->command(self::bootKernel(), 'picasso:purge');
+
+        self::assertSame(Command::FAILURE, $purge->execute(['paths' => ['photo.jpg'], '--transformer' => $transformer]));
+        $display = (string) preg_replace('/\s+/', ' ', $purge->getDisplay());
+        self::assertStringContainsString('photo.jpg: ' . $error, $display);
+        self::assertStringContainsString('1 of 1 images could not be purged.', $display);
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function provideTransformersWithoutPurge(): iterable
+    {
+        yield 'transformer without purge' => ['query', 'Transformer "query" does not support cache purging.'];
+        yield 'imgix without api key' => ['imgix', 'Imgix purge requires an "api_key" to be configured.'];
     }
 
     public function testWarmupReportsMissingImages(): void

@@ -176,6 +176,23 @@ class GlideTransformerServeTest extends TestCase
         self::assertSame('image/webp', $response->headers->get('Content-Type'));
     }
 
+    public function testServeReadsWatermarksFromFlysystemStorage(): void
+    {
+        $watermarks = new CountingFilesystem(__DIR__ . '/../Fixtures');
+        $transformer = $this->createTransformer($this->tempDir . '/cache', $this->createRegistryOf('marks.storage', $watermarks), watermarks: 'marks.storage');
+
+        $response = $transformer->serve(
+            $this->createLoader(__DIR__ . '/../Fixtures'),
+            'photo.jpg',
+            $this->createSignedRequest('photo.jpg', ['w' => '10', 'fm' => 'png', 'mark' => 'pixel.gif']),
+            ['transformer' => 'glide', 'loader' => 'filesystem'],
+        );
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('image/png', $response->headers->get('Content-Type'));
+        self::assertSame(1, $watermarks->calls['read'] ?? 0, 'the watermark is read from the named Flysystem storage, not from a "marks.storage" directory');
+    }
+
     public function testServeReadsSourceFromCustomImageSource(): void
     {
         $contents = (string) file_get_contents(__DIR__ . '/../Fixtures/photo.jpg');
@@ -1025,7 +1042,7 @@ class GlideTransformerServeTest extends TestCase
         return sprintf('%04o', fileperms($path) & 0o777);
     }
 
-    private function createTransformer(string $cache, ?FlysystemRegistry $flysystemRegistry = null, bool $publicCache = false, string $cachePrefix = '', ?DeferredCacheWriter $deferredCacheWriter = null, ?LockFactory $lockFactory = null, string $driver = 'gd', float $lockWait = 10.0): GlideTransformer
+    private function createTransformer(string $cache, ?FlysystemRegistry $flysystemRegistry = null, bool $publicCache = false, string $cachePrefix = '', ?DeferredCacheWriter $deferredCacheWriter = null, ?LockFactory $lockFactory = null, string $driver = 'gd', float $lockWait = 10.0, ?string $watermarks = null): GlideTransformer
     {
         $router = self::createStub(UrlGeneratorInterface::class);
         $router->method('generate')->willReturnCallback(static function (string $name, array $params): string {
@@ -1054,6 +1071,7 @@ class GlideTransformerServeTest extends TestCase
             $lockFactory,
             30.0,
             $lockWait,
+            $watermarks,
         );
     }
 

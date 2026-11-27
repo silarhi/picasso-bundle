@@ -85,16 +85,11 @@ final readonly class ImageSourceFlysystemAdapter implements FilesystemAdapter
         $stream = $this->readStream($path);
 
         try {
-            $contents = stream_get_contents($stream);
+            // Without an offset, stream_get_contents() returns a string, empty when nothing can be read
+            return (string) stream_get_contents($stream);
         } finally {
             fclose($stream);
         }
-
-        if (false === $contents) {
-            throw UnableToReadFile::fromLocation($path, 'The stream could not be read.');
-        }
-
-        return $contents;
     }
 
     public function readStream(string $path)

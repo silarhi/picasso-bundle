@@ -42,6 +42,8 @@ class ModifiersTest extends TestCase
         yield 'no rotation' => [['or' => 0], 'orient=1'];
         // Glide rotates counter-clockwise, Imgix's degree aliases clockwise
         yield 'rotation' => [['or' => 90], 'orient=270'];
+        yield 'half turn' => [['or' => 180], 'orient=180'];
+        yield 'rotation the other way' => [['or' => '270'], 'orient=90'];
         yield 'flip both' => [['flip' => 'both'], 'flip=hv'];
         yield 'flip' => [['flip' => 'h'], 'flip=h'];
         yield 'crop rectangle' => [['crop' => '100,50,10,20'], 'rect=10%2C20%2C100%2C50'];
