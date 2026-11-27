@@ -22,15 +22,18 @@ use Silarhi\PicassoBundle\DataCollector\Dto\Totals;
 use Silarhi\PicassoBundle\DataCollector\Dto\UrlEntry;
 use Silarhi\PicassoBundle\Dto\ImageRenderData;
 use Silarhi\PicassoBundle\Dto\ImageTransformation;
-use Symfony\Bundle\FrameworkBundle\DataCollector\AbstractDataCollector;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\DataCollector\DataCollector;
 use Throwable;
 
 /**
  * Collects Picasso image operations for the Symfony web profiler.
+ *
+ * It extends the DataCollector of symfony/http-kernel, not the AbstractDataCollector of the framework, so loading it
+ * needs no symfony/framework-bundle: the "data_collector" tag of the bundle gives the profiler its id and template.
  */
-final class PicassoDataCollector extends AbstractDataCollector
+final class PicassoDataCollector extends DataCollector
 {
     /** @var list<RenderEntry> */
     private array $renders = [];
@@ -133,7 +136,9 @@ final class PicassoDataCollector extends AbstractDataCollector
         return 'picasso';
     }
 
-    #[Override]
+    /**
+     * The profiler template, also given by the "data_collector" tag.
+     */
     public static function getTemplate(): string
     {
         return '@Picasso/Collector/picasso.html.twig';

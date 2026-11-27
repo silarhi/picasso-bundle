@@ -51,6 +51,7 @@ use Silarhi\PicassoBundle\Service\UrlAliases;
 use Silarhi\PicassoBundle\Source\FlysystemImageSource;
 use Silarhi\PicassoBundle\Source\ImageSourceInterface;
 use Silarhi\PicassoBundle\Source\LocalImageSource;
+use Silarhi\PicassoBundle\Tests\Fixtures\ServiceLocator;
 use Silarhi\PicassoBundle\Tests\Source\Stub\ObjectStoreFailures;
 use Silarhi\PicassoBundle\Tests\Transformer\Stub\CountingFilesystem;
 use Silarhi\PicassoBundle\Tests\Transformer\Stub\RacyCacheAdapter;
@@ -61,7 +62,6 @@ use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 use function sprintf;
 use function strlen;
 
-use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\Filesystem\Filesystem as SymfonyFilesystem;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;

@@ -27,13 +27,13 @@ use Silarhi\PicassoBundle\Service\TransformerRegistry;
 use Silarhi\PicassoBundle\Service\UrlAliases;
 use Silarhi\PicassoBundle\Tests\Fixtures\CollectsDeprecationsTrait;
 use Silarhi\PicassoBundle\Tests\Fixtures\LegacyMetadataToken;
+use Silarhi\PicassoBundle\Tests\Fixtures\ServiceLocator;
 use Silarhi\PicassoBundle\Transformer\GlideSignature;
 use Silarhi\PicassoBundle\Transformer\GlideTransformer;
 use Silarhi\PicassoBundle\Transformer\LocalTransformerInterface;
 
 use function sprintf;
 
-use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;

@@ -12,6 +12,11 @@ sidebar:
 | PHP                                                                                           | 8.2+            |
 | Symfony                                                                                       | 6.4, 7.x or 8.x |
 
+Installing the bundle pulls `symfony/http-foundation`, `symfony/http-kernel` and `symfony/routing`, not the framework:
+registering `PicassoBundle` needs `symfony/framework-bundle`, which every Symfony application has. Without it, build
+the loaders, transformers and `ImageHelper` by hand, see
+[Without the bundle](https://github.com/silarhi/picasso-bundle#without-the-bundle).
+
 ## Optional Dependencies
 
 | Package                                   | Required for                                                                 |
@@ -22,6 +27,7 @@ sidebar:
 | `intervention/image-driver-vips`          | Glide `vips` driver ([libvips](/transformers/glide/#choosing-a-driver))                          |
 | `symfony/lock`                            | Glide `lock` option ([one render per variant](/transformers/glide/#rendering-each-variant-once)) |
 | `symfony/web-link`                        | [Preloading priority images](/guides/priority-images/#preloading)          |
+| `symfony/console`                         | The [`picasso:warmup`](/guides/cache-warmup/) and [`picasso:purge`](/guides/cache-purge/) commands |
 | `kornrunner/blurhash` + `imagine/imagine` | BlurHash placeholder                                                         |
 | `league/flysystem-bundle`                 | Flysystem loader                                                             |
 | `vich/uploader-bundle`                    | VichUploader loader                                                          |

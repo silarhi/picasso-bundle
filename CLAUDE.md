@@ -9,7 +9,10 @@ PicassoBundle is a Symfony bundle that provides responsive image components, ins
 ## Tech Stack
 
 - **Language**: PHP 8.2+
-- **Framework**: Symfony 6.4 / 7.0 / 8.0
+- **Framework**: Symfony 6.4 / 7.0 / 8.0; the runtime code requires `symfony/http-foundation`, `symfony/http-kernel`,
+  `symfony/routing`, `symfony/service-contracts`, `symfony/deprecation-contracts` and `psr/container` only
+- **Dev**: `symfony/framework-bundle`, `symfony/dependency-injection`, `symfony/config` (only `PicassoBundle.php` and
+  `src/DependencyInjection/` use them; registering the bundle needs the framework, installing it does not)
 - **Optional**: Symfony UX Twig Component 2.13+ (`<twig:Picasso:Image>`), TwigBundle (Twig functions), League Glide (local transforms), Imgix (CDN transforms), Flysystem, VichUploaderBundle
 
 ## Repository Structure
@@ -64,7 +67,8 @@ templates/
 │   └── Image.html.twig # Twig component template (thin wrapper around image.html.twig)
 └── Collector/
     └── picasso.html.twig # Web profiler toolbar/panel template (opt-in via picasso.collector: true)
-tests/                  # PHPUnit tests mirroring src/ structure
+tests/                  # PHPUnit tests mirroring src/ structure (`unit` suite); tests/Functional/ (kernels) is the
+                        #   `functional` suite; Fixtures/ServiceLocator is the PSR-11 locator of the unit tests
 benchmarks/             # Stress benchmarks (run.php, BenchKernel, CountingStorage) + Dockerfile (official
                         #   php:8.4-cli-alpine with gd, imagick, vips) for Linux numbers; var/ is generated and ignored
 ```
@@ -75,8 +79,11 @@ benchmarks/             # Stress benchmarks (run.php, BenchKernel, CountingStora
 # Install dependencies
 composer install
 
-# Run tests
+# Run tests (both suites; --testsuite unit or --testsuite functional for one)
 vendor/bin/phpunit
+
+# What the "PHPUnit without the bundle dependencies" CI job runs, once the framework, DI and Config are removed
+vendor/bin/phpunit --testsuite unit --exclude-group bundle --no-coverage
 
 # Static analysis (level: max)
 vendor/bin/phpstan analyse
@@ -112,7 +119,11 @@ The JS tooling (husky + lint-staged at the root, the Starlight site in `docs/`) 
 - Uses **Laminas CI Matrix Action** (`.github/workflows/continuous-integration.yml`)
 - Configured extensions: `gd`, `pcov`
 - Ignores PHP platform requirements for PHP 8.4, 8.5, 8.6; PHPUnit is excluded on 8.6 and README Linting is excluded
-- Additional check (`.laminas-ci.json`): `composer validate --strict && composer normalize --dry-run --diff` on lowest PHP with latest dependencies
+- Additional checks (`.laminas-ci.json`, lowest PHP, latest dependencies): `composer validate --strict && composer normalize --dry-run --diff`, and
+  "PHPUnit without the bundle dependencies": it removes `symfony/framework-bundle`, `symfony/dependency-injection`,
+  `symfony/config` and the dev packages requiring them (`league/flysystem-bundle`, `symfony/twig-bundle`,
+  `symfony/ux-twig-component`, `vich/uploader-bundle`), then runs the `unit` suite without the `bundle` group (the
+  `DependencyInjection/` and Vich tests). The `functional` suite (its kernels need the framework) is left out
 - Runs on: `ubuntu-latest`
 - `coverage` job calls the reusable `silarhi/.github/.github/workflows/coverage-report.yml@main` (uploads `coverage/clover.xml` from the latest-deps PHPUnit jobs); a `CI passed` gate job aggregates `matrix` + `qa`
 
@@ -182,7 +193,7 @@ The JS tooling (husky + lint-staged at the root, the Starlight site in `docs/`) 
     - Keep it that way: no 1.x code in `ImageController`, `serve()`, rendering or the config tree. Dropping 1.x support is deleting these pieces and their wiring.
 - **Metadata resolution** (`resolve_metadata`): Controls whether the `MetadataGuesser` reads image streams to detect dimensions. Configurable globally (default: `false`), per-loader (filesystem and asset_mapper loaders default to `true`), or at runtime via the `resolveMetadata` parameter. To reduce CLS, `width` and `height` attributes are only rendered when **both** are available. When both display dimensions are given, the source is still read if metadata resolution is enabled, only to cap the srcset candidates to the source dimensions (width, and height for a crop: `sourceHeight * width / height`), so nothing is upscaled: the rendered dimensions are never changed by that read. The guesser reads streams progressively (64KB initially, doubling up to a 2MB cap) so dimensions are found even when large EXIF/ICC/XMP segments push the image header past the first read; results are cached under a versioned namespace (`metadata.v2`) in the configured PSR-6 pool.
 - **SrcsetGenerator** builds responsive srcset strings across configured widths and formats.
-- **PicassoDataCollector** is an opt-in `AbstractDataCollector` for the Symfony web profiler. Enabled via the bundle `collector` option (default: `false`). When enabled, the bundle registers `CollectingImageHelper`, a decorator over `ImageHelperInterface` that times every `imageData()` / `imageUrl()` call and forwards the result to the collector, and `CollectingMetadataGuesser`, a decorator over `MetadataGuesserInterface` that records metadata guesses. Recorded entries are stored as typed DTOs in `src/DataCollector/Dto/` (`RenderEntry`, `UrlEntry`, `MetadataEntry`, `Totals`) so the template consumes property access instead of array shapes. Entries record _resolved_ loader/transformer/placeholder names, never `(default)`: render entries read them from `ImageRenderData` (which exposes `loader`, `transformer` and `placeholder` resolved by `ImageHelper`), and URL entries resolve them through `ImagePipeline::resolveLoaderName()` / `resolveTransformerName($transformer, $loaderName)` — the same methods and arguments `ImagePipeline::url()` uses internally. When nothing was recorded (`Totals::$handled`, derived in the DTO together with `headline`), the toolbar item is hidden, the menu entry disabled and the panel replaced by an empty state. The toolbar headline counts `renders + urls` (direct Twig calls); the full panel breaks down each operation type with durations.
+- **PicassoDataCollector** is an opt-in data collector for the Symfony web profiler: it extends the `DataCollector` of `symfony/http-kernel`, not FrameworkBundle's `AbstractDataCollector` (nor its `TemplateAwareDataCollectorInterface`), so the class loads without the framework; the `data_collector` tag gives the profiler its `id` and `template`. Enabled via the bundle `collector` option (default: `false`). When enabled, the bundle registers `CollectingImageHelper`, a decorator over `ImageHelperInterface` that times every `imageData()` / `imageUrl()` call and forwards the result to the collector, and `CollectingMetadataGuesser`, a decorator over `MetadataGuesserInterface` that records metadata guesses. Recorded entries are stored as typed DTOs in `src/DataCollector/Dto/` (`RenderEntry`, `UrlEntry`, `MetadataEntry`, `Totals`) so the template consumes property access instead of array shapes. Entries record _resolved_ loader/transformer/placeholder names, never `(default)`: render entries read them from `ImageRenderData` (which exposes `loader`, `transformer` and `placeholder` resolved by `ImageHelper`), and URL entries resolve them through `ImagePipeline::resolveLoaderName()` / `resolveTransformerName($transformer, $loaderName)` — the same methods and arguments `ImagePipeline::url()` uses internally. When nothing was recorded (`Totals::$handled`, derived in the DTO together with `headline`), the toolbar item is hidden, the menu entry disabled and the panel replaced by an empty state. The toolbar headline counts `renders + urls` (direct Twig calls); the full panel breaks down each operation type with durations.
 - All bundle configuration and service wiring lives in `PicassoBundle.php` (uses `AbstractBundle`).
 
 ## Domain Exceptions
@@ -218,6 +229,14 @@ All bundle exceptions implement `PicassoExceptionInterface` (extends `Throwable`
 ### Dependency Constraints
 
 - **Integration libraries** (symfony/_, league/_, imagine, vich, psr/\*, kornrunner/blurhash) keep **wide version ranges** (e.g. `^6.4 || ^7.0 || ^8.0`) so the CI matrix genuinely tests from the lowest to the latest supported versions. Never bump their floors to the currently installed version.
+- **No framework at runtime.** Only `PicassoBundle.php` and `src/DependencyInjection/` may use
+  `symfony/dependency-injection`, `symfony/config` or FrameworkBundle services (`router`, `cache.app`, `asset_mapper`,
+  `request_stack`, `debug.stopwatch`...); the rest of `src/` never imports `Symfony\Bundle\` nor the DI/Config
+  components, so applications without a kernel build the services by hand (README "Without the bundle"). A package the
+  core always needs goes in `require`; one only an optional feature needs (Glide, Flysystem, Vich, AssetMapper, lock,
+  web-link, console, Twig, PSR-6 cache, stopwatch) stays in `require-dev` + `suggest`, behind a nullable argument or a
+  `class_exists()`/`interface_exists()` check in the bundle class. A test needing DI, Config or a dev package that
+  requires them gets `#[Group('bundle')]`; a test extending a FrameworkBundle class goes in `tests/Functional/`.
 - **QA tools** (php-cs-fixer, phpstan/\*, phpunit, rector, twig-cs-fixer, composer-normalize) are bumped to current versions via `composer bump:tools`.
 - `intervention/image-driver-vips` (Glide `vips` driver) is not a dev dependency on purpose: it pulls `jcupitt/vips`, which needs `ext-ffi` and libvips, absent from the CI images. The driver tests skip when it cannot run; install it locally (`composer require --dev intervention/image-driver-vips` then revert `composer.json`) to run them.
 - `config.bump-after-update` was removed on purpose: it bumped **all** dev dependencies after every `composer update`, including integration libraries — do not re-add it.

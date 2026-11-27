@@ -128,7 +128,9 @@ PicassoBundle solves this the same way Next.js Image did for React:
 ## Requirements
 
 - PHP 8.2+
-- Symfony 6.4, 7.x or 8.x
+- Symfony 6.4, 7.x or 8.x (`symfony/http-foundation`, `symfony/http-kernel`, `symfony/routing`): registering the bundle
+  needs `symfony/framework-bundle`, which every Symfony application has, see [Without the bundle](#without-the-bundle)
+  otherwise
 - [Symfony UX Twig Component](https://symfony.com/bundles/ux-twig-component/current/index.html) 2.13+ for the
   `<twig:Picasso:Image>` component
 
@@ -146,6 +148,63 @@ composer require symfony/ux-twig-component
 # and a transformer: Glide renders the images locally (Imgix needs no extra package)
 composer require league/glide
 ```
+
+### Without the bundle
+
+The bundle class only wires services from its configuration: an application without `symfony/framework-bundle`,
+`symfony/dependency-injection` or `symfony/config` builds them by hand. Here a filesystem loader and Imgix, with the
+defaults of the bundle configuration:
+
+```php
+use Psr\Container\ContainerInterface;
+use Silarhi\PicassoBundle\Loader\FilesystemLoader;
+use Silarhi\PicassoBundle\Service\ImageHelper;
+use Silarhi\PicassoBundle\Service\ImagePipeline;
+use Silarhi\PicassoBundle\Service\LoaderRegistry;
+use Silarhi\PicassoBundle\Service\MetadataGuesser;
+use Silarhi\PicassoBundle\Service\PlaceholderRegistry;
+use Silarhi\PicassoBundle\Service\SrcsetGenerator;
+use Silarhi\PicassoBundle\Service\TransformerRegistry;
+use Silarhi\PicassoBundle\Transformer\ImgixTransformer;
+use Silarhi\PicassoBundle\Twig\Extension\PicassoExtension;
+use Symfony\Contracts\Service\ServiceLocatorTrait;
+
+// The registries take any PSR-11 container: this one comes with symfony/service-contracts
+final class Locator implements ContainerInterface
+{
+    use ServiceLocatorTrait;
+}
+
+$loaders = new LoaderRegistry(
+    new Locator(['uploads' => static fn () => new FilesystemLoader(__DIR__ . '/public/uploads')]),
+    resolveMetadataMap: ['uploads' => true], // read the dimensions of local files
+);
+$transformers = new TransformerRegistry(
+    new Locator(['imgix' => static fn () => new ImgixTransformer('https://example.imgix.net', $_ENV['IMGIX_TOKEN'])]),
+);
+
+$imageHelper = new ImageHelper(
+    new ImagePipeline($loaders, $transformers, 'uploads', 'imgix'),
+    new SrcsetGenerator([640, 750, 828, 1080, 1200, 1920, 2048, 3840], [16, 32, 48, 64, 96, 128, 256, 384], 75, 'contain'),
+    $transformers,
+    new MetadataGuesser(), // give it a PSR-6 pool to cache the dimensions
+    new PlaceholderRegistry(new Locator([])),
+    $loaders,
+    formats: ['avif', 'webp', 'jpg'],
+    defaultQuality: 75,
+    defaultFit: 'contain',
+);
+
+$imageHelper->imageUrl('photo.jpg', width: 800);
+$imageHelper->imageData(src: 'photo.jpg', width: 800, sizes: '(max-width: 768px) 100vw, 800px');
+
+// picasso_image() and the other Twig functions, with twig/twig
+$twigLoader->addPath(__DIR__ . '/vendor/silarhi/picasso-bundle/templates', 'Picasso');
+$twig->addExtension(new PicassoExtension($imageHelper));
+```
+
+Glide serves its images from the `picasso_image` route through `ImageController`, and the profiler panel needs the
+framework: register the bundle for those.
 
 Upgrading from 1.x? Follow [UPGRADE-2.0.md](UPGRADE-2.0.md), or the [upgrade guide](https://picasso-bundle.silarhi.dev/upgrade/from-1x/).
 
