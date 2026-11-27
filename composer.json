@@ -75,7 +75,7 @@
         "symfony/twig-bundle": "^6.4 || ^7.0 || ^8.0",
         "symfony/ux-twig-component": "^2.13 || ^3.0",
         "symfony/web-link": "^6.4 || ^7.0 || ^8.0",
-        "twig/twig": "^3.31.0",
+        "twig/twig": "^3.31.1",
         "vich/uploader-bundle": "^2.9 || ^3.0",
         "vincentlanglet/twig-cs-fixer": "^4.1.2"
     },
